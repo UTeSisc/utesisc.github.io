@@ -73,7 +73,7 @@
 
         // State Panel
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
-        const [editModePanelId, setEditModePanelId] = useState(null);
+        const [editModePanelKp, setEditModePanelKp] = useState(null);
         const [editPanelForm, setEditPanelForm] = useState({});
         const [panelForm, setPanelForm] = useState({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA' });
 
@@ -111,14 +111,15 @@
           if (error) setMsg({ type: 'error', text: 'Gagal mendaftar panel: ' + error.message });
           else { setMsg({ type: 'success', text: 'Panel didaftarkan!' }); setPanelForm({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA' }); fetchData(); }
         };
-        const handleUpdatePanel = async (id) => {
-          const { error } = await supabase.from('panel_penemuduga').update(editPanelForm).eq('id', id);
-          if (error) alert('Gagal mengemas kini: ' + error.message); else { setEditModePanelId(null); fetchData(); }
+        const startEditPanel = (panel) => { setEditModePanelKp(panel.no_kp); setEditPanelForm({ ...panel }); };
+        const handleUpdatePanel = async (kp) => {
+          const { error } = await supabase.from('panel_penemuduga').update(editPanelForm).eq('no_kp', kp);
+          if (error) alert('Gagal mengemas kini: ' + error.message); else { setEditModePanelKp(null); fetchData(); }
         };
-        const handleDeletePanel = async (id, nama) => {
+        const handleDeletePanel = async (kp, nama) => {
           if (!window.confirm(`Pasti memadam profil panel: ${nama}?`)) return;
-          const { error } = await supabase.from('panel_penemuduga').delete().eq('id', id);
-          if (!error) fetchData();
+          const { error } = await supabase.from('panel_penemuduga').delete().eq('no_kp', kp);
+          if (!error) fetchData(); else alert('Gagal memadam: ' + error.message);
         };
 
         // --- PENGURUSAN CALON ---
@@ -145,7 +146,6 @@
           let newStatus = 'HADIR';
           if (statusSemasa === 'HADIR') newStatus = 'TIDAK HADIR';
           else if (statusSemasa === 'TIDAK HADIR') newStatus = 'BELUM';
-          
           await supabase.from('calon').update({ kehadiran: newStatus }).eq('no_kp', kp);
           fetchData();
         };
@@ -163,16 +163,12 @@
         const currentRes = selectedCalon ? getResultForCandidate(selectedCalon.no_kp) : null;
         
         const scoresMap = currentRes ? {
-          skor_bimbingan: ((currentRes.skor_bimbingan || 0) / 5) * 25,
-          skor_instruksional: ((currentRes.skor_instruksional || 0) / 5) * 20,
-          skor_pemikiran_strategik: ((currentRes.skor_pemikiran_strategik || 0) / 5) * 20,
-          skor_analisis_data: ((currentRes.skor_analisis_data || 0) / 5) * 15,
-          skor_interpersonal: ((currentRes.skor_interpersonal || 0) / 5) * 10,
-          skor_evidens: ((currentRes.skor_evidens || 0) / 5) * 10
+          skor_bimbingan: ((currentRes.skor_bimbingan || 0) / 5) * 25, skor_instruksional: ((currentRes.skor_instruksional || 0) / 5) * 20,
+          skor_pemikiran_strategik: ((currentRes.skor_pemikiran_strategik || 0) / 5) * 20, skor_analisis_data: ((currentRes.skor_analisis_data || 0) / 5) * 15,
+          skor_interpersonal: ((currentRes.skor_interpersonal || 0) / 5) * 10, skor_evidens: ((currentRes.skor_evidens || 0) / 5) * 10
         } : { skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 };
         const totalMarkah = currentRes ? currentRes.jumlah_markah : 0;
 
-        // Mendapatkan butiran penuh panel berdasarkan nama panel yang dihantar dalam penilaian
         const panelPenilai = currentRes ? panelList.find(p => p.nama_penuh === currentRes.nama_panel) : null;
 
         const displayedPanels = filterZonPanel === 'SEMUA' ? panelList : panelList.filter(p => p.zon_temuduga === filterZonPanel);
@@ -188,7 +184,6 @@
         const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => c.zon_temuduga === cetakZon).map(c => c.sesi).filter(Boolean))].sort() : [];
         const cetakCalonFiltered = cetakSesi ? calonList.filter(c => c.zon_temuduga === cetakZon && String(c.sesi) === String(cetakSesi)) : [];
 
-        // UI Tabs Navigator
         const TabButton = ({ id, label }) => (
           <button onClick={() => { setActiveTab(id); setMsg({type:'',text:''}); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === id ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
             {label}
@@ -241,25 +236,25 @@
                           </tr>
                         </thead>
                         <tbody>
-                          {displayedPanels.map((p) => editModePanelId === p.id ? (
-                            <tr key={p.id} className="bg-slate-800">
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value})} /></td>
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.no_kp} onChange={e => setEditPanelForm({...editPanelForm, no_kp: e.target.value})} /></td>
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value})} /></td>
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.tempat_bertugas} onChange={e => setEditPanelForm({...editPanelForm, tempat_bertugas: e.target.value})} /></td>
+                          {displayedPanels.map((p) => editModePanelKp === p.no_kp ? (
+                            <tr key={p.no_kp} className="bg-slate-800">
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-slate-400" disabled value={editPanelForm.no_kp} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value.toUpperCase()})} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.tempat_bertugas} onChange={e => setEditPanelForm({...editPanelForm, tempat_bertugas: e.target.value.toUpperCase()})} /></td>
                               <td className="p-2">
-                                <select className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.zon_temuduga} onChange={e => setEditPanelForm({...editPanelForm, zon_temuduga: e.target.value})}>
+                                <select className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.zon_temuduga} onChange={e => setEditPanelForm({...editPanelForm, zon_temuduga: e.target.value})}>
                                   <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
                                 </select>
                               </td>
-                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.id)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelId(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
+                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.no_kp)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelKp(null)} className="bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
                             </tr>
                           ) : (
-                            <tr key={p.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                            <tr key={p.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
                               <td className="p-4 font-bold">{p.nama_penuh}</td><td className="p-4 font-mono text-amber-300">{p.no_kp}</td><td className="p-4">{p.jawatan}</td><td className="p-4">{p.tempat_bertugas}</td>
                               <td className="p-4"><span className="bg-amber-500/20 text-amber-300 px-2 py-1 rounded text-xs font-bold">{p.zon_temuduga}</span></td>
                               <td className="p-4 text-center">
-                                <button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.id, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button>
+                                <button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button>
                               </td>
                             </tr>
                           ))}
@@ -411,7 +406,6 @@
                         <div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400"><h4 className="text-xs font-bold text-center mb-2 uppercase">MARKAH vs KOMPETENSI</h4><RadarChart dataScores={scoresMap} /></div>
                       </div>
                       
-                      {/* RUANG TANDATANGAN PANEL (BAHARU) */}
                       <div className="mt-16 flex justify-end">
                         <div className="w-1/2 md:w-2/5">
                           <p className="font-bold mb-16">Tandatangan Panel Penemuduga:</p>
