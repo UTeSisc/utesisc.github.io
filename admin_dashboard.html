@@ -47,51 +47,22 @@
           chartInstanceRef.current = new Chart(ctx, {
             type: 'radar',
             data: {
-              labels: [
-                'BIMBINGAN PROFESIONAL (25%)',
-                'INSTRUKSIONAL (20%)',
-                'PENGURUSAN STRATEGIK (20%)',
-                'ANALISIS DATA (15%)',
-                'INTERPERSONAL (10%)',
-                'EVIDENS PROFESIONAL (10%)'
-              ],
+              labels: ['BIMBINGAN (25%)', 'INSTRUKSIONAL (20%)', 'STRATEGIK (20%)', 'ANALISIS (15%)', 'INTERPERSONAL (10%)', 'EVIDENS (10%)'],
               datasets: [{
-                label: 'MARKAH KOMPETENSI',
+                label: 'MARKAH',
                 data: [
-                  dataScores.skor_bimbingan || 0,
-                  dataScores.skor_instruksional || 0,
-                  dataScores.skor_pemikiran_strategik || 0,
-                  dataScores.skor_analisis_data || 0,
-                  dataScores.skor_interpersonal || 0,
-                  dataScores.skor_evidens || 0
+                  dataScores.skor_bimbingan || 0, dataScores.skor_instruksional || 0, dataScores.skor_pemikiran_strategik || 0,
+                  dataScores.skor_analisis_data || 0, dataScores.skor_interpersonal || 0, dataScores.skor_evidens || 0
                 ],
-                backgroundColor: 'rgba(212, 175, 55, 0.3)',
-                borderColor: '#D4AF37',
-                borderWidth: 3,
-                pointBackgroundColor: '#F59E0B',
-                pointBorderColor: '#FFF',
-                pointRadius: 4
+                backgroundColor: 'rgba(212, 175, 55, 0.3)', borderColor: '#D4AF37', borderWidth: 3, pointBackgroundColor: '#F59E0B'
               }]
             },
-            options: {
-              responsive: true,
-              maintainAspectRatio: false,
-              scales: {
-                r: {
-                  angleLines: { color: '#475569' },
-                  grid: { color: '#334155' },
-                  pointLabels: { font: { size: 10, weight: 'bold' }, color: '#D4AF37' },
-                  suggestedMin: 0,
-                  suggestedMax: 25
-                }
-              },
-              plugins: { legend: { display: false } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { r: { angleLines: { color: '#475569' }, grid: { color: '#334155' }, pointLabels: { font: { size: 9, weight: 'bold' }, color: '#D4AF37' }, suggestedMin: 0, suggestedMax: 25 } }, plugins: { legend: { display: false } } }
           });
           return () => { if (chartInstanceRef.current) chartInstanceRef.current.destroy(); };
         }, [dataScores]);
 
-        return <div className="w-full h-72 relative flex items-center justify-center"><canvas ref={canvasRef}></canvas></div>;
+        return <div className="w-full h-64 relative flex items-center justify-center"><canvas ref={canvasRef}></canvas></div>;
       }
 
       function AdminApp() {
@@ -99,21 +70,31 @@
         const [calonList, setCalonList] = useState([]);
         const [panelList, setPanelList] = useState([]);
         const [resultsList, setResultsList] = useState([]);
-        const [selectedCalon, setSelectedCalon] = useState(null);
 
-        // State Tapisan & Edit Panel
+        // State Panel
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [editModePanelId, setEditModePanelId] = useState(null);
         const [editPanelForm, setEditPanelForm] = useState({});
-
         const [panelForm, setPanelForm] = useState({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA' });
+
+        // State Urus Calon (BAHARU)
+        const [filterZonCalon, setFilterZonCalon] = useState('SEMUA');
+        const [filterSesiCalon, setFilterSesiCalon] = useState('SEMUA');
+        const [editModeCalonKp, setEditModeCalonKp] = useState(null);
+        const [editCalonForm, setEditCalonForm] = useState({});
+        const [calonForm, setCalonForm] = useState({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' });
+
+        // State Cetak & Tetapan
+        const [cetakZon, setCetakZon] = useState('');
+        const [cetakSesi, setCetakSesi] = useState('');
+        const [selectedCalon, setSelectedCalon] = useState(null);
         const [adminEmail, setAdminEmail] = useState('');
         const [msg, setMsg] = useState({ type: '', text: '' });
 
         useEffect(() => { fetchData(); }, []);
 
         const fetchData = async () => {
-          const { data: dataCalon } = await supabase.from('calon').select('*').limit(1000);
+          const { data: dataCalon } = await supabase.from('calon').select('*').order('created_at', { ascending: false });
           if (dataCalon) setCalonList(dataCalon);
           
           const { data: dataPanel } = await supabase.from('panel_penemuduga').select('*').order('created_at', { ascending: false });
@@ -123,58 +104,61 @@
           if (dataSkor) setResultsList(dataSkor);
         };
 
-        // --- FUNGSI TAMBAH PANEL ---
+        // --- PENGURUSAN PANEL ---
         const handleRegisterPanel = async (e) => {
           e.preventDefault();
-          setMsg({ type: '', text: '' });
           const { error } = await supabase.from('panel_penemuduga').insert([panelForm]);
           if (error) setMsg({ type: 'error', text: 'Gagal mendaftar panel: ' + error.message });
-          else {
-            setMsg({ type: 'success', text: 'Profil Panel Penemuduga berjaya didaftarkan!' });
-            setPanelForm({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA' });
-            fetchData();
-          }
+          else { setMsg({ type: 'success', text: 'Panel didaftarkan!' }); setPanelForm({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA' }); fetchData(); }
         };
-
-        // --- FUNGSI KEMASKINI (EDIT) PANEL ---
-        const startEditPanel = (panel) => {
-          setEditModePanelId(panel.id);
-          setEditPanelForm({ ...panel });
-        };
-
         const handleUpdatePanel = async (id) => {
           const { error } = await supabase.from('panel_penemuduga').update(editPanelForm).eq('id', id);
-          if (error) {
-            alert('Gagal mengemas kini: ' + error.message);
-          } else {
-            alert('Maklumat panel berjaya dikemas kini!');
-            setEditModePanelId(null);
-            fetchData();
-          }
+          if (error) alert('Gagal mengemas kini: ' + error.message); else { setEditModePanelId(null); fetchData(); }
         };
-
-        // --- FUNGSI PADAM (DELETE) PANEL ---
         const handleDeletePanel = async (id, nama) => {
-          const isConfirm = window.confirm(`Adakah anda pasti untuk MEMADAM profil panel: ${nama}?`);
-          if (!isConfirm) return;
-
+          if (!window.confirm(`Pasti memadam profil panel: ${nama}?`)) return;
           const { error } = await supabase.from('panel_penemuduga').delete().eq('id', id);
-          if (error) {
-            alert('Gagal memadam panel: ' + error.message);
-          } else {
-            alert('Profil panel berjaya dipadam.');
-            fetchData();
-          }
+          if (!error) fetchData();
         };
 
+        // --- PENGURUSAN CALON (BAHARU) ---
+        const handleRegisterCalon = async (e) => {
+          e.preventDefault();
+          const { error } = await supabase.from('calon').insert([calonForm]);
+          if (error) setMsg({ type: 'error', text: 'Gagal mendaftar calon: ' + error.message });
+          else { 
+            setMsg({ type: 'success', text: 'Calon berjaya didaftarkan!' }); 
+            setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' }); 
+            fetchData(); 
+          }
+        };
+        const handleUpdateCalon = async (kp_lama) => {
+          const { error } = await supabase.from('calon').update(editCalonForm).eq('no_kp', kp_lama);
+          if (error) alert('Gagal mengemas kini calon: ' + error.message); else { setEditModeCalonKp(null); fetchData(); }
+        };
+        const handleDeleteCalon = async (kp, nama) => {
+          if (!window.confirm(`AWAS! Anda pasti memadam calon ini secara kekal?\nNama: ${nama}`)) return;
+          const { error } = await supabase.from('calon').delete().eq('no_kp', kp);
+          if (error) alert('Ralat: ' + error.message); else fetchData();
+        };
+        const handleKehadiranToggle = async (kp, statusSemasa) => {
+          let newStatus = 'HADIR';
+          if (statusSemasa === 'HADIR') newStatus = 'TIDAK HADIR';
+          else if (statusSemasa === 'TIDAK HADIR') newStatus = 'BELUM';
+          
+          await supabase.from('calon').update({ kehadiran: newStatus }).eq('no_kp', kp);
+          fetchData();
+        };
+
+        // --- TETAPAN ---
         const handleResetPassword = async (e) => {
           e.preventDefault();
-          if (!adminEmail) return alert('Sila masukkan emel rasmi admin.');
           const { error } = await supabase.auth.resetPasswordForEmail(adminEmail, { redirectTo: window.location.href });
           if (error) setMsg({ type: 'error', text: 'Gagal menghantar emel: ' + error.message });
-          else setMsg({ type: 'success', text: 'Pautan tetapan semula katalaluan telah dihantar ke emel ' + adminEmail });
+          else setMsg({ type: 'success', text: 'Pautan dihantar ke emel ' + adminEmail });
         };
 
+        // Data Helpers
         const getResultForCandidate = (no_kp) => resultsList.find(r => String(r.no_kp_calon).trim() === String(no_kp).trim());
         const currentRes = selectedCalon ? getResultForCandidate(selectedCalon.no_kp) : null;
         
@@ -186,132 +170,96 @@
           skor_interpersonal: ((currentRes.skor_interpersonal || 0) / 5) * 10,
           skor_evidens: ((currentRes.skor_evidens || 0) / 5) * 10
         } : { skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 };
-        
         const totalMarkah = currentRes ? currentRes.jumlah_markah : 0;
 
-        // Tapis Senarai Panel Mengikut Zon
         const displayedPanels = filterZonPanel === 'SEMUA' ? panelList : panelList.filter(p => p.zon_temuduga === filterZonPanel);
+        const availableZonCalonList = [...new Set(calonList.map(c => c.zon_temuduga).filter(Boolean))].sort();
+        const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || c.zon_temuduga === filterZonCalon).map(c => c.sesi).filter(Boolean))].sort();
+        
+        const displayedCalons = calonList.filter(c => {
+          const matchZon = filterZonCalon === 'SEMUA' || c.zon_temuduga === filterZonCalon;
+          const matchSesi = filterSesiCalon === 'SEMUA' || String(c.sesi) === String(filterSesiCalon);
+          return matchZon && matchSesi;
+        });
+
+        const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => c.zon_temuduga === cetakZon).map(c => c.sesi).filter(Boolean))].sort() : [];
+        const cetakCalonFiltered = cetakSesi ? calonList.filter(c => c.zon_temuduga === cetakZon && String(c.sesi) === String(cetakSesi)) : [];
+
+        // UI Tabs Navigator
+        const TabButton = ({ id, label }) => (
+          <button onClick={() => { setActiveTab(id); setMsg({type:'',text:''}); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === id ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>
+            {label}
+          </button>
+        );
 
         return (
           <div className="min-h-screen flex flex-col">
-            <div className="bg-slate-900 border-b border-amber-500/30 p-4 flex justify-between items-center px-8 shadow-xl no-print">
-              <span className="font-extrabold text-lg text-amber-400 tracking-wider">MODUL ADMIN - SISC+ KPM</span>
-              <div className="flex gap-2">
-                <button onClick={() => {setActiveTab('dashboard'); setMsg({type:'',text:''});}} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Papan Pemuka</button>
-                <button onClick={() => {setActiveTab('cetak'); setMsg({type:'',text:''});}} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'cetak' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Cetak Rumusan KPM</button>
-                <button onClick={() => {setActiveTab('panel'); setMsg({type:'',text:''});}} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'panel' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Daftar Panel</button>
-                <button onClick={() => {setActiveTab('tetapan'); setMsg({type:'',text:''});}} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'tetapan' ? 'bg-amber-500 text-slate-950 shadow-lg' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}>Tetapan</button>
-                <a href="index.html" className="px-4 py-2 rounded-lg text-sm font-bold bg-red-900/80 text-red-200 hover:bg-red-800 transition-all border border-red-500/50 ml-2">Log Keluar</a>
+            <div className="bg-slate-900 border-b border-amber-500/30 p-4 flex flex-wrap gap-4 justify-between items-center px-8 shadow-xl no-print">
+              <span className="font-extrabold text-lg text-amber-400 tracking-wider">MODUL ADMIN SISC+</span>
+              <div className="flex flex-wrap gap-2">
+                <TabButton id="dashboard" label="Papan Pemuka" />
+                <TabButton id="urus_calon" label="Urus Calon" />
+                <TabButton id="cetak" label="Cetak Rumusan" />
+                <TabButton id="panel" label="Daftar Panel" />
+                <TabButton id="tetapan" label="Tetapan" />
+                <a href="index.html" className="px-4 py-2 rounded-lg text-sm font-bold bg-red-900/80 text-red-200 hover:bg-red-800 border border-red-500/50">Log Keluar</a>
               </div>
             </div>
 
             <div className="p-8 max-w-7xl mx-auto w-full flex-grow">
-              {msg.text && (
-                <div className={`p-4 mb-6 rounded-lg text-base font-bold no-print ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
-                  {msg.text}
-                </div>
-              )}
+              {msg.text && ( <div className={`p-4 mb-6 rounded-lg text-base font-bold no-print ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border-red-500' : 'bg-emerald-900/80 text-emerald-200 border-emerald-500'}`}>{msg.text}</div> )}
 
+              {/* TAB 1: PAPAN PEMUKA */}
               {activeTab === 'dashboard' && (
                 <div className="no-print">
-                  <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide mb-6">Papan Pemuka Pengurusan</h1>
+                  <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide mb-6">Statistik & Pengurusan Panel</h1>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow">
-                      <p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Jumlah Calon</p>
-                      <p className="text-5xl font-extrabold text-amber-400 mt-2">{calonList.length}</p>
-                    </div>
-                    <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow">
-                      <p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Panel Penemuduga</p>
-                      <p className="text-5xl font-extrabold text-blue-400 mt-2">{panelList.length}</p>
-                    </div>
-                    <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
-                      <p className="text-slate-400 text-xs uppercase font-bold tracking-wider">Penilaian Selesai</p>
-                      <p className="text-5xl font-extrabold text-emerald-400 mt-2">{resultsList.length}</p>
-                    </div>
-                    <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow">
-                      <p className="text-slate-400 text-xs uppercase font-bold tracking-wider">% Kemajuan</p>
-                      <p className="text-5xl font-extrabold text-amber-300 mt-2">
-                        {calonList.length > 0 ? Math.round((resultsList.length / calonList.length) * 100) : 0}%
-                      </p>
-                    </div>
+                    <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">Jumlah Calon</p><p className="text-5xl font-extrabold text-amber-400 mt-2">{calonList.length}</p></div>
+                    <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">Panel Penemuduga</p><p className="text-5xl font-extrabold text-blue-400 mt-2">{panelList.length}</p></div>
+                    <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">Penilaian Selesai</p><p className="text-5xl font-extrabold text-emerald-400 mt-2">{resultsList.length}</p></div>
+                    <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">% Kemajuan</p><p className="text-5xl font-extrabold text-amber-300 mt-2">{calonList.length > 0 ? Math.round((resultsList.length / calonList.length) * 100) : 0}%</p></div>
                   </div>
 
                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
-                      <h2 className="text-lg font-bold text-amber-400">Senarai Panel Penemuduga Sistem</h2>
-                      
-                      {/* Dropdown Tapisan Zon */}
-                      <div className="flex items-center gap-3 mt-4 md:mt-0">
-                        <label className="text-sm font-bold text-slate-300 uppercase">Tapis Zon:</label>
-                        <select 
-                          className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none"
-                          value={filterZonPanel}
-                          onChange={(e) => setFilterZonPanel(e.target.value)}
-                        >
-                          <option value="SEMUA">Kesemua Zon</option>
-                          <option value="UTARA">Utara</option>
-                          <option value="TIMUR">Timur</option>
-                          <option value="TENGAH">Tengah</option>
-                          <option value="SELATAN">Selatan</option>
-                          <option value="SABAH">Sabah</option>
-                          <option value="SARAWAK">Sarawak</option>
+                      <h2 className="text-lg font-bold text-amber-400">Senarai Panel Penemuduga</h2>
+                      <div className="flex items-center gap-3">
+                        <label className="text-sm font-bold text-slate-300">Tapis Zon:</label>
+                        <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold" value={filterZonPanel} onChange={(e) => setFilterZonPanel(e.target.value)}>
+                          <option value="SEMUA">Kesemua Zon</option><option value="UTARA">Utara</option><option value="TIMUR">Timur</option><option value="TENGAH">Tengah</option><option value="SELATAN">Selatan</option><option value="SABAH">Sabah</option><option value="SARAWAK">Sarawak</option>
                         </select>
                       </div>
                     </div>
-
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-sm border-collapse">
                         <thead>
                           <tr className="bg-slate-950 text-amber-400 uppercase text-xs border-b border-slate-800">
-                            <th className="p-4">Nama Penuh Panel</th>
-                            <th className="p-4">No. KP</th>
-                            <th className="p-4">Jawatan</th>
-                            <th className="p-4">Tempat Bertugas</th>
-                            <th className="p-4">Zon Tugas</th>
-                            <th className="p-4 text-center">Tindakan</th>
+                            <th className="p-4">Nama Panel</th><th className="p-4">No. KP</th><th className="p-4">Jawatan</th><th className="p-4">Lokasi</th><th className="p-4">Zon</th><th className="p-4 text-center">Tindakan</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {displayedPanels.length === 0 ? (
-                            <tr><td colSpan="6" className="p-8 text-center text-slate-500 font-bold">Tiada panel dijumpai untuk zon ini.</td></tr>
+                          {displayedPanels.map((p) => editModePanelId === p.id ? (
+                            <tr key={p.id} className="bg-slate-800">
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value})} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.no_kp} onChange={e => setEditPanelForm({...editPanelForm, no_kp: e.target.value})} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value})} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.tempat_bertugas} onChange={e => setEditPanelForm({...editPanelForm, tempat_bertugas: e.target.value})} /></td>
+                              <td className="p-2">
+                                <select className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs" value={editPanelForm.zon_temuduga} onChange={e => setEditPanelForm({...editPanelForm, zon_temuduga: e.target.value})}>
+                                  <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
+                                </select>
+                              </td>
+                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.id)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelId(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
+                            </tr>
                           ) : (
-                            displayedPanels.map((p) => (
-                              editModePanelId === p.id ? (
-                                /* Paparan Mod Kemas Kini (Edit Inline) */
-                                <tr key={p.id} className="border-b border-slate-700 bg-slate-800/80">
-                                  <td className="p-3"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-slate-100 text-sm" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value})} /></td>
-                                  <td className="p-3"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-slate-100 text-sm font-mono" value={editPanelForm.no_kp} onChange={e => setEditPanelForm({...editPanelForm, no_kp: e.target.value})} /></td>
-                                  <td className="p-3"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-slate-100 text-sm" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value})} /></td>
-                                  <td className="p-3"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-slate-100 text-sm" value={editPanelForm.tempat_bertugas} onChange={e => setEditPanelForm({...editPanelForm, tempat_bertugas: e.target.value})} /></td>
-                                  <td className="p-3">
-                                    <select className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-slate-100 text-sm font-bold" value={editPanelForm.zon_temuduga} onChange={e => setEditPanelForm({...editPanelForm, zon_temuduga: e.target.value})}>
-                                      <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option>
-                                      <option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
-                                    </select>
-                                  </td>
-                                  <td className="p-3 text-center flex flex-col gap-2 justify-center items-center">
-                                    <button onClick={() => handleUpdatePanel(p.id)} className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold px-2 py-1.5 rounded text-xs shadow">Simpan</button>
-                                    <button onClick={() => setEditModePanelId(null)} className="w-full bg-slate-600 hover:bg-slate-500 text-white font-bold px-2 py-1.5 rounded text-xs">Batal</button>
-                                  </td>
-                                </tr>
-                              ) : (
-                                /* Paparan Biasa */
-                                <tr key={p.id} className="border-b border-slate-800 hover:bg-slate-800/50 transition-colors">
-                                  <td className="p-4 font-bold text-slate-100">{p.nama_penuh}</td>
-                                  <td className="p-4 font-mono text-amber-300">{p.no_kp}</td>
-                                  <td className="p-4">{p.jawatan}</td>
-                                  <td className="p-4">{p.tempat_bertugas}</td>
-                                  <td className="p-4"><span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-3 py-1 rounded-full text-xs font-extrabold">{p.zon_temuduga}</span></td>
-                                  <td className="p-4 text-center">
-                                    <div className="flex justify-center gap-2">
-                                      <button onClick={() => startEditPanel(p)} className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white border border-blue-600/50 px-3 py-1.5 rounded text-xs font-bold transition-all">Edit</button>
-                                      <button onClick={() => handleDeletePanel(p.id, p.nama_penuh)} className="bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white border border-red-600/50 px-3 py-1.5 rounded text-xs font-bold transition-all">Padam</button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )
-                            ))
-                          )}
+                            <tr key={p.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                              <td className="p-4 font-bold">{p.nama_penuh}</td><td className="p-4 font-mono text-amber-300">{p.no_kp}</td><td className="p-4">{p.jawatan}</td><td className="p-4">{p.tempat_bertugas}</td>
+                              <td className="p-4"><span className="bg-amber-500/20 text-amber-300 px-2 py-1 rounded text-xs font-bold">{p.zon_temuduga}</span></td>
+                              <td className="p-4 text-center">
+                                <button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.id, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button>
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -319,198 +267,186 @@
                 </div>
               )}
 
+              {/* TAB 2: URUS CALON (FUNGSI BARU SEPENUHNYA) */}
+              {activeTab === 'urus_calon' && (
+                <div className="no-print space-y-8">
+                  {/* Borang Tambah Calon Manual */}
+                  <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
+                    <h2 className="text-xl font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-2">+ Tambah Calon Baharu Secara Manual</h2>
+                    <form onSubmit={handleRegisterCalon} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
+                      <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
+                      <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}>
+                        <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
+                      </select>
+                      <input type="text" placeholder="Kod Sesi (Cth: S1, S2)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value.toUpperCase()})} />
+                      <input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} />
+                      <input type="text" placeholder="SME Subjek (Cth: BM, SC)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} />
+                      <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold rounded p-3 text-sm shadow">DAFTAR CALON</button>
+                    </form>
+                  </div>
+
+                  {/* Senarai & Tapisan Calon */}
+                  <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
+                    <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
+                      <h2 className="text-lg font-bold text-amber-400">Senarai Calon Peserta & Kehadiran</h2>
+                      <div className="flex gap-4">
+                        <select className="p-2 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={filterZonCalon} onChange={(e) => {setFilterZonCalon(e.target.value); setFilterSesiCalon('SEMUA');}}>
+                          <option value="SEMUA">Semua Zon</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}
+                        </select>
+                        <select className="p-2 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={filterSesiCalon} onChange={(e) => setFilterSesiCalon(e.target.value)}>
+                          <option value="SEMUA">Semua Sesi</option>{availableSesiCalonList.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                      <table className="w-full text-left text-sm border-collapse relative">
+                        <thead className="sticky top-0 bg-slate-950 shadow">
+                          <tr className="text-amber-400 uppercase text-xs border-b border-slate-800">
+                            <th className="p-3">Nama Calon</th><th className="p-3">No. KP</th><th className="p-3">Zon & Sesi</th><th className="p-3">PPD</th><th className="p-3 text-center">Kehadiran</th><th className="p-3 text-center">Tindakan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayedCalons.map(c => editModeCalonKp === c.no_kp ? (
+                            /* Mod Kemas Kini Calon */
+                            <tr key={c.no_kp} className="bg-slate-800">
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value})} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td>
+                              <td className="p-2 flex gap-1">
+                                <select className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value})}><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option></select>
+                                <input type="text" className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value})} />
+                              </td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.ppd} onChange={e => setEditCalonForm({...editCalonForm, ppd: e.target.value})} /></td>
+                              <td className="p-2 text-center text-xs text-slate-400">Mod Edit</td>
+                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateCalon(c.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeCalonKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
+                            </tr>
+                          ) : (
+                            /* Paparan Normal Calon */
+                            <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
+                              <td className="p-3 font-bold">{c.nama_penuh}</td><td className="p-3 font-mono text-slate-300">{c.no_kp}</td>
+                              <td className="p-3 text-amber-300 font-bold">{c.zon_temuduga} <span className="text-slate-400 font-normal">/ {c.sesi}</span></td>
+                              <td className="p-3">{c.ppd}</td>
+                              <td className="p-3 text-center">
+                                <button onClick={() => handleKehadiranToggle(c.no_kp, c.kehadiran)} className={`px-3 py-1 rounded text-xs font-bold w-24 transition-colors border ${c.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : c.kehadiran === 'TIDAK HADIR' ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>
+                                  {c.kehadiran || 'BELUM'}
+                                </button>
+                              </td>
+                              <td className="p-3 text-center">
+                                <button onClick={() => { setEditModeCalonKp(c.no_kp); setEditCalonForm({...c}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | 
+                                <button onClick={() => handleDeleteCalon(c.no_kp, c.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: CETAK RUMUSAN */}
               {activeTab === 'cetak' && (
                 <div>
                   <div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print">
                     <div>
-                      <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide">Cetakan Rumusan Skor Rasmi KPM</h1>
-                      <p className="text-slate-300 text-sm mt-1">Pilih calon untuk mencetak borang rumusan.</p>
+                      <h1 className="text-2xl font-extrabold text-amber-400">Cetakan Rumusan Skor</h1>
+                      <p className="text-slate-300 text-sm">Pilih Zon dan Sesi untuk mencari calon.</p>
                     </div>
-                    <button onClick={() => window.print()} disabled={!currentRes} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-lg text-base shadow-lg disabled:opacity-40 transition-all">
-                      🖨️ Cetak Borang
-                    </button>
+                    <button onClick={() => window.print()} disabled={!currentRes} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-lg shadow-lg disabled:opacity-40">🖨️ Cetak Borang</button>
+                  </div>
+                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl mb-8 shadow-sm no-print">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-sm font-bold uppercase text-amber-400 mb-2">1. Pilih Zon</label>
+                        <select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100" value={cetakZon} onChange={(e) => {setCetakZon(e.target.value); setCetakSesi(''); setSelectedCalon(null);}}>
+                          <option value="">-- Pilih Zon --</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold uppercase text-amber-400 mb-2">2. Pilih Sesi</label>
+                        <select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={cetakSesi} disabled={!cetakZon} onChange={(e) => {setCetakSesi(e.target.value); setSelectedCalon(null);}}>
+                          <option value="">-- Pilih Sesi --</option>{cetakSesiList.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-bold uppercase text-amber-400 mb-2">3. Pilih Nama Calon</label>
+                        <select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={selectedCalon?.no_kp || ''} disabled={!cetakSesi} onChange={(e) => setSelectedCalon(calonList.find(c => c.no_kp === e.target.value) || null)}>
+                          <option value="">-- Pilih Calon --</option>{cetakCalonFiltered.map(c => <option key={c.no_kp} value={c.no_kp}>{c.nama_penuh}</option>)}
+                        </select>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl mb-8 shadow-sm no-print">
-                    <label className="block text-sm font-bold uppercase text-amber-400 mb-2">Pilih Calon Peserta</label>
-                    <select 
-                      className="w-full p-4 border border-slate-700 rounded-lg text-base font-semibold bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none"
-                      value={selectedCalon?.no_kp || ''}
-                      onChange={(e) => setSelectedCalon(calonList.find(c => c.no_kp === e.target.value) || null)}
-                    >
-                      <option value="">-- Senarai Calon Berdaftar --</option>
-                      {calonList.map(c => <option key={c.no_kp} value={c.no_kp}>{c.no_kp} - {c.nama_penuh} ({c.zon_temuduga})</option>)}
-                    </select>
-                  </div>
-
+                  {/* Template Borang Cetak */}
                   {selectedCalon && currentRes ? (
-                    <div className="bg-white p-8 border rounded-xl shadow-2xl print-area text-slate-900">
+                    <div className="bg-white p-8 border rounded-xl print-area text-slate-900">
                       <div className="text-center mb-6">
-                        <div className="flex justify-center mb-2">
-                          <img src="https://upload.wikimedia.org/wikipedia/commons/2/26/Coat_of_arms_of_Malaysia.svg" alt="Jata Negara" className="h-16" />
-                        </div>
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/2/26/Coat_of_arms_of_Malaysia.svg" alt="Jata Negara" className="h-16 mx-auto mb-2" />
                         <h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan</h3>
                         <h4 className="text-xs font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
-                        <h2 className="text-base font-extrabold uppercase mt-2 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">
-                          BORANG RUMUSAN SKOR INDIVIDU BAGI SESI TEMU DUGA SISC+<br />KEMENTERIAN PENDIDIKAN
-                        </h2>
+                        <h2 className="text-base font-extrabold uppercase mt-2 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">BORANG RUMUSAN SKOR INDIVIDU TEMU DUGA SISC+</h2>
                       </div>
-                      
                       <table className="w-full text-sm border-collapse border border-slate-400 mb-6 font-semibold">
                         <tbody>
-                          <tr className="border-b border-slate-400">
-                            <td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td>
-                            <td className="p-2.5 border-r border-slate-400 uppercase font-bold" colSpan="3">{selectedCalon.nama_penuh}</td>
-                          </tr>
-                          <tr className="border-b border-slate-400">
-                            <td className="p-2.5 bg-slate-100 border-r border-slate-400">NO KAD PENGENALAN</td>
-                            <td className="p-2.5 border-r border-slate-400 font-mono font-bold" colSpan="3">{selectedCalon.no_kp}</td>
-                          </tr>
-                          <tr className="border-b border-slate-400">
-                            <td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD</td>
-                            <td className="p-2.5 border-r border-slate-400 uppercase" colSpan="3">{selectedCalon.ppd || '-'}</td>
-                          </tr>
-                          <tr>
-                            <td className="p-2.5 bg-slate-100 border-r border-slate-400">MP BM/BI/MT/SC</td>
-                            <td className="p-2.5 uppercase font-bold" colSpan="3">{selectedCalon.sme_subjek}</td>
-                          </tr>
+                          <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td><td className="p-2.5 uppercase font-bold">{selectedCalon.nama_penuh}</td></tr>
+                          <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">NO KAD PENGENALAN</td><td className="p-2.5 font-mono font-bold">{selectedCalon.no_kp}</td></tr>
+                          <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD & SUBJEK</td><td className="p-2.5 uppercase">{selectedCalon.ppd || '-'} ({selectedCalon.sme_subjek || '-'})</td></tr>
                         </tbody>
                       </table>
-
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <div>
                           <table className="w-full text-sm border-collapse border border-slate-400">
-                            <thead>
-                              <tr className="bg-slate-100 border-b border-slate-400 font-bold text-center">
-                                <th className="p-2 border-r border-slate-400 text-left">KOMPETENSI</th>
-                                <th className="p-2 border-r border-slate-400 w-20">MARKAH</th>
-                                <th className="p-2 w-24">KOD SOALAN</th>
-                              </tr>
-                            </thead>
-                            <tbody className="font-semibold">
-                              <tr className="border-b border-slate-400 bg-amber-50">
-                                <td className="p-2 border-r border-slate-400">KOMPETENSI BIMBINGAN (25%)</td>
-                                <td className="p-2 border-r border-slate-400 text-center font-bold">{scoresMap.skor_bimbingan.toFixed(1)}</td>
-                                <td className="p-2 text-center font-mono">P2</td>
-                              </tr>
-                              <tr className="border-b border-slate-400 bg-amber-50">
-                                <td className="p-2 border-r border-slate-400">KOMPETENSI INSTRUKSIONAL (20%)</td>
-                                <td className="p-2 border-r border-slate-400 text-center font-bold">{scoresMap.skor_instruksional.toFixed(1)}</td>
-                                <td className="p-2 text-center font-mono">K4</td>
-                              </tr>
-                              <tr className="border-b border-slate-400 bg-amber-50">
-                                <td className="p-2 border-r border-slate-400">PENGURUSAN STRATEGIK (20%)</td>
-                                <td className="p-2 border-r border-slate-400 text-center font-bold">{scoresMap.skor_pemikiran_strategik.toFixed(1)}</td>
-                                <td className="p-2 text-center font-mono">PS1</td>
-                              </tr>
-                              <tr className="border-b border-slate-400 bg-amber-50">
-                                <td className="p-2 border-r border-slate-400">KOMPETENSI ANALISIS DATA (15%)</td>
-                                <td className="p-2 border-r border-slate-400 text-center font-bold">{scoresMap.skor_analisis_data.toFixed(1)}</td>
-                                <td className="p-2 text-center font-mono">C2</td>
-                              </tr>
-                              <tr className="border-b border-slate-400 bg-amber-50">
-                                <td className="p-2 border-r border-slate-400">KOMPETENSI INTERPERSONAL (10%)</td>
-                                <td className="p-2 border-r border-slate-400 text-center font-bold">{scoresMap.skor_interpersonal.toFixed(1)}</td>
-                                <td className="p-2 text-center font-mono">S3</td>
-                              </tr>
-                              <tr className="border-b border-slate-400 bg-amber-50">
-                                <td className="p-2 border-r border-slate-400">EVIDENS PROFESIONAL (10%)</td>
-                                <td className="p-2 border-r border-slate-400 text-center font-bold">{scoresMap.skor_evidens.toFixed(1)}</td>
-                                <td className="p-2 text-center font-mono">-</td>
-                              </tr>
-                              <tr className="bg-slate-200 font-extrabold">
-                                <td className="p-2 border-r border-slate-400">JUMLAH MARKAH</td>
-                                <td className="p-2 border-r border-slate-400 text-center text-base text-blue-900">{totalMarkah}</td>
-                                <td className="p-2 text-center">100.0</td>
-                              </tr>
+                            <thead><tr className="bg-slate-100 border-b border-slate-400 font-bold text-center"><th className="p-2 border-r border-slate-400 text-left">KOMPETENSI</th><th className="p-2 border-r border-slate-400">MARKAH</th></tr></thead>
+                            <tbody className="font-semibold text-center">
+                              <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">BIMBINGAN (25%)</td><td className="p-2">{scoresMap.skor_bimbingan.toFixed(1)}</td></tr>
+                              <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">INSTRUKSIONAL (20%)</td><td className="p-2">{scoresMap.skor_instruksional.toFixed(1)}</td></tr>
+                              <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">STRATEGIK (20%)</td><td className="p-2">{scoresMap.skor_pemikiran_strategik.toFixed(1)}</td></tr>
+                              <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">ANALISIS DATA (15%)</td><td className="p-2">{scoresMap.skor_analisis_data.toFixed(1)}</td></tr>
+                              <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">INTERPERSONAL (10%)</td><td className="p-2">{scoresMap.skor_interpersonal.toFixed(1)}</td></tr>
+                              <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">EVIDENS (10%)</td><td className="p-2">{scoresMap.skor_evidens.toFixed(1)}</td></tr>
+                              <tr className="bg-slate-200 font-extrabold"><td className="p-2 border-r border-slate-400 text-left">JUMLAH MARKAH</td><td className="p-2 text-base text-blue-900">{totalMarkah}%</td></tr>
                             </tbody>
                           </table>
-                          <div className="mt-4 border border-slate-400 p-3 rounded min-h-[100px] text-sm">
-                            <p className="font-bold underline mb-1">Ulasan Penemuduga:</p>
-                            <p className="italic text-slate-800">{currentRes?.ulasan_panel || '(Tiada ulasan dimasukkan)'}</p>
-                          </div>
+                          <div className="mt-4 border border-slate-400 p-3 rounded min-h-[80px] text-sm"><p className="font-bold underline mb-1">Ulasan:</p><p className="italic text-slate-800">{currentRes?.ulasan_panel || '-'}</p></div>
                         </div>
-
-                        <div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400">
-                          <h4 className="text-xs font-bold text-center mb-2 uppercase tracking-wide">MARKAH vs KOMPETENSI</h4>
-                          <RadarChart dataScores={scoresMap} />
-                        </div>
+                        <div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400"><h4 className="text-xs font-bold text-center mb-2 uppercase">MARKAH vs KOMPETENSI</h4><RadarChart dataScores={scoresMap} /></div>
                       </div>
-
-                      <div className="grid grid-cols-3 gap-6 pt-6 text-sm font-semibold">
-                        <div>
-                          <p className="mb-14">Disediakan oleh,</p><p className="border-b border-slate-400 w-full mb-1"></p>
-                          <p>Nama : <span className="font-bold">{currentRes?.nama_panel || ''}</span></p><p>Tarikh : </p>
-                        </div>
-                        <div>
-                          <p className="mb-14">Disediakan oleh,</p><p className="border-b border-slate-400 w-full mb-1"></p>
-                          <p>Nama : </p><p>Tarikh : </p>
-                        </div>
-                        <div>
-                          <p className="mb-14">Disahkan oleh,</p><p className="border-b border-slate-400 w-full mb-1"></p>
-                          <p>Nama : </p><p>Tarikh : </p>
-                        </div>
-                      </div>
-                      <div className="mt-8 text-xs text-slate-500 italic border-t pt-2 text-center">
-                        Dokumen ini adalah cetakan rasmi Sistem Penilaian SISC+ Kementerian Pendidikan Malaysia.
-                      </div>
+                      <div className="mt-8 text-xs text-slate-500 italic border-t pt-2 text-center">Dokumen cetakan rasmi Sistem SISC+ Kementerian Pendidikan Malaysia. Dinilai oleh: {currentRes?.nama_panel}</div>
                     </div>
                   ) : selectedCalon && !currentRes ? (
-                    <div className="p-10 text-center bg-slate-900 border border-slate-800 rounded-xl text-amber-400 font-bold text-base no-print">
-                      ⚠️ Calon ini belum dinilai oleh panel penemuduga. Borang tidak dapat dijana.
-                    </div>
+                    <div className="p-10 text-center bg-slate-900 border border-slate-800 rounded-xl text-amber-400 font-bold">⚠️ Calon belum dinilai. Borang tidak dapat dijana.</div>
                   ) : null}
                 </div>
               )}
 
+              {/* TAB 4: DAFTAR PANEL */}
               {activeTab === 'panel' && (
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-2xl mx-auto shadow-2xl">
-                  <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Daftar Profil Panel Penemuduga Baharu</h2>
+                  <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Daftar Panel Penemuduga Baharu</h2>
                   <form onSubmit={handleRegisterPanel} className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-bold uppercase text-amber-300 mb-2">Nama Penuh Panel</label>
-                      <input type="text" required placeholder="Cth: DATO' DR. AHMAD BIN HASAN" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-base font-semibold" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({ ...panelForm, nama_penuh: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold uppercase text-amber-300 mb-2">No. Kad Pengenalan</label>
-                      <input type="text" required placeholder="Cth: 750812015543" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-base font-mono font-bold" value={panelForm.no_kp} onChange={(e) => setPanelForm({ ...panelForm, no_kp: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold uppercase text-amber-300 mb-2">Jawatan Semasa</label>
-                      <input type="text" required placeholder="Cth: PEGAWAI SISC+ / TIMBALAN PPD" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-base font-semibold" value={panelForm.jawatan} onChange={(e) => setPanelForm({ ...panelForm, jawatan: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold uppercase text-amber-300 mb-2">Tempat Bertugas</label>
-                      <input type="text" required placeholder="Cth: PPD PONTIAN / JPN JOHOR" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-base font-semibold" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({ ...panelForm, tempat_bertugas: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold uppercase text-amber-300 mb-2">Zon Tugas</label>
-                      <select className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-base font-bold" value={panelForm.zon_temuduga} onChange={(e) => setPanelForm({ ...panelForm, zon_temuduga: e.target.value })}>
-                        <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option>
-                        <option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
-                      </select>
-                    </div>
-                    <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg shadow-lg transition-all">
-                      Daftar Panel Penemuduga
-                    </button>
+                    <input type="text" required placeholder="Nama Penuh" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
+                    <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
+                    <input type="text" required placeholder="Jawatan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
+                    <input type="text" required placeholder="Tempat Bertugas" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
+                    <select className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 font-bold" value={panelForm.zon_temuduga} onChange={(e) => setPanelForm({...panelForm, zon_temuduga: e.target.value})}>
+                      <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
+                    </select>
+                    <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg">Daftar Panel</button>
                   </form>
                 </div>
               )}
 
+              {/* TAB 5: TETAPAN */}
               {activeTab === 'tetapan' && (
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-2xl mx-auto shadow-2xl">
                   <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Tetapan Semula Katalaluan Admin</h2>
                   <form onSubmit={handleResetPassword} className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-bold uppercase text-amber-300 mb-2">Emel Rasmi Admin Supabase</label>
-                      <input type="email" required placeholder="admin.sisc@moe.gov.my" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-base font-semibold" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
-                    </div>
-                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 rounded-xl text-lg shadow-lg transition-all">
-                      Hantar Pautan Ke Emel
-                    </button>
+                    <input type="email" required placeholder="Emel Rasmi (Cth: admin@moe.gov.my)" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+                    <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 rounded-xl text-lg">Hantar Pautan Ke Emel</button>
                   </form>
                 </div>
               )}
+
             </div>
           </div>
         );
