@@ -59,19 +59,27 @@
         const [calonList, setCalonList] = useState([]);
         const [panelList, setPanelList] = useState([]);
         const [resultsList, setResultsList] = useState([]);
+        const [urusSetiaList, setUrusSetiaList] = useState([]);
 
+        // State Panel
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [editModePanelKp, setEditModePanelKp] = useState(null);
         const [editPanelForm, setEditPanelForm] = useState({});
-        // Tambah katalaluan pada state pendaftaran panel
         const [panelForm, setPanelForm] = useState({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA', katalaluan: '' });
 
+        // State Urus Setia
+        const [usForm, setUsForm] = useState({ nama_penuh: '', no_kp: '', katalaluan: '' });
+        const [editModeUsKp, setEditModeUsKp] = useState(null);
+        const [editUsForm, setEditUsForm] = useState({});
+
+        // State Urus Calon
         const [filterZonCalon, setFilterZonCalon] = useState('SEMUA');
         const [filterSesiCalon, setFilterSesiCalon] = useState('SEMUA');
         const [editModeCalonKp, setEditModeCalonKp] = useState(null);
         const [editCalonForm, setEditCalonForm] = useState({});
         const [calonForm, setCalonForm] = useState({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' });
 
+        // State Cetak & Tetapan
         const [cetakZon, setCetakZon] = useState('');
         const [cetakSesi, setCetakSesi] = useState('');
         const [selectedCalon, setSelectedCalon] = useState(null);
@@ -85,10 +93,13 @@
           if (dataCalon) setCalonList(dataCalon);
           const { data: dataPanel } = await supabase.from('panel_penemuduga').select('*').order('created_at', { ascending: false });
           if (dataPanel) setPanelList(dataPanel);
+          const { data: dataUS } = await supabase.from('urus_setia').select('*').order('id', { ascending: false });
+          if (dataUS) setUrusSetiaList(dataUS);
           const { data: dataSkor } = await supabase.from('penilaian_skor').select('*').order('created_at', { ascending: false });
           if (dataSkor) setResultsList(dataSkor);
         };
 
+        // --- PENGURUSAN PANEL ---
         const handleRegisterPanel = async (e) => {
           e.preventDefault();
           const { error } = await supabase.from('panel_penemuduga').insert([panelForm]);
@@ -106,15 +117,30 @@
           if (!error) fetchData(); else alert('Gagal memadam: ' + error.message);
         };
 
+        // --- PENGURUSAN URUS SETIA ---
+        const handleRegisterUS = async (e) => {
+          e.preventDefault();
+          const { error } = await supabase.from('urus_setia').insert([usForm]);
+          if (error) setMsg({ type: 'error', text: 'Gagal mendaftar urus setia: ' + error.message });
+          else { setMsg({ type: 'success', text: 'Akaun Urus Setia didaftarkan!' }); setUsForm({ nama_penuh: '', no_kp: '', katalaluan: '' }); fetchData(); }
+        };
+        const startEditUS = (us) => { setEditModeUsKp(us.no_kp); setEditUsForm({ ...us }); };
+        const handleUpdateUS = async (kp) => {
+          const { error } = await supabase.from('urus_setia').update(editUsForm).eq('no_kp', kp);
+          if (error) alert('Gagal mengemas kini: ' + error.message); else { setEditModeUsKp(null); fetchData(); }
+        };
+        const handleDeleteUS = async (kp, nama) => {
+          if (!window.confirm(`Pasti memadam akaun urus setia: ${nama}?`)) return;
+          const { error } = await supabase.from('urus_setia').delete().eq('no_kp', kp);
+          if (!error) fetchData(); else alert('Gagal memadam: ' + error.message);
+        };
+
+        // --- PENGURUSAN CALON ---
         const handleRegisterCalon = async (e) => {
           e.preventDefault();
           const { error } = await supabase.from('calon').insert([calonForm]);
           if (error) setMsg({ type: 'error', text: 'Gagal mendaftar calon: ' + error.message });
-          else { 
-            setMsg({ type: 'success', text: 'Calon berjaya didaftarkan!' }); 
-            setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' }); 
-            fetchData(); 
-          }
+          else { setMsg({ type: 'success', text: 'Calon berjaya didaftarkan!' }); setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' }); fetchData(); }
         };
         const handleUpdateCalon = async (kp_lama) => {
           const { error } = await supabase.from('calon').update(editCalonForm).eq('no_kp', kp_lama);
@@ -140,6 +166,7 @@
           else setMsg({ type: 'success', text: 'Pautan dihantar ke emel ' + adminEmail });
         };
 
+        // Data Helpers
         const getResultForCandidate = (no_kp) => resultsList.find(r => String(r.no_kp_calon).trim() === String(no_kp).trim());
         const currentRes = selectedCalon ? getResultForCandidate(selectedCalon.no_kp) : null;
         
@@ -181,7 +208,8 @@
                   <TabButton id="dashboard" label="Papan Pemuka" />
                   <TabButton id="urus_calon" label="Urus Calon" />
                   <TabButton id="cetak" label="Cetak Rumusan" />
-                  <TabButton id="panel" label="Daftar Panel" />
+                  <TabButton id="panel" label="Urus Panel" />
+                  <TabButton id="urus_setia" label="Urus Setia" />
                   <TabButton id="tetapan" label="Tetapan" />
                   <a href="index.html" className="px-4 py-2 rounded-lg text-sm font-bold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 ml-2 transition-colors">Log Keluar</a>
                 </div>
@@ -194,12 +222,34 @@
 
               {activeTab === 'dashboard' && (
                 <div className="no-print">
-                  <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide mb-6">Statistik & Pengurusan Panel</h1>
+                  <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide mb-6">Statistik & Pengurusan Sistem</h1>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                     <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">Jumlah Calon</p><p className="text-5xl font-extrabold text-amber-400 mt-2">{calonList.length}</p></div>
                     <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">Panel Penemuduga</p><p className="text-5xl font-extrabold text-blue-400 mt-2">{panelList.length}</p></div>
                     <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">Penilaian Selesai</p><p className="text-5xl font-extrabold text-emerald-400 mt-2">{resultsList.length}</p></div>
                     <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-xl shadow"><p className="text-slate-400 text-xs font-bold uppercase">% Kemajuan</p><p className="text-5xl font-extrabold text-amber-300 mt-2">{calonList.length > 0 ? Math.round((resultsList.length / calonList.length) * 100) : 0}%</p></div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: URUS PANEL */}
+              {activeTab === 'panel' && (
+                <div className="no-print space-y-8">
+                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl shadow-md">
+                    <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">+ Daftar Panel Penemuduga Baharu</h2>
+                    <form onSubmit={handleRegisterPanel} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <input type="text" required placeholder="Nama Penuh" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
+                      <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
+                      <input type="text" required placeholder="Kata Laluan Sementara (Cth: BPG2026)" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.katalaluan} onChange={(e) => setPanelForm({...panelForm, katalaluan: e.target.value})} />
+                      <input type="text" required placeholder="Jawatan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
+                      <input type="text" required placeholder="Tempat Bertugas" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
+                      <div className="flex gap-4">
+                        <select className="w-1/2 p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 font-bold" value={panelForm.zon_temuduga} onChange={(e) => setPanelForm({...panelForm, zon_temuduga: e.target.value})}>
+                          <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
+                        </select>
+                        <button type="submit" className="w-1/2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg">Daftar Panel</button>
+                      </div>
+                    </form>
                   </div>
 
                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
@@ -250,6 +300,54 @@
                 </div>
               )}
 
+              {/* TAB: URUS SETIA (BAHARU) */}
+              {activeTab === 'urus_setia' && (
+                <div className="no-print space-y-8">
+                  <div className="bg-slate-900 border border-blue-500/30 p-8 rounded-xl shadow-md">
+                    <h2 className="text-xl font-bold text-blue-400 mb-6 border-b border-slate-800 pb-3">+ Daftar Akaun Urus Setia Baharu</h2>
+                    <form onSubmit={handleRegisterUS} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <input type="text" required placeholder="Nama Penuh Urus Setia" className="p-4 bg-slate-950 border border-slate-700 rounded-lg text-base text-slate-100 col-span-2" value={usForm.nama_penuh} onChange={e => setUsForm({...usForm, nama_penuh: e.target.value.toUpperCase()})} />
+                      <input type="text" required placeholder="No. Kad Pengenalan / ID" className="p-4 bg-slate-950 border border-slate-700 rounded-lg text-base font-mono text-slate-100" value={usForm.no_kp} onChange={e => setUsForm({...usForm, no_kp: e.target.value})} />
+                      <div className="flex gap-2">
+                        <input type="text" required placeholder="Kata Laluan" className="w-full p-4 bg-slate-950 border border-slate-700 rounded-lg text-base font-mono text-slate-100" value={usForm.katalaluan} onChange={e => setUsForm({...usForm, katalaluan: e.target.value})} />
+                      </div>
+                      <button type="submit" className="md:col-span-4 mt-2 bg-blue-500 hover:bg-blue-600 text-white font-extrabold rounded-xl py-4 text-lg shadow-lg">Daftar Akaun Urus Setia</button>
+                    </form>
+                  </div>
+
+                  <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
+                    <h2 className="text-lg font-bold text-amber-400 mb-6 border-b border-slate-800 pb-4">Senarai Akaun Urus Setia Berdaftar</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm border-collapse">
+                        <thead>
+                          <tr className="bg-slate-950 text-amber-400 uppercase text-xs border-b border-slate-800">
+                            <th className="p-4">Nama Penuh</th><th className="p-4">ID / No. KP</th><th className="p-4">Kata Laluan</th><th className="p-4 text-center">Tindakan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {urusSetiaList.map((u) => editModeUsKp === u.no_kp ? (
+                            <tr key={u.no_kp} className="bg-slate-800">
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-white" value={editUsForm.nama_penuh} onChange={e => setEditUsForm({...editUsForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-slate-400" disabled value={editUsForm.no_kp} /></td>
+                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-white" value={editUsForm.katalaluan} onChange={e => setEditUsForm({...editUsForm, katalaluan: e.target.value})} /></td>
+                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateUS(u.no_kp)} className="bg-emerald-500 text-slate-900 px-3 py-1.5 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeUsKp(null)} className="bg-slate-600 text-white px-3 py-1.5 rounded font-bold text-xs">Batal</button></td>
+                            </tr>
+                          ) : (
+                            <tr key={u.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
+                              <td className="p-4 font-bold text-base">{u.nama_penuh}</td><td className="p-4 font-mono text-amber-300 text-base">{u.no_kp}</td><td className="p-4 font-mono text-slate-300 text-base">{u.katalaluan}</td>
+                              <td className="p-4 text-center">
+                                <button onClick={() => startEditUS(u)} className="text-blue-400 font-bold text-sm mx-2 hover:underline">Edit</button> | <button onClick={() => handleDeleteUS(u.no_kp, u.nama_penuh)} className="text-red-400 font-bold text-sm mx-2 hover:underline">Padam</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: URUS CALON */}
               {activeTab === 'urus_calon' && (
                 <div className="no-print space-y-8">
                   <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
@@ -266,6 +364,7 @@
                       <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold rounded p-3 text-sm shadow">DAFTAR CALON</button>
                     </form>
                   </div>
+
                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
                       <h2 className="text-lg font-bold text-amber-400">Senarai Calon Peserta & Kehadiran</h2>
@@ -301,6 +400,7 @@
                 </div>
               )}
 
+              {/* TAB 3: CETAK RUMUSAN */}
               {activeTab === 'cetak' && (
                 <div>
                   <div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print">
@@ -314,6 +414,8 @@
                       <div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">3. Pilih Nama Calon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={selectedCalon?.no_kp || ''} disabled={!cetakSesi} onChange={(e) => setSelectedCalon(calonList.find(c => c.no_kp === e.target.value) || null)}><option value="">-- Pilih Calon --</option>{cetakCalonFiltered.map(c => <option key={c.no_kp} value={c.no_kp}>{c.nama_penuh}</option>)}</select></div>
                     </div>
                   </div>
+
+                  {/* Template Borang Cetak */}
                   {selectedCalon && currentRes ? (
                     <div className="bg-white p-8 border rounded-xl print-area text-slate-900">
                       <div className="text-center mb-6">
@@ -356,7 +458,7 @@
                           <p className="text-sm mt-3">Tarikh: ________________________</p>
                         </div>
                       </div>
-                      <div className="mt-8 text-xs text-slate-500 italic border-t pt-2 text-center">Dokumen cetakan rasmi Sistem Pengurusan Temuduga SISC+.</div>
+                      <div className="mt-8 text-xs text-slate-500 italic border-t pt-2 text-center">Dokumen cetakan rasmi Sistem Pengurusan Temuduga SISC+. Dicetak melalui Modul Admin.</div>
                     </div>
                   ) : selectedCalon && !currentRes ? (
                     <div className="p-10 text-center bg-slate-900 border border-slate-800 rounded-xl text-amber-400 font-bold">⚠️ Calon belum dinilai. Borang tidak dapat dijana.</div>
@@ -364,34 +466,17 @@
                 </div>
               )}
 
-              {activeTab === 'panel' && (
-                <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-2xl mx-auto shadow-2xl">
-                  <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Daftar Panel Penemuduga Baharu</h2>
-                  <form onSubmit={handleRegisterPanel} className="space-y-6">
-                    <input type="text" required placeholder="Nama Penuh" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
-                    <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
-                    {/* Input untuk Kata Laluan diletakkan di sini */}
-                    <input type="text" required placeholder="Kata Laluan Sementara (Cth: BPG2026)" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.katalaluan} onChange={(e) => setPanelForm({...panelForm, katalaluan: e.target.value})} />
-                    
-                    <input type="text" required placeholder="Jawatan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
-                    <input type="text" required placeholder="Tempat Bertugas" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
-                    <select className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 font-bold" value={panelForm.zon_temuduga} onChange={(e) => setPanelForm({...panelForm, zon_temuduga: e.target.value})}>
-                      <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
-                    </select>
-                    <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg">Daftar Panel</button>
-                  </form>
-                </div>
-              )}
-
+              {/* TAB 4: TETAPAN */}
               {activeTab === 'tetapan' && (
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-2xl mx-auto shadow-2xl">
-                  <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Tetapan Semula Katalaluan Admin</h2>
+                  <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Tetapan Semula Katalaluan Admin Utama</h2>
                   <form onSubmit={handleResetPassword} className="space-y-6">
                     <input type="email" required placeholder="Emel Rasmi (Cth: admin@moe.gov.my)" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
                     <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 rounded-xl text-lg">Hantar Pautan Ke Emel</button>
                   </form>
                 </div>
               )}
+
             </div>
           </div>
         );
