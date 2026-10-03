@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Modul Panel - Sistem SISC+ KPM</title>
+    <title>Modul Panel - Sistem SISC+</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM CDN -->
@@ -33,8 +33,6 @@
         const [selectedKP, setSelectedKP] = useState('');
         const [selectedCalon, setSelectedCalon] = useState(null);
         
-        const [showPanduan, setShowPanduan] = useState(false);
-
         const [scores, setScores] = useState({ 
           skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, 
           skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 
@@ -43,7 +41,6 @@
         const [loading, setLoading] = useState(false);
         const [message, setMessage] = useState({ type: '', text: '' });
 
-        // DATABASE RUBRIK BARS KPM
         const RUBRIK = [
           { 
             id: 'skor_bimbingan', nama: '1. Kompetensi Bimbingan Profesional (25%)', wajaran: 25,
@@ -107,9 +104,6 @@
           return total.toFixed(2);
         };
 
-        // ==========================================
-        // ALGORITMA PENJANA ULASAN PINTAR (AI-RULE BASED)
-        // ==========================================
         const generateUlasanPintar = () => {
           if (Object.values(scores).some(val => val === 0)) {
             alert('Sila klik/pilih kesemua 6 markah kompetensi terlebih dahulu untuk membolehkan sistem menjana ulasan pintar.');
@@ -122,9 +116,7 @@
             skor_interpersonal: 'Kemahiran Interpersonal', skor_evidens: 'Penyediaan Evidens Profesional'
           };
 
-          let kekuatan = [];
-          let kelemahan = [];
-
+          let kekuatan = []; let kelemahan = [];
           Object.keys(scores).forEach(key => {
             if(scores[key] >= 4) kekuatan.push(namaKompetensi[key]);
             else if(scores[key] <= 3 && scores[key] > 0) kelemahan.push(namaKompetensi[key]);
@@ -142,12 +134,10 @@
           if(kekuatan.length > 0) {
             teks += `\n\nKekuatan utama calon amat terserlah dalam elemen ${kekuatan.join(', ')}. Calon berupaya menerangkan proses pelaksanaan berserta contoh yang kukuh.`;
           }
-          
           if(kelemahan.length > 0) {
             teks += `\n\nWalau bagaimanapun, sebagai cadangan penambahbaikan, calon disarankan untuk lebih memfokuskan kepada pengukuhan elemen ${kelemahan.join(', ')} bagi memastikan keberkesanan peranan pembimbing di peringkat akar umbi.`;
           }
-
-          teks += `\n\nSecara keseluruhan, calon ini ${total >= 75 ? 'dinilai BERSEDIA dan LAYAK' : 'memerlukan sedikit pendedahan dan peningkatan sebelum bersedia'} untuk menggalas tanggungjawab sebagai pegawai SISC+ KPM secara optimum.`;
+          teks += `\n\nSecara keseluruhan, calon ini ${total >= 75 ? 'dinilai BERSEDIA dan LAYAK' : 'memerlukan sedikit pendedahan dan peningkatan sebelum bersedia'} untuk menggalas tanggungjawab sebagai pegawai SISC+ secara optimum.`;
 
           setUlasan(teks);
         };
@@ -163,47 +153,46 @@
           const isPassed = total >= 75 && scores.skor_bimbingan >= 3 && scores.skor_instruksional >= 3 && scores.skor_pemikiran_strategik >= 3 && scores.skor_analisis_data >= 3;
 
           const payload = {
-            nama_panel: activePanel.nama_penuh,
-            no_kp_calon: selectedCalon.no_kp,
-            zon: selectedCalon.zon_temuduga,
-            bilik: selectedCalon.bilik_temuduga,
-            ...scores,
-            jumlah_markah: parseFloat(total),
-            status_lulus: isPassed,
-            ulasan_panel: ulasan
+            nama_panel: activePanel.nama_penuh, no_kp_calon: selectedCalon.no_kp, zon: selectedCalon.zon_temuduga,
+            bilik: selectedCalon.bilik_temuduga, ...scores, jumlah_markah: parseFloat(total), status_lulus: isPassed, ulasan_panel: ulasan
           };
 
           const { error } = await supabase.from('penilaian_skor').insert([payload]);
           if (error) {
             setMessage({ type: 'error', text: 'Gagal menyimpan penilaian: ' + error.message });
           } else {
-            // Update Kehadiran calon
             await supabase.from('calon').update({ kehadiran: 'HADIR' }).eq('no_kp', selectedCalon.no_kp);
-
             setMessage({ type: 'success', text: 'Penilaian calon berjaya disimpan secara rasmi!' });
             setScores({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 });
-            setUlasan('');
-            setSelectedCalon(null);
-            setSelectedKP('');
+            setUlasan(''); setSelectedCalon(null); setSelectedKP('');
           }
           setLoading(false);
         };
 
         return (
           <div className="min-h-screen flex flex-col">
-            <div className="bg-slate-900 border-b border-amber-500/30 p-4 flex justify-between items-center px-8 shadow-xl">
-              <span className="font-extrabold text-lg text-amber-400 tracking-wider">MODUL PANEL PENEMUDUGA SISC+</span>
-              <div className="flex gap-3">
-                {activePanel && (
-                  <button onClick={() => { setActivePanel(null); setInputKP(''); setSelectedCalon(null); setMessage({type:'',text:''}); }} className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-800 text-amber-400 border border-amber-500/30 hover:bg-slate-700">
-                    Log Keluar Panel
-                  </button>
-                )}
-                <a href="index.html" className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-800 text-slate-300 hover:bg-slate-700">Kembali Utama</a>
+            
+            {/* HEADER MEWAH BAHARU */}
+            <div className="w-full flex flex-col no-print">
+              <div className="bg-white w-full py-4 px-6 md:px-10 flex flex-col md:flex-row justify-between items-center shadow-md z-10 gap-4">
+                <div className="flex items-center gap-4">
+                  <img src="logo-kpm.png" alt="Logo KPM" className="h-12 object-contain" />
+                  <span className="font-extrabold text-xl text-slate-900 tracking-wider border-l-2 border-slate-300 pl-4 hidden md:block">MODUL PANEL SISC+</span>
+                </div>
+                <div className="flex gap-3">
+                  {activePanel && (
+                    <button onClick={() => { setActivePanel(null); setInputKP(''); setSelectedCalon(null); setMessage({type:'',text:''}); }} className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors">
+                      Log Keluar Panel
+                    </button>
+                  )}
+                  <a href="index.html" className="px-4 py-2 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors">Kembali Utama</a>
+                </div>
               </div>
+              {/* Garisan Pemisah Emas Mewah */}
+              <div className="h-1.5 w-full bg-gradient-to-r from-amber-700 via-amber-300 to-amber-700 shadow-[0_2px_10px_rgba(212,175,55,0.4)]"></div>
             </div>
 
-            <div className="p-6 max-w-5xl mx-auto w-full flex-grow">
+            <div className="p-6 max-w-5xl mx-auto w-full flex-grow mt-4">
               {!activePanel ? (
                 <div className="bg-slate-900 border border-slate-800 p-10 rounded-2xl max-w-lg mx-auto my-12 shadow-2xl">
                   <div className="text-center mb-8">
@@ -267,7 +256,6 @@
                         </div>
                       ))}
 
-                      {/* BAHAGIAN ULASAN PINTAR (DITAMBAH BUTANG JANA AI) */}
                       <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-md">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
                           <label className="block text-sm font-bold uppercase text-amber-400">Ulasan Keseluruhan Penemuduga</label>
