@@ -77,7 +77,7 @@
         const [editPanelForm, setEditPanelForm] = useState({});
         const [panelForm, setPanelForm] = useState({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA' });
 
-        // State Urus Calon (BAHARU)
+        // State Urus Calon
         const [filterZonCalon, setFilterZonCalon] = useState('SEMUA');
         const [filterSesiCalon, setFilterSesiCalon] = useState('SEMUA');
         const [editModeCalonKp, setEditModeCalonKp] = useState(null);
@@ -121,7 +121,7 @@
           if (!error) fetchData();
         };
 
-        // --- PENGURUSAN CALON (BAHARU) ---
+        // --- PENGURUSAN CALON ---
         const handleRegisterCalon = async (e) => {
           e.preventDefault();
           const { error } = await supabase.from('calon').insert([calonForm]);
@@ -171,6 +171,9 @@
           skor_evidens: ((currentRes.skor_evidens || 0) / 5) * 10
         } : { skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 };
         const totalMarkah = currentRes ? currentRes.jumlah_markah : 0;
+
+        // Mendapatkan butiran penuh panel berdasarkan nama panel yang dihantar dalam penilaian
+        const panelPenilai = currentRes ? panelList.find(p => p.nama_penuh === currentRes.nama_panel) : null;
 
         const displayedPanels = filterZonPanel === 'SEMUA' ? panelList : panelList.filter(p => p.zon_temuduga === filterZonPanel);
         const availableZonCalonList = [...new Set(calonList.map(c => c.zon_temuduga).filter(Boolean))].sort();
@@ -267,10 +270,9 @@
                 </div>
               )}
 
-              {/* TAB 2: URUS CALON (FUNGSI BARU SEPENUHNYA) */}
+              {/* TAB 2: URUS CALON */}
               {activeTab === 'urus_calon' && (
                 <div className="no-print space-y-8">
-                  {/* Borang Tambah Calon Manual */}
                   <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
                     <h2 className="text-xl font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-2">+ Tambah Calon Baharu Secara Manual</h2>
                     <form onSubmit={handleRegisterCalon} className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -286,7 +288,6 @@
                     </form>
                   </div>
 
-                  {/* Senarai & Tapisan Calon */}
                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
                       <h2 className="text-lg font-bold text-amber-400">Senarai Calon Peserta & Kehadiran</h2>
@@ -308,7 +309,6 @@
                         </thead>
                         <tbody>
                           {displayedCalons.map(c => editModeCalonKp === c.no_kp ? (
-                            /* Mod Kemas Kini Calon */
                             <tr key={c.no_kp} className="bg-slate-800">
                               <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value})} /></td>
                               <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td>
@@ -321,7 +321,6 @@
                               <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateCalon(c.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeCalonKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
                             </tr>
                           ) : (
-                            /* Paparan Normal Calon */
                             <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
                               <td className="p-3 font-bold">{c.nama_penuh}</td><td className="p-3 font-mono text-slate-300">{c.no_kp}</td>
                               <td className="p-3 text-amber-300 font-bold">{c.zon_temuduga} <span className="text-slate-400 font-normal">/ {c.sesi}</span></td>
@@ -407,11 +406,23 @@
                               <tr className="bg-slate-200 font-extrabold"><td className="p-2 border-r border-slate-400 text-left">JUMLAH MARKAH</td><td className="p-2 text-base text-blue-900">{totalMarkah}%</td></tr>
                             </tbody>
                           </table>
-                          <div className="mt-4 border border-slate-400 p-3 rounded min-h-[80px] text-sm"><p className="font-bold underline mb-1">Ulasan:</p><p className="italic text-slate-800">{currentRes?.ulasan_panel || '-'}</p></div>
+                          <div className="mt-4 border border-slate-400 p-3 rounded min-h-[80px] text-sm"><p className="font-bold underline mb-1">Ulasan:</p><p className="italic text-slate-800 text-justify">{currentRes?.ulasan_panel || '-'}</p></div>
                         </div>
                         <div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400"><h4 className="text-xs font-bold text-center mb-2 uppercase">MARKAH vs KOMPETENSI</h4><RadarChart dataScores={scoresMap} /></div>
                       </div>
-                      <div className="mt-8 text-xs text-slate-500 italic border-t pt-2 text-center">Dokumen cetakan rasmi Sistem SISC+ Kementerian Pendidikan Malaysia. Dinilai oleh: {currentRes?.nama_panel}</div>
+                      
+                      {/* RUANG TANDATANGAN PANEL (BAHARU) */}
+                      <div className="mt-16 flex justify-end">
+                        <div className="w-1/2 md:w-2/5">
+                          <p className="font-bold mb-16">Tandatangan Panel Penemuduga:</p>
+                          <div className="border-b-2 border-slate-800 w-full mb-2"></div>
+                          <p className="font-bold uppercase text-sm">{currentRes?.nama_panel || '-'}</p>
+                          <p className="text-xs uppercase">{panelPenilai ? panelPenilai.jawatan : '-'}</p>
+                          <p className="text-sm mt-3">Tarikh: ________________________</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 text-xs text-slate-500 italic border-t pt-2 text-center">Dokumen cetakan rasmi Sistem SISC+ Kementerian Pendidikan Malaysia.</div>
                     </div>
                   ) : selectedCalon && !currentRes ? (
                     <div className="p-10 text-center bg-slate-900 border border-slate-800 rounded-xl text-amber-400 font-bold">⚠️ Calon belum dinilai. Borang tidak dapat dijana.</div>
