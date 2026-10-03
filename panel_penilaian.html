@@ -4,22 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Modul Panel - Sistem SISC+</title>
-    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- React & ReactDOM CDN -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    <!-- Supabase JS CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Babel Compiler -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
   <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
     <div id="root"></div>
-
     <script type="text/babel">
       const { useState, useEffect } = React;
-
       const SUPABASE_URL = 'https://beyxrxnuuwegkvziglmg.supabase.co';
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
       const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -27,6 +21,8 @@
       function PanelApp() {
         const [activePanel, setActivePanel] = useState(null);
         const [inputKP, setInputKP] = useState('');
+        // Tambahan state untuk kata laluan
+        const [inputKatalaluan, setInputKatalaluan] = useState('');
         
         const [allCandidates, setAllCandidates] = useState([]);
         const [selectedSesi, setSelectedSesi] = useState('');
@@ -42,39 +38,27 @@
         const [message, setMessage] = useState({ type: '', text: '' });
 
         const RUBRIK = [
-          { 
-            id: 'skor_bimbingan', nama: '1. Kompetensi Bimbingan Profesional (25%)', wajaran: 25,
-            deskriptor: { 5: "Mengemudi sesi bimbingan berasaskan keperluan guru secara mendalam. Mencetus perubahan amalan guru.", 4: "Melaksanakan sesi bimbingan secara sistematik dan berkesan.", 3: "Melaksanakan sesi bimbingan mengikut struktur yang ditetapkan.", 2: "Melaksanakan sebahagian langkah bimbingan dengan betul.", 1: "Memberi arahan sebagai pendekatan utama tanpa soalan reflektif." }
-          },
-          { 
-            id: 'skor_instruksional', nama: '2. Kompetensi Instruksional (20%)', wajaran: 20,
-            deskriptor: { 5: "Mentafsir kurikulum dengan tepat dan membimbing guru memilih strategi & pentaksiran selari.", 4: "Mentafsir kurikulum dengan tepat dan mencadangkan strategi pedagogi yang sesuai.", 3: "Menjelaskan struktur utama dokumen kurikulum dengan betul.", 2: "Mengenal pasti sebahagian komponen kurikulum, penerangan masih umum.", 1: "Tidak dapat menjelaskan struktur utama dokumen kurikulum secara berkesan." }
-          },
-          { 
-            id: 'skor_pemikiran_strategik', nama: '3. Kompetensi Pemikiran Strategik (20%)', wajaran: 20,
-            deskriptor: { 5: "Menganalisis isu daripada perspektif sistem dan membina tindakan jangka panjang & pendek mampan.", 4: "Menganalisis isu secara menyeluruh dan menetapkan tindakan yang realistik.", 3: "Mengenal pasti isu utama dengan tepat dan mencadangkan tindakan bersesuaian.", 2: "Mengenal pasti simptom lebih jelas berbanding punca sebenar.", 1: "Cadangan tindakan tidak menjawab punca masalah sebenar." }
-          },
-          { 
-            id: 'skor_analisis_data', nama: '4. Kompetensi Analisis Data (15%)', wajaran: 15,
-            deskriptor: { 5: "Membuat triangulasi pelbagai evidens. Mengenal pasti punca sebenar & menetapkan keutamaan data.", 4: "Menggunakan lebih daripada satu sumber data dan merancang intervensi realistik.", 3: "Menggunakan data yang relevan untuk mengenal pasti isu utama.", 2: "Menggunakan data secara terhad dan keutamaan tindakan tidak jelas.", 1: "Tidak menggunakan data sebagai asas pertimbangan." }
-          },
-          { 
-            id: 'skor_interpersonal', nama: '5. Kompetensi Interpersonal (10%)', wajaran: 10,
-            deskriptor: { 5: "Menyampaikan mesej amat jelas, berempati dan mengawal emosi secara konsisten.", 4: "Menyampaikan mesej tersusun, menunjukkan empati dan mengurus maklum balas profesional.", 3: "Menyampaikan mesej yang difahami dan menunjukkan sikap profesional.", 2: "Menyampaikan jawapan yang kurang tersusun dan kesukaran menyesuaikan gaya komunikasi.", 1: "Menyampaikan mesej tidak jelas dan cenderung bersikap defensif." }
-          },
-          { 
-            id: 'skor_evidens', nama: '6. Evidens Profesional (10%)', wajaran: 10,
-            deskriptor: { 5: "Evidens amat relevan, disahkan, impak intervensi & perubahan guru terbukti jelas.", 4: "Evidens relevan dengan pengalaman bimbingan yang kukuh dan impak dapat dikenal pasti.", 3: "Evidens berkaitan pengalaman profesional dan penglibatan calon jelas.", 2: "Evidens kurang relevan dengan peranan sebenar pembimbing SISC+.", 1: "Evidens sangat minimum dan kesahihan tidak dapat dipastikan." }
-          }
+          { id: 'skor_bimbingan', nama: '1. Kompetensi Bimbingan Profesional (25%)', wajaran: 25, deskriptor: { 5: "Mengemudi sesi bimbingan berasaskan keperluan guru secara mendalam. Mencetus perubahan amalan guru.", 4: "Melaksanakan sesi bimbingan secara sistematik dan berkesan.", 3: "Melaksanakan sesi bimbingan mengikut struktur yang ditetapkan.", 2: "Melaksanakan sebahagian langkah bimbingan dengan betul.", 1: "Memberi arahan sebagai pendekatan utama tanpa soalan reflektif." } },
+          { id: 'skor_instruksional', nama: '2. Kompetensi Instruksional (20%)', wajaran: 20, deskriptor: { 5: "Mentafsir kurikulum dengan tepat dan membimbing guru memilih strategi & pentaksiran selari.", 4: "Mentafsir kurikulum dengan tepat dan mencadangkan strategi pedagogi yang sesuai.", 3: "Menjelaskan struktur utama dokumen kurikulum dengan betul.", 2: "Mengenal pasti sebahagian komponen kurikulum, penerangan masih umum.", 1: "Tidak dapat menjelaskan struktur utama dokumen kurikulum secara berkesan." } },
+          { id: 'skor_pemikiran_strategik', nama: '3. Kompetensi Pemikiran Strategik (20%)', wajaran: 20, deskriptor: { 5: "Menganalisis isu daripada perspektif sistem dan membina tindakan jangka panjang & pendek mampan.", 4: "Menganalisis isu secara menyeluruh dan menetapkan tindakan yang realistik.", 3: "Mengenal pasti isu utama dengan tepat dan mencadangkan tindakan bersesuaian.", 2: "Mengenal pasti simptom lebih jelas berbanding punca sebenar.", 1: "Cadangan tindakan tidak menjawab punca masalah sebenar." } },
+          { id: 'skor_analisis_data', nama: '4. Kompetensi Analisis Data (15%)', wajaran: 15, deskriptor: { 5: "Membuat triangulasi pelbagai evidens. Mengenal pasti punca sebenar & menetapkan keutamaan data.", 4: "Menggunakan lebih daripada satu sumber data dan merancang intervensi realistik.", 3: "Menggunakan data yang relevan untuk mengenal pasti isu utama.", 2: "Menggunakan data secara terhad dan keutamaan tindakan tidak jelas.", 1: "Tidak menggunakan data sebagai asas pertimbangan." } },
+          { id: 'skor_interpersonal', nama: '5. Kompetensi Interpersonal (10%)', wajaran: 10, deskriptor: { 5: "Menyampaikan mesej amat jelas, berempati dan mengawal emosi secara konsisten.", 4: "Menyampaikan mesej tersusun, menunjukkan empati dan mengurus maklum balas profesional.", 3: "Menyampaikan mesej yang difahami dan menunjukkan sikap profesional.", 2: "Menyampaikan jawapan yang kurang tersusun dan kesukaran menyesuaikan gaya komunikasi.", 1: "Menyampaikan mesej tidak jelas dan cenderung bersikap defensif." } },
+          { id: 'skor_evidens', nama: '6. Evidens Profesional (10%)', wajaran: 10, deskriptor: { 5: "Evidens amat relevan, disahkan, impak intervensi & perubahan guru terbukti jelas.", 4: "Evidens relevan dengan pengalaman bimbingan yang kukuh dan impak dapat dikenal pasti.", 3: "Evidens berkaitan pengalaman profesional dan penglibatan calon jelas.", 2: "Evidens kurang relevan dengan peranan sebenar pembimbing SISC+.", 1: "Evidens sangat minimum dan kesahihan tidak dapat dipastikan." } }
         ];
 
         const handleLoginPanel = async (e) => {
           e.preventDefault();
           setMessage({ type: '', text: '' });
-          const { data, error } = await supabase.from('panel_penemuduga').select('*').eq('no_kp', inputKP.trim()).single();
+          
+          // Mengesahkan No. KP dan Kata Laluan serentak
+          const { data, error } = await supabase.from('panel_penemuduga')
+            .select('*')
+            .eq('no_kp', inputKP.trim())
+            .eq('katalaluan', inputKatalaluan.trim())
+            .single();
 
           if (error || !data) {
-            setMessage({ type: 'error', text: 'No. Kad Pengenalan tidak dijumpai. Sila pastikan Urus Setia telah mendaftar anda.' });
+            setMessage({ type: 'error', text: 'Log masuk gagal. Sila pastikan No. Kad Pengenalan dan Kata Laluan dimasukkan dengan tepat.' });
           } else {
             setActivePanel(data);
             fetchCalonByZon(data.zon_temuduga);
@@ -109,19 +93,12 @@
             alert('Sila klik/pilih kesemua 6 markah kompetensi terlebih dahulu untuk membolehkan sistem menjana ulasan pintar.');
             return;
           }
-
-          const namaKompetensi = {
-            skor_bimbingan: 'Bimbingan Profesional', skor_instruksional: 'Kepimpinan Instruksional',
-            skor_pemikiran_strategik: 'Pemikiran Strategik', skor_analisis_data: 'Analisis Data Berkesan',
-            skor_interpersonal: 'Kemahiran Interpersonal', skor_evidens: 'Penyediaan Evidens Profesional'
-          };
-
+          const namaKompetensi = { skor_bimbingan: 'Bimbingan Profesional', skor_instruksional: 'Kepimpinan Instruksional', skor_pemikiran_strategik: 'Pemikiran Strategik', skor_analisis_data: 'Analisis Data Berkesan', skor_interpersonal: 'Kemahiran Interpersonal', skor_evidens: 'Penyediaan Evidens Profesional' };
           let kekuatan = []; let kelemahan = [];
           Object.keys(scores).forEach(key => {
             if(scores[key] >= 4) kekuatan.push(namaKompetensi[key]);
             else if(scores[key] <= 3 && scores[key] > 0) kelemahan.push(namaKompetensi[key]);
           });
-
           const total = parseFloat(calculateTotal());
           let prestasi = '';
           if(total >= 85) prestasi = 'sangat cemerlang dan luar biasa';
@@ -130,15 +107,9 @@
           else prestasi = 'yang masih memerlukan bimbingan menyeluruh';
 
           let teks = `Calon mempamerkan tahap penguasaan yang ${prestasi} sepanjang sesi temu duga ini dengan kefahaman konsep peranan SISC+ yang bersesuaian.`;
-          
-          if(kekuatan.length > 0) {
-            teks += `\n\nKekuatan utama calon amat terserlah dalam elemen ${kekuatan.join(', ')}. Calon berupaya menerangkan proses pelaksanaan berserta contoh yang kukuh.`;
-          }
-          if(kelemahan.length > 0) {
-            teks += `\n\nWalau bagaimanapun, sebagai cadangan penambahbaikan, calon disarankan untuk lebih memfokuskan kepada pengukuhan elemen ${kelemahan.join(', ')} bagi memastikan keberkesanan peranan pembimbing di peringkat akar umbi.`;
-          }
+          if(kekuatan.length > 0) { teks += `\n\nKekuatan utama calon amat terserlah dalam elemen ${kekuatan.join(', ')}. Calon berupaya menerangkan proses pelaksanaan berserta contoh yang kukuh.`; }
+          if(kelemahan.length > 0) { teks += `\n\nWalau bagaimanapun, sebagai cadangan penambahbaikan, calon disarankan untuk lebih memfokuskan kepada pengukuhan elemen ${kelemahan.join(', ')} bagi memastikan keberkesanan peranan pembimbing di peringkat akar umbi.`; }
           teks += `\n\nSecara keseluruhan, calon ini ${total >= 75 ? 'dinilai BERSEDIA dan LAYAK' : 'memerlukan sedikit pendedahan dan peningkatan sebelum bersedia'} untuk menggalas tanggungjawab sebagai pegawai SISC+ secara optimum.`;
-
           setUlasan(teks);
         };
 
@@ -171,8 +142,6 @@
 
         return (
           <div className="min-h-screen flex flex-col">
-            
-            {/* HEADER MEWAH BAHARU */}
             <div className="w-full flex flex-col no-print">
               <div className="bg-white w-full py-4 px-6 md:px-10 flex flex-col md:flex-row justify-between items-center shadow-md z-10 gap-4">
                 <div className="flex items-center gap-4">
@@ -181,14 +150,13 @@
                 </div>
                 <div className="flex gap-3">
                   {activePanel && (
-                    <button onClick={() => { setActivePanel(null); setInputKP(''); setSelectedCalon(null); setMessage({type:'',text:''}); }} className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors">
+                    <button onClick={() => { setActivePanel(null); setInputKP(''); setInputKatalaluan(''); setSelectedCalon(null); setMessage({type:'',text:''}); }} className="px-4 py-2 rounded-lg text-sm font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 transition-colors">
                       Log Keluar Panel
                     </button>
                   )}
                   <a href="index.html" className="px-4 py-2 rounded-lg text-sm font-bold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 transition-colors">Kembali Utama</a>
                 </div>
               </div>
-              {/* Garisan Pemisah Emas Mewah */}
               <div className="h-1.5 w-full bg-gradient-to-r from-amber-700 via-amber-300 to-amber-700 shadow-[0_2px_10px_rgba(212,175,55,0.4)]"></div>
             </div>
 
@@ -197,11 +165,13 @@
                 <div className="bg-slate-900 border border-slate-800 p-10 rounded-2xl max-w-lg mx-auto my-12 shadow-2xl">
                   <div className="text-center mb-8">
                     <h2 className="text-3xl font-extrabold text-amber-400">Log Masuk Panel</h2>
-                    <p className="text-slate-400 text-base mt-2">Sahkan identiti Kad Pengenalan anda.</p>
+                    <p className="text-slate-400 text-base mt-2">Sila masukkan butiran log masuk yang dibekalkan.</p>
                   </div>
                   {message.text && (<div className="p-4 mb-6 rounded text-sm font-bold bg-red-900/80 text-red-200 border border-red-500 text-center">{message.text}</div>)}
                   <form onSubmit={handleLoginPanel} className="space-y-6">
                     <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-4 border border-slate-700 rounded-xl bg-slate-950 text-slate-100 text-lg font-mono font-bold text-center" value={inputKP} onChange={(e) => setInputKP(e.target.value)} />
+                    {/* Tambahan ruangan kata laluan */}
+                    <input type="password" required placeholder="Kata Laluan" className="w-full p-4 border border-slate-700 rounded-xl bg-slate-950 text-slate-100 text-lg font-mono font-bold text-center" value={inputKatalaluan} onChange={(e) => setInputKatalaluan(e.target.value)} />
                     <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg shadow-lg">Sahkan & Masuk</button>
                   </form>
                 </div>
@@ -283,7 +253,6 @@
           </div>
         );
       }
-
       ReactDOM.createRoot(document.getElementById('root')).render(<PanelApp />);
     </script>
   </body>
