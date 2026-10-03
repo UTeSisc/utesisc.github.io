@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Portal Log Masuk - SISC+ KPM</title>
+    <title>Sistem Pengurusan Temuduga SISC+ - Kementerian Pendidikan</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM CDN -->
@@ -12,7 +12,7 @@
     <!-- Babel Compiler -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
-  <body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex items-center justify-center">
+  <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
     <div id="root" class="w-full"></div>
 
     <script type="text/babel">
@@ -20,61 +20,77 @@
 
       function LoginPortal() {
         return (
-          <div className="max-w-5xl mx-auto p-6">
-            {/* Bahagian Pengepala (Header) KPM */}
-            <div className="text-center mb-16">
-              <img src="logo-kpm.png" alt="Logo BPG KPM" className="h-36 mx-auto mb-6 drop-shadow-2xl object-contain" />
-              <h1 className="text-3xl md:text-5xl font-extrabold text-amber-400 tracking-wider mb-3 uppercase drop-shadow-md">
-                Portal Penilaian SISC+
-              </h1>
-              <h2 className="text-lg md:text-xl text-slate-300 font-semibold uppercase tracking-widest">
-                Kementerian Pendidikan Malaysia
-              </h2>
+          <div className="w-full min-h-screen flex flex-col">
+            
+            {/* Bahagian Pengepala (Header) Putih */}
+            <div className="bg-white w-full py-5 flex justify-center items-center shadow-md relative z-10">
+              <img src="logo-kpm.png" alt="Logo Kementerian Pendidikan" className="h-20 object-contain" />
             </div>
+            
+            {/* Garisan Pemisah Emas Mewah */}
+            <div className="h-2 w-full bg-gradient-to-r from-amber-700 via-amber-300 to-amber-700 shadow-[0_5px_20px_rgba(212,175,55,0.4)]"></div>
 
-            {/* Kad Pemilihan Modul Laluan Log Masuk */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              
-              {/* Kad 1: Laluan Panel Penemuduga */}
-              <a href="panel_penilaian.html" className="group bg-slate-900 border border-slate-700 hover:border-amber-400 p-10 rounded-2xl shadow-2xl transition-all duration-300 hover:-translate-y-2 flex flex-col items-center text-center cursor-pointer relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="bg-slate-800 p-5 rounded-full mb-6 group-hover:bg-amber-500/20 transition-colors shadow-inner">
-                  <svg className="w-14 h-14 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                  </svg>
+            {/* Bahagian Kandungan Utama */}
+            <div className="flex-grow flex flex-col items-center justify-center p-6 md:p-12">
+              <div className="max-w-5xl w-full">
+                
+                {/* Tajuk Sistem */}
+                <div className="text-center mb-14 mt-4">
+                  <h1 className="text-3xl md:text-5xl font-extrabold text-amber-400 tracking-wider mb-4 uppercase drop-shadow-lg">
+                    Sistem Pengurusan Temuduga SISC+
+                  </h1>
+                  <h2 className="text-lg md:text-xl text-slate-300 font-bold uppercase tracking-widest">
+                    Kementerian Pendidikan
+                  </h2>
                 </div>
-                <h3 className="text-2xl font-extrabold text-slate-100 mb-3 uppercase tracking-wide">Panel Penemuduga</h3>
-                <p className="text-slate-400 text-base mb-8 leading-relaxed">
-                  Log masuk untuk memilih zon & sesi, menilai calon melalui rubrik BARS, dan menghantar markah rasmi.
-                </p>
-                <span className="mt-auto bg-amber-500 text-slate-950 font-extrabold px-8 py-3.5 rounded-lg w-full group-hover:bg-amber-400 transition-colors shadow-lg text-lg">
-                  Masuk Modul Panel
-                </span>
-              </a>
 
-              {/* Kad 2: Laluan Urus Setia / Admin */}
-              <a href="admin_dashboard.html" className="group bg-slate-900 border border-slate-700 hover:border-amber-400 p-10 rounded-2xl shadow-2xl transition-all duration-300 hover:-translate-y-2 flex flex-col items-center text-center cursor-pointer relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div className="bg-slate-800 p-5 rounded-full mb-6 group-hover:bg-amber-500/20 transition-colors shadow-inner">
-                  <svg className="w-14 h-14 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                  </svg>
+                {/* Kad Pemilihan Modul Laluan Log Masuk */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                  
+                  {/* Kad 1: Laluan Panel Penemuduga */}
+                  <a href="panel_penilaian.html" className="group bg-slate-900 border border-slate-700 hover:border-amber-400 p-10 rounded-2xl shadow-2xl transition-all duration-300 hover:-translate-y-2 flex flex-col items-center text-center cursor-pointer relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="bg-slate-800 p-5 rounded-full mb-6 group-hover:bg-amber-500/20 transition-colors shadow-inner">
+                      <svg className="w-14 h-14 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-2xl font-extrabold text-slate-100 mb-3 uppercase tracking-wide">Panel Penemuduga</h3>
+                    <p className="text-slate-400 text-base mb-8 leading-relaxed">
+                      Log masuk untuk memilih zon & sesi, menilai calon melalui rubrik BARS, dan menjana ulasan.
+                    </p>
+                    <span className="mt-auto bg-amber-500 text-slate-950 font-extrabold px-8 py-3.5 rounded-lg w-full group-hover:bg-amber-400 transition-colors shadow-lg text-lg">
+                      Masuk Modul Panel
+                    </span>
+                  </a>
+
+                  {/* Kad 2: Laluan Urus Setia / Admin */}
+                  <a href="admin_dashboard.html" className="group bg-slate-900 border border-slate-700 hover:border-amber-400 p-10 rounded-2xl shadow-2xl transition-all duration-300 hover:-translate-y-2 flex flex-col items-center text-center cursor-pointer relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div className="bg-slate-800 p-5 rounded-full mb-6 group-hover:bg-amber-500/20 transition-colors shadow-inner">
+                      <svg className="w-14 h-14 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                      </svg>
+                    </div>
+                    <h3 className="text-2xl font-extrabold text-slate-100 mb-3 uppercase tracking-wide">Pentadbir (Admin)</h3>
+                    <p className="text-slate-400 text-base mb-8 leading-relaxed">
+                      Papan pemuka statistik kemajuan, pengurusan panel & calon, dan cetakan borang rumusan skor.
+                    </p>
+                    <span className="mt-auto bg-slate-800 text-amber-400 font-extrabold px-8 py-3.5 rounded-lg w-full group-hover:bg-slate-700 transition-colors border border-amber-500/30 shadow-lg text-lg">
+                      Masuk Modul Admin
+                    </span>
+                  </a>
+
                 </div>
-                <h3 className="text-2xl font-extrabold text-slate-100 mb-3 uppercase tracking-wide">Pentadbir (Admin)</h3>
-                <p className="text-slate-400 text-base mb-8 leading-relaxed">
-                  Papan pemuka statistik kemajuan, pendaftaran profil panel, dan cetakan borang rumusan skor calon.
-                </p>
-                <span className="mt-auto bg-slate-800 text-amber-400 font-extrabold px-8 py-3.5 rounded-lg w-full group-hover:bg-slate-700 transition-colors border border-amber-500/30 shadow-lg text-lg">
-                  Masuk Modul Admin
-                </span>
-              </a>
 
+                {/* Bahagian Footer */}
+                <div className="text-center mt-16 text-sm text-slate-500 tracking-wide font-medium">
+                  <p>&copy; 2026 Hak Cipta Terpelihara Kementerian Pendidikan.</p>
+                  <p className="mt-1">Dibangunkan untuk Pengurusan Temuduga SISC+</p>
+                </div>
+              </div>
             </div>
 
-            <div className="text-center mt-16 text-sm text-slate-600 tracking-wide font-medium">
-              <p>&copy; 2026 Hak Cipta Terpelihara Kementerian Pendidikan Malaysia.</p>
-              <p className="mt-1">Dibangunkan untuk Pengurusan Temu Duga SISC+</p>
-            </div>
           </div>
         );
       }
