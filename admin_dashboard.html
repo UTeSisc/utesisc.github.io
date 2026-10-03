@@ -99,7 +99,6 @@
           if (dataSkor) setResultsList(dataSkor);
         };
 
-        // --- PENGURUSAN PANEL ---
         const handleRegisterPanel = async (e) => {
           e.preventDefault();
           const { error } = await supabase.from('panel_penemuduga').insert([panelForm]);
@@ -117,7 +116,6 @@
           if (!error) fetchData(); else alert('Gagal memadam: ' + error.message);
         };
 
-        // --- PENGURUSAN URUS SETIA ---
         const handleRegisterUS = async (e) => {
           e.preventDefault();
           const { error } = await supabase.from('urus_setia').insert([usForm]);
@@ -135,7 +133,6 @@
           if (!error) fetchData(); else alert('Gagal memadam: ' + error.message);
         };
 
-        // --- PENGURUSAN CALON ---
         const handleRegisterCalon = async (e) => {
           e.preventDefault();
           const { error } = await supabase.from('calon').insert([calonForm]);
@@ -166,7 +163,6 @@
           else setMsg({ type: 'success', text: 'Pautan dihantar ke emel ' + adminEmail });
         };
 
-        // Data Helpers
         const getResultForCandidate = (no_kp) => resultsList.find(r => String(r.no_kp_calon).trim() === String(no_kp).trim());
         const currentRes = selectedCalon ? getResultForCandidate(selectedCalon.no_kp) : null;
         
@@ -232,7 +228,6 @@
                 </div>
               )}
 
-              {/* TAB: URUS PANEL */}
               {activeTab === 'panel' && (
                 <div className="no-print space-y-8">
                   <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl shadow-md">
@@ -258,7 +253,7 @@
                       <div className="flex items-center gap-3">
                         <label className="text-sm font-bold text-slate-300">Tapis Zon:</label>
                         <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold" value={filterZonPanel} onChange={(e) => setFilterZonPanel(e.target.value)}>
-                          <option value="SEMUA">Kesemua Zon</option><option value="UTARA">Utara</option><option value="TIMUR">Timur</option><option value="TENGAH">Tengah</option><option value="SELATAN">Selatan</option><option value="SABAH">Sabah</option><option value="SARAWAK">Sarawak</option>
+                          <option value="SEMUA">Kesemua Zon</option><option value="UTARA">Utara</option><option value="TIMUR">Timur</option><option value="TENGAH">Tengah</option><option value="SELATAN">Selatan</option><option value="SABAH">Sabah</option><option value="SARAWAK">SARAWAK</option>
                         </select>
                       </div>
                     </div>
@@ -300,7 +295,6 @@
                 </div>
               )}
 
-              {/* TAB: URUS SETIA (BAHARU) */}
               {activeTab === 'urus_setia' && (
                 <div className="no-print space-y-8">
                   <div className="bg-slate-900 border border-blue-500/30 p-8 rounded-xl shadow-md">
@@ -347,7 +341,6 @@
                 </div>
               )}
 
-              {/* TAB 2: URUS CALON */}
               {activeTab === 'urus_calon' && (
                 <div className="no-print space-y-8">
                   <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
@@ -356,7 +349,7 @@
                       <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
                       <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
                       <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}>
-                        <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
+                        <option value="UTARA">ZON UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
                       </select>
                       <input type="text" placeholder="Kod Sesi (Cth: S1, S2)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value.toUpperCase()})} />
                       <input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} />
@@ -400,7 +393,6 @@
                 </div>
               )}
 
-              {/* TAB 3: CETAK RUMUSAN */}
               {activeTab === 'cetak' && (
                 <div>
                   <div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print">
@@ -449,16 +441,25 @@
                         </div>
                         <div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400"><h4 className="text-xs font-bold text-center mb-2 uppercase">MARKAH vs KOMPETENSI</h4><RadarChart dataScores={scoresMap} /></div>
                       </div>
-                      <div className="mt-16 flex justify-end">
-                        <div className="w-1/2 md:w-2/5">
-                          <p className="font-bold mb-16">Tandatangan Panel Penemuduga:</p>
-                          <div className="border-b-2 border-slate-800 w-full mb-2"></div>
-                          <p className="font-bold uppercase text-sm">{currentRes?.nama_panel || '-'}</p>
-                          <p className="text-xs uppercase">{panelPenilai ? panelPenilai.jawatan : '-'}</p>
-                          <p className="text-sm mt-3">Tarikh: ________________________</p>
+                      
+                      {/* RUANGAN PENGESAHAN TANPA TANDATANGAN (DIKEMAS KINI) */}
+                      <div className="mt-12 flex justify-between items-end text-sm text-slate-800">
+                        <div>
+                          <p className="font-bold text-slate-500 uppercase text-xs mb-1">Dicetak Oleh:</p>
+                          <p className="font-bold uppercase text-base">PENTADBIR SISTEM (ADMIN)</p>
+                          <p className="uppercase text-xs text-slate-500 mt-0.5">BAHAGIAN PROFESIONALISME GURU</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-slate-500 uppercase text-xs mb-1">Dinilai & Disahkan Oleh:</p>
+                          <p className="font-bold uppercase text-base">{currentRes?.nama_panel || '-'}</p>
+                          <p className="uppercase text-xs text-slate-500 mt-0.5">{panelPenilai ? panelPenilai.jawatan : '-'}</p>
+                          <p className="mt-1 text-xs font-semibold">Tarikh: {currentRes?.created_at ? new Date(currentRes.created_at).toLocaleDateString('en-GB') : '-'}</p>
                         </div>
                       </div>
-                      <div className="mt-8 text-xs text-slate-500 italic border-t pt-2 text-center">Dokumen cetakan rasmi Sistem Pengurusan Temuduga SISC+. Dicetak melalui Modul Admin.</div>
+
+                      <div className="mt-8 text-xs text-slate-400 italic border-t pt-3 text-center">
+                        * Dokumen ini dijana secara automatik oleh Sistem Pengurusan Temuduga SISC+ dan tidak memerlukan tandatangan fizikal.
+                      </div>
                     </div>
                   ) : selectedCalon && !currentRes ? (
                     <div className="p-10 text-center bg-slate-900 border border-slate-800 rounded-xl text-amber-400 font-bold">⚠️ Calon belum dinilai. Borang tidak dapat dijana.</div>
@@ -466,7 +467,6 @@
                 </div>
               )}
 
-              {/* TAB 4: TETAPAN */}
               {activeTab === 'tetapan' && (
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-2xl mx-auto shadow-2xl">
                   <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Tetapan Semula Katalaluan Admin Utama</h2>
