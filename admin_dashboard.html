@@ -28,6 +28,8 @@
       .flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
       .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.75rem; }
       .flip-card-back { transform: rotateY(180deg); }
+      
+      /* Skrol kustom yang elegan */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: #0f172a; }
       ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
@@ -43,7 +45,10 @@
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
       const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      function RadarChartNasional({ results }) {
+      // ==========================================
+      // KOMPONEN CARTA ANALITIK (CHART.JS)
+      // ==========================================
+      function RadarChartKeseluruhan({ results }) {
         const canvasRef = useRef(null);
         const chartInstanceRef = useRef(null);
         useEffect(() => {
@@ -62,7 +67,10 @@
           }
           chartInstanceRef.current = new Chart(ctx, {
             type: 'radar',
-            data: { labels: ['BIMBINGAN', 'INSTRUKSIONAL', 'STRATEGIK', 'ANALISIS', 'INTERPERSONAL', 'EVIDENS'], datasets: [{ label: 'Purata Nasional', data: avgScores, backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', borderWidth: 2, pointBackgroundColor: '#F59E0B' }] },
+            data: { 
+              labels: ['BIMBINGAN', 'INSTRUKSIONAL', 'STRATEGIK', 'ANALISIS', 'INTERPERSONAL', 'EVIDENS'], 
+              datasets: [{ label: 'Purata Keseluruhan', data: avgScores, backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', borderWidth: 2, pointBackgroundColor: '#F59E0B' }] 
+            },
             options: { responsive: true, maintainAspectRatio: false, scales: { r: { angleLines: { color: '#334155' }, grid: { color: '#1e293b' }, pointLabels: { font: { size: 10, weight: 'bold' }, color: '#94a3b8' }, suggestedMin: 0, suggestedMax: 25 } }, plugins: { legend: { display: false } } }
           });
           return () => { if (chartInstanceRef.current) chartInstanceRef.current.destroy(); };
@@ -81,14 +89,20 @@
           const gagal = results.length - lulus;
           chartRef.current = new Chart(ctx, {
             type: 'doughnut',
-            data: { labels: ['Layak (>=75%)', 'Belum Layak'], datasets: [{ data: results.length === 0 ? [1] : [lulus, gagal], backgroundColor: results.length === 0 ? ['#334155'] : ['#10B981', '#BE123C'], borderWidth: 0, hoverOffset: 4 }] },
+            data: { 
+              labels: ['Layak (>=75%)', 'Belum Layak'], 
+              datasets: [{ data: results.length === 0 ? [1] : [lulus, gagal], backgroundColor: results.length === 0 ? ['#334155'] : ['#10B981', '#BE123C'], borderWidth: 0, hoverOffset: 4 }] 
+            },
             options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1' } } } }
           });
           return () => { if (chartRef.current) chartRef.current.destroy(); };
         }, [results]);
         return (
            <div className="w-full h-64 relative flex items-center justify-center">
-              <div className="absolute flex flex-col items-center justify-center pointer-events-none"><span className="text-3xl font-extrabold text-white">{results.length > 0 ? Math.round((results.filter(r=>r.status_lulus).length/results.length)*100) : 0}%</span><span className="text-xs text-slate-400 uppercase tracking-widest">Kadar Lulus</span></div>
+              <div className="absolute flex flex-col items-center justify-center pointer-events-none">
+                 <span className="text-3xl font-extrabold text-white">{results.length > 0 ? Math.round((results.filter(r=>r.status_lulus).length/results.length)*100) : 0}%</span>
+                 <span className="text-xs text-slate-400 uppercase tracking-widest">Kadar Lulus</span>
+              </div>
               <canvas ref={canvasRef}></canvas>
            </div>
         );
@@ -102,11 +116,23 @@
           const ctx = canvasRef.current.getContext('2d');
           if (chartRef.current) chartRef.current.destroy();
           const zons = [...new Set(calonList.map(c => c.zon_temuduga))].sort();
-          const selesaiData = zons.map(z => { const calonZon = calonList.filter(c => c.zon_temuduga === z); return calonZon.filter(c => resultsList.some(r => r.no_kp_calon === c.no_kp)).length; });
-          const belumData = zons.map((z, idx) => { const totalZon = calonList.filter(c => c.zon_temuduga === z).length; return totalZon - selesaiData[idx]; });
+          const selesaiData = zons.map(z => { 
+             const calonZon = calonList.filter(c => c.zon_temuduga === z); 
+             return calonZon.filter(c => resultsList.some(r => r.no_kp_calon === c.no_kp)).length; 
+          });
+          const belumData = zons.map((z, idx) => { 
+             const totalZon = calonList.filter(c => c.zon_temuduga === z).length; 
+             return totalZon - selesaiData[idx]; 
+          });
           chartRef.current = new Chart(ctx, {
             type: 'bar',
-            data: { labels: zons, datasets: [ { label: 'Selesai Dinilai', data: selesaiData, backgroundColor: '#D4AF37' }, { label: 'Belum Dinilai', data: belumData, backgroundColor: '#334155' } ] },
+            data: { 
+              labels: zons, 
+              datasets: [ 
+                { label: 'Selesai Dinilai', data: selesaiData, backgroundColor: '#D4AF37' }, 
+                { label: 'Belum Dinilai', data: belumData, backgroundColor: '#334155' } 
+              ] 
+            },
             options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false }, ticks:{color:'#94a3b8'} }, y: { stacked: true, grid: { color: '#1e293b' }, ticks:{color:'#94a3b8'} } }, plugins: { legend: { position: 'top', labels: { color: '#cbd5e1' } } } }
           });
           return () => { if (chartRef.current) chartRef.current.destroy(); };
@@ -114,6 +140,9 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
+      // ==========================================
+      // APLIKASI UTAMA ADMIN
+      // ==========================================
       function AdminApp() {
         const [activeTab, setActiveTab] = useState('dashboard');
         const [calonList, setCalonList] = useState([]);
@@ -125,7 +154,7 @@
         // Form Penugasan
         const [penugasanForm, setPenugasanForm] = useState({ no_kp_panel: '', zon_bertugas: 'UTARA', sesi_bertugas: 'SESI 1', tarikh_bertugas: '', peranan: 'Panel Penemuduga' });
 
-        // Tapis & Pagination: Penugasan (BAHARU)
+        // Tapis & Pagination: Penugasan 
         const [searchTugas, setSearchTugas] = useState('');
         const [filterZonTugas, setFilterZonTugas] = useState('SEMUA');
         const [pageTugas, setPageTugas] = useState(1);
@@ -219,54 +248,36 @@
         const handleKehadiranToggle = async (kp, statusSemasa) => { let newStatus = 'HADIR'; if (statusSemasa === 'HADIR') newStatus = 'TIDAK HADIR'; else if (statusSemasa === 'TIDAK HADIR') newStatus = 'BELUM'; await supabase.from('calon').update({ kehadiran: newStatus }).eq('no_kp', kp); fetchData(); };
         const handleResetPassword = async (e) => { e.preventDefault(); await supabase.auth.resetPasswordForEmail(adminEmail, { redirectTo: window.location.href }); setMsg({ type: 'success', text: 'Pautan dihantar' }); };
 
-        // DATA HELPER
+        // DATA HELPER & RANKING CALON (TERKINI)
         const getResultForCandidate = (no_kp) => resultsList.find(r => String(r.no_kp_calon).trim() === String(no_kp).trim());
         const currentRes = selectedCalon ? getResultForCandidate(selectedCalon.no_kp) : null;
         const scoresMap = currentRes ? { skor_bimbingan: ((currentRes.skor_bimbingan || 0) / 5) * 25, skor_instruksional: ((currentRes.skor_instruksional || 0) / 5) * 20, skor_pemikiran_strategik: ((currentRes.skor_pemikiran_strategik || 0) / 5) * 20, skor_analisis_data: ((currentRes.skor_analisis_data || 0) / 5) * 15, skor_interpersonal: ((currentRes.skor_interpersonal || 0) / 5) * 10, skor_evidens: ((currentRes.skor_evidens || 0) / 5) * 10 } : { skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 };
         const totalMarkah = currentRes ? currentRes.jumlah_markah : 0;
         const panelPenilai = currentRes ? panelList.find(p => p.nama_penuh === currentRes.nama_panel) : null;
-        const topPanels = panelList.map(p => ({ nama: p.nama_penuh, count: resultsList.filter(r => r.nama_panel === p.nama_penuh).length })).sort((a,b) => b.count - a.count).slice(0, 5);
+        
+        // Ranking 10 Calon Terbaik
+        const top10Calon = [...resultsList].sort((a,b) => b.jumlah_markah - a.jumlah_markah).slice(0, 10);
 
         // PAGINATION & FILTERING SETTINGS
         const ITEMS_PER_PAGE = 10;
-
-        // 1. Pagination Penugasan
-        const filteredPenugasan = penugasanList.filter(tugas => {
-           const pDetail = panelList.find(p => p.no_kp === tugas.no_kp_panel);
-           const namaPanel = pDetail ? pDetail.nama_penuh.toUpperCase() : tugas.no_kp_panel;
-           const matchZon = filterZonTugas === 'SEMUA' || tugas.zon_bertugas === filterZonTugas;
-           const matchSearch = namaPanel.includes(searchTugas.toUpperCase()) || tugas.no_kp_panel.includes(searchTugas);
-           return matchZon && matchSearch;
-        });
+        const filteredPenugasan = penugasanList.filter(tugas => { const pDetail = panelList.find(p => p.no_kp === tugas.no_kp_panel); const namaPanel = pDetail ? pDetail.nama_penuh.toUpperCase() : tugas.no_kp_panel; const matchZon = filterZonTugas === 'SEMUA' || tugas.zon_bertugas === filterZonTugas; const matchSearch = namaPanel.includes(searchTugas.toUpperCase()) || tugas.no_kp_panel.includes(searchTugas); return matchZon && matchSearch; });
         const totalPagesTugas = Math.ceil(filteredPenugasan.length / ITEMS_PER_PAGE) || 1;
         const displayedPenugasan = filteredPenugasan.slice((pageTugas - 1) * ITEMS_PER_PAGE, pageTugas * ITEMS_PER_PAGE);
 
-        // 2. Pagination Profil Panel
-        const filteredPanels = panelList.filter(p => {
-           const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => t.no_kp_panel === p.no_kp && t.zon_bertugas === filterZonPanel);
-           const matchSearch = p.nama_penuh.includes(searchPanel.toUpperCase()) || p.no_kp.includes(searchPanel);
-           return matchZon && matchSearch;
-        });
+        const filteredPanels = panelList.filter(p => { const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => t.no_kp_panel === p.no_kp && t.zon_bertugas === filterZonPanel); const matchSearch = p.nama_penuh.includes(searchPanel.toUpperCase()) || p.no_kp.includes(searchPanel); return matchZon && matchSearch; });
         const totalPagesPanel = Math.ceil(filteredPanels.length / ITEMS_PER_PAGE) || 1;
         const displayedPanels = filteredPanels.slice((pagePanel - 1) * ITEMS_PER_PAGE, pagePanel * ITEMS_PER_PAGE);
 
-        // 3. Pagination Calon
         const availableZonCalonList = [...new Set(calonList.map(c => c.zon_temuduga).filter(Boolean))].sort();
         const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || c.zon_temuduga === filterZonCalon).map(c => c.sesi).filter(Boolean))].sort();
         const showCalonData = searchCalon.trim() !== '' || filterZonCalon !== 'SEMUA';
-        const filteredCalons = calonList.filter(c => { 
-          const matchZon = filterZonCalon === 'SEMUA' || c.zon_temuduga === filterZonCalon; 
-          const matchSesi = filterSesiCalon === 'SEMUA' || String(c.sesi) === String(filterSesiCalon); 
-          const matchSearch = c.nama_penuh.includes(searchCalon.toUpperCase()) || c.no_kp.includes(searchCalon);
-          return matchZon && matchSesi && matchSearch; 
-        });
+        const filteredCalons = calonList.filter(c => { const matchZon = filterZonCalon === 'SEMUA' || c.zon_temuduga === filterZonCalon; const matchSesi = filterSesiCalon === 'SEMUA' || String(c.sesi) === String(filterSesiCalon); const matchSearch = c.nama_penuh.includes(searchCalon.toUpperCase()) || c.no_kp.includes(searchCalon); return matchZon && matchSesi && matchSearch; });
         const totalPagesCalon = Math.ceil(filteredCalons.length / ITEMS_PER_PAGE) || 1;
         const displayedCalons = filteredCalons.slice((pageCalon - 1) * ITEMS_PER_PAGE, pageCalon * ITEMS_PER_PAGE);
 
         const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => c.zon_temuduga === cetakZon).map(c => c.sesi).filter(Boolean))].sort() : [];
         const cetakCalonFiltered = cetakSesi ? calonList.filter(c => c.zon_temuduga === cetakZon && String(c.sesi) === String(cetakSesi)) : [];
 
-        // Auto-reset page when filter changes
         useEffect(() => { setPageTugas(1); }, [searchTugas, filterZonTugas]);
         useEffect(() => { setPagePanel(1); }, [searchPanel, filterZonPanel]);
         useEffect(() => { setPageCalon(1); }, [searchCalon, filterZonCalon, filterSesiCalon]);
@@ -294,18 +305,53 @@
                 <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                   <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide">Pusat Kawalan Eksekutif SISC+</h1>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="flip-card h-36 bg-transparent"><div className="flip-card-inner"><div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Jumlah Calon Daftar</p><p className="text-5xl font-extrabold text-amber-400 mt-2">{calonList.length}</p></div><div className="flip-card-back bg-slate-800 border border-amber-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center"><p className="text-amber-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Zon Tertinggi</p>{availableZonCalonList.slice(0,3).map(z => (<div key={z} className="flex justify-between text-sm text-slate-200"><span>{z}</span><span className="font-bold">{calonList.filter(c=>c.zon_temuduga===z).length}</span></div>))}</div></div></div>
+                    <div className="flip-card h-36 bg-transparent"><div className="flip-card-inner"><div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Jumlah Calon Daftar</p><p className="text-5xl font-extrabold text-amber-400 mt-2">{calonList.length}</p></div><div className="flip-card-back bg-slate-800 border border-amber-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center">
+                       <p className="text-amber-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Bilangan Calon (Zon)</p>
+                       <div className="overflow-y-auto max-h-[80px] pr-1">
+                          {availableZonCalonList.map(z => (<div key={z} className="flex justify-between text-sm text-slate-200 mb-1"><span>{z}</span><span className="font-bold">{calonList.filter(c=>c.zon_temuduga===z).length}</span></div>))}
+                       </div>
+                    </div></div></div>
+                    
                     <div className="flip-card h-36 bg-transparent"><div className="flip-card-inner"><div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Akaun Penemuduga</p><p className="text-5xl font-extrabold text-blue-400 mt-2">{panelList.length}</p></div><div className="flip-card-back bg-slate-800 border border-blue-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center text-center"><p className="text-blue-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Jumlah Penugasan Sesi</p><p className="text-3xl font-extrabold text-white mt-1">{penugasanList.length}</p></div></div></div>
                     <div className="flip-card h-36 bg-transparent"><div className="flip-card-inner"><div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Penilaian Selesai</p><p className="text-5xl font-extrabold text-emerald-400 mt-2">{resultsList.length}</p></div><div className="flip-card-back bg-slate-800 border border-emerald-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center"><p className="text-emerald-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Status Kelulusan</p><div className="flex justify-between text-sm text-slate-200"><span className="text-emerald-400">Layak (>=75%)</span><span className="font-bold">{resultsList.filter(r=>r.status_lulus).length}</span></div><div className="flex justify-between text-sm text-slate-200 mt-1"><span className="text-rose-400">Belum Layak</span><span className="font-bold">{resultsList.filter(r=>!r.status_lulus).length}</span></div></div></div></div>
-                    <div className="flip-card h-36 bg-transparent"><div className="flip-card-inner"><div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center"><p className="text-slate-400 text-xs font-bold uppercase tracking-wider">% Kemajuan Nasional</p><p className="text-5xl font-extrabold text-amber-300 mt-2">{calonList.length > 0 ? Math.round((resultsList.length / calonList.length) * 100) : 0}%</p></div><div className="flip-card-back bg-slate-800 border border-amber-300/50 p-4 rounded-xl shadow-lg flex flex-col justify-center text-center"><p className="text-amber-300 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Baki Tugas</p><p className="text-2xl font-extrabold text-white">{calonList.length - resultsList.length}</p><p className="text-xs text-slate-400">Calon belum dinilai</p></div></div></div>
+                    <div className="flip-card h-36 bg-transparent"><div className="flip-card-inner"><div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center">
+                       <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">% Selesai</p>
+                       <p className="text-5xl font-extrabold text-amber-300 mt-2">{calonList.length > 0 ? Math.round((resultsList.length / calonList.length) * 100) : 0}%</p>
+                    </div><div className="flip-card-back bg-slate-800 border border-amber-300/50 p-4 rounded-xl shadow-lg flex flex-col justify-center text-center"><p className="text-amber-300 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Baki Tugas</p><p className="text-2xl font-extrabold text-white">{calonList.length - resultsList.length}</p><p className="text-xs text-slate-400">Calon belum dinilai</p></div></div></div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg"><h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Analisis Kelulusan Calon</h2><DoughnutChartLulus results={resultsList} /></div>
-                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center"><h2 className="w-full text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Purata Kompetensi Nasional</h2><RadarChartNasional results={resultsList} /></div>
+                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center">
+                        <h2 className="w-full text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Purata Kompetensi Keseluruhan</h2>
+                        <RadarChartKeseluruhan results={resultsList} />
+                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg md:col-span-2"><h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Prestasi Temu Duga Mengikut Zon</h2><StackedBarZon calonList={calonList} resultsList={resultsList} /></div>
-                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg"><h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide flex items-center gap-2"><span className="text-amber-400">🏆</span> Top 5 Penilai</h2><ul className="space-y-4">{topPanels.length === 0 ? <li className="text-sm text-slate-500 italic">Tiada data.</li> : topPanels.map((p, idx) => (<li key={idx} className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800"><div className="flex items-center gap-3"><span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-400">{idx+1}</span><div><p className="text-sm font-bold text-slate-200 truncate w-32 md:w-40">{p.nama}</p></div></div><div className="text-lg font-extrabold text-emerald-400 bg-emerald-900/30 px-3 py-1 rounded">{p.count}</div></li>))}</ul></div>
+                     
+                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
+                        <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide flex items-center gap-2">
+                           <span className="text-amber-400">🏆</span> 10 Calon Markah Tertinggi Keseluruhan
+                        </h2>
+                        <ul className="space-y-3 overflow-y-auto max-h-[300px] pr-2">
+                           {top10Calon.length === 0 ? <li className="text-sm text-slate-500 italic">Tiada rekod penilaian.</li> : top10Calon.map((res, idx) => {
+                              const cDetail = calonList.find(c => c.no_kp === res.no_kp_calon);
+                              const namaCalon = cDetail ? cDetail.nama_penuh : res.no_kp_calon;
+                              return (
+                                 <li key={idx} className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
+                                    <div className="flex items-center gap-3">
+                                       <span className="flex items-center justify-center min-w-[24px] h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-400">{idx+1}</span>
+                                       <div>
+                                          <p className="text-sm font-bold text-slate-200 truncate w-32 md:w-40" title={namaCalon}>{namaCalon}</p>
+                                          <p className="text-xs text-amber-500 uppercase">{res.zon}</p>
+                                       </div>
+                                    </div>
+                                    <div className="text-lg font-extrabold text-emerald-400 bg-emerald-900/30 px-3 py-1 rounded">{res.jumlah_markah}%</div>
+                                 </li>
+                              );
+                           })}
+                        </ul>
+                     </div>
                   </div>
                 </div>
               )}
@@ -314,148 +360,30 @@
               {activeTab === 'panel' && (
                 <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    {/* Borang Profil */}
-                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-md">
-                      <h2 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Panel</h2>
-                      <form onSubmit={handleRegisterPanel} className="space-y-4">
-                        <input type="text" required placeholder="Nama Penuh Panel" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
-                        <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
-                        <input type="text" required placeholder="Kata Laluan Log Masuk" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.katalaluan} onChange={(e) => setPanelForm({...panelForm, katalaluan: e.target.value})} />
-                        <input type="text" required placeholder="Jawatan Rasmi" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
-                        <input type="text" required placeholder="Tempat Bertugas / Jabatan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
-                        <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Daftar Akaun Panel</button>
-                      </form>
-                    </div>
-
-                    {/* Borang Penugasan */}
-                    <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow-md">
-                      <h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">2. Agihan Surat Penugasan & Peranan</h2>
-                      <form onSubmit={handleRegisterPenugasan} className="space-y-4">
-                        <label className="block text-xs text-slate-400 font-bold uppercase">Pilih Nama Panel Berdaftar</label>
-                        <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanForm.no_kp_panel} onChange={(e) => setPenugasanForm({...penugasanForm, no_kp_panel: e.target.value})}>
-                          <option value="">-- Sila Pilih Profil Panel --</option>
-                          {panelList.map(p => <option key={p.no_kp} value={p.no_kp}>{p.nama_penuh} ({p.no_kp})</option>)}
-                        </select>
-                        <div className="flex gap-4">
-                          <div className="w-1/3">
-                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Zon Bertugas</label>
-                            <select className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.zon_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, zon_bertugas: e.target.value})}>
-                              <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON</option>
-                            </select>
-                          </div>
-                          <div className="w-1/3">
-                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pilihan Sesi</label>
-                            <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})}>
-                              <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
-                            </select>
-                          </div>
-                          <div className="w-1/3">
-                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh</label>
-                            <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_bertugas: e.target.value})} />
-                          </div>
-                        </div>
-                        <label className="block text-xs text-slate-400 font-bold uppercase">Tetapkan Tahap Akses / Peranan</label>
-                        <select className="w-full p-3 border border-emerald-500/50 rounded bg-slate-950 text-emerald-300 text-sm font-bold" value={penugasanForm.peranan} onChange={(e) => setPenugasanForm({...penugasanForm, peranan: e.target.value})}>
-                          <option value="Panel Penemuduga">Panel Penemuduga (Penilai Biasa)</option>
-                          <option value="Ketua Zon Panel Penemuduga">Ketua Zon Panel Penemuduga</option>
-                          <option value="Ketua Panel Utama">Ketua Panel Utama</option>
-                        </select>
-                        <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Tambah Penugasan</button>
-                      </form>
-                    </div>
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-md"><h2 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Panel</h2><form onSubmit={handleRegisterPanel} className="space-y-4"><input type="text" required placeholder="Nama Penuh Panel" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} /><input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} /><input type="text" required placeholder="Kata Laluan Log Masuk" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.katalaluan} onChange={(e) => setPanelForm({...panelForm, katalaluan: e.target.value})} /><input type="text" required placeholder="Jawatan Rasmi" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} /><input type="text" required placeholder="Tempat Bertugas / Jabatan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} /><button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Daftar Akaun Panel</button></form></div>
+                    <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow-md"><h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">2. Agihan Surat Penugasan & Peranan</h2><form onSubmit={handleRegisterPenugasan} className="space-y-4"><label className="block text-xs text-slate-400 font-bold uppercase">Pilih Nama Panel Berdaftar</label><select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanForm.no_kp_panel} onChange={(e) => setPenugasanForm({...penugasanForm, no_kp_panel: e.target.value})}><option value="">-- Sila Pilih Profil Panel --</option>{panelList.map(p => <option key={p.no_kp} value={p.no_kp}>{p.nama_penuh} ({p.no_kp})</option>)}</select><div className="flex gap-4"><div className="w-1/3"><label className="block text-xs text-slate-400 font-bold uppercase mb-1">Zon Bertugas</label><select className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.zon_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, zon_bertugas: e.target.value})}><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON</option></select></div><div className="w-1/3"><label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pilihan Sesi</label><select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})}><option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option></select></div><div className="w-1/3"><label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh</label><input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_bertugas: e.target.value})} /></div></div><label className="block text-xs text-slate-400 font-bold uppercase">Tetapkan Tahap Akses / Peranan</label><select className="w-full p-3 border border-emerald-500/50 rounded bg-slate-950 text-emerald-300 text-sm font-bold" value={penugasanForm.peranan} onChange={(e) => setPenugasanForm({...penugasanForm, peranan: e.target.value})}><option value="Panel Penemuduga">Panel Penemuduga (Penilai Biasa)</option><option value="Ketua Zon Panel Penemuduga">Ketua Zon Panel Penemuduga</option><option value="Ketua Panel Utama">Ketua Panel Utama</option></select><button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Tambah Penugasan</button></form></div>
                   </div>
 
-                  {/* JADUAL 1: PENUGASAN AKTIF (DENGAN SMART FILTERS & PAGINATION) */}
                   <div className="bg-slate-900 border border-emerald-500/20 p-6 rounded-xl shadow-lg mt-8">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
-                      <div>
-                         <h2 className="text-lg font-bold text-emerald-400">Ringkasan Agihan Penugasan Aktif</h2>
-                         <p className="text-xs text-slate-400 mt-1">Jumlah: {penugasanList.length} Penugasan</p>
-                      </div>
-                      <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                        <input type="text" placeholder="🔍 Cari Nama Panel..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-emerald-500 focus:outline-none" value={searchTugas} onChange={(e) => setSearchTugas(e.target.value)} />
-                        <select className="w-full md:w-48 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-emerald-500 focus:outline-none" value={filterZonTugas} onChange={(e) => setFilterZonTugas(e.target.value)}>
-                          <option value="SEMUA">Kesemua Zon</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON</option>
-                        </select>
-                      </div>
+                      <div><h2 className="text-lg font-bold text-emerald-400">Ringkasan Agihan Penugasan Aktif</h2><p className="text-xs text-slate-400 mt-1">Jumlah: {penugasanList.length} Penugasan</p></div>
+                      <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto"><input type="text" placeholder="🔍 Cari Nama Panel..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-emerald-500 focus:outline-none" value={searchTugas} onChange={(e) => setSearchTugas(e.target.value)} /><select className="w-full md:w-48 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-emerald-500 focus:outline-none" value={filterZonTugas} onChange={(e) => setFilterZonTugas(e.target.value)}><option value="SEMUA">Kesemua Zon</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON</option></select></div>
                     </div>
-
                     <div className="overflow-x-auto min-h-[250px]">
-                      <table className="w-full text-left text-sm border-collapse relative">
-                        <thead className="bg-slate-950 shadow"><tr className="text-emerald-400 uppercase text-xs border-b border-slate-800"><th className="p-3">Nama Pegawai (Panel)</th><th className="p-3">Zon & Tarikh Sesi</th><th className="p-3">Tahap Peranan</th><th className="p-3 text-center">Tindakan</th></tr></thead>
-                        <tbody>
-                          {displayedPenugasan.length === 0 ? <tr><td colSpan="4" className="text-center p-8 text-slate-500 italic">Tiada rekod penugasan dijumpai berdasarkan carian.</td></tr> : 
-                          displayedPenugasan.map(tugas => {
-                            const pDetail = panelList.find(p => p.no_kp === tugas.no_kp_panel);
-                            return (
-                              <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                <td className="p-3 font-bold">{pDetail ? pDetail.nama_penuh : tugas.no_kp_panel}</td><td className="p-3 font-mono text-slate-300">{tugas.zon_bertugas} - {tugas.sesi_bertugas}</td>
-                                <td className="p-3 text-emerald-300 font-semibold">{tugas.peranan}</td><td className="p-3 text-center"><button onClick={() => handleDeletePenugasan(tugas.id)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Batal Tugas</button></td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                      <table className="w-full text-left text-sm border-collapse relative"><thead className="bg-slate-950 shadow"><tr className="text-emerald-400 uppercase text-xs border-b border-slate-800"><th className="p-3">Nama Pegawai (Panel)</th><th className="p-3">Zon & Tarikh Sesi</th><th className="p-3">Tahap Peranan</th><th className="p-3 text-center">Tindakan</th></tr></thead><tbody>{displayedPenugasan.length === 0 ? <tr><td colSpan="4" className="text-center p-8 text-slate-500 italic">Tiada rekod penugasan dijumpai berdasarkan carian.</td></tr> : displayedPenugasan.map(tugas => { const pDetail = panelList.find(p => p.no_kp === tugas.no_kp_panel); return (<tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="p-3 font-bold">{pDetail ? pDetail.nama_penuh : tugas.no_kp_panel}</td><td className="p-3 font-mono text-slate-300">{tugas.zon_bertugas} - {tugas.sesi_bertugas}</td><td className="p-3 text-emerald-300 font-semibold">{tugas.peranan}</td><td className="p-3 text-center"><button onClick={() => handleDeletePenugasan(tugas.id)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Batal Tugas</button></td></tr>); })}</tbody></table>
                     </div>
-
-                    {totalPagesTugas > 1 && (
-                       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800">
-                          <p className="text-xs text-slate-500 font-bold">Halaman {pageTugas} daripada {totalPagesTugas}</p>
-                          <div className="flex gap-2">
-                             <button onClick={() => setPageTugas(prev => Math.max(prev - 1, 1))} disabled={pageTugas === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button>
-                             <button onClick={() => setPageTugas(prev => Math.min(prev + 1, totalPagesTugas))} disabled={pageTugas === totalPagesTugas} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button>
-                          </div>
-                       </div>
-                    )}
+                    {totalPagesTugas > 1 && (<div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800"><p className="text-xs text-slate-500 font-bold">Halaman {pageTugas} daripada {totalPagesTugas}</p><div className="flex gap-2"><button onClick={() => setPageTugas(prev => Math.max(prev - 1, 1))} disabled={pageTugas === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button><button onClick={() => setPageTugas(prev => Math.min(prev + 1, totalPagesTugas))} disabled={pageTugas === totalPagesTugas} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button></div></div>)}
                   </div>
 
-                  {/* JADUAL 2: PROFIL PANEL */}
                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg mt-8">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
-                      <div>
-                         <h2 className="text-lg font-bold text-amber-400">Pangkalan Data Profil Panel</h2>
-                         <p className="text-xs text-slate-400 mt-1">Jumlah: {panelList.length} Panel Didaftar</p>
-                      </div>
-                      <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                        <input type="text" placeholder="🔍 Cari Nama atau KP..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchPanel} onChange={(e) => setSearchPanel(e.target.value)} />
-                        <select className="w-full md:w-48 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonPanel} onChange={(e) => setFilterZonPanel(e.target.value)}>
-                          <option value="SEMUA">Kesemua Zon</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
-                        </select>
-                      </div>
+                      <div><h2 className="text-lg font-bold text-amber-400">Pangkalan Data Profil Panel</h2><p className="text-xs text-slate-400 mt-1">Jumlah: {panelList.length} Panel Didaftar</p></div>
+                      <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto"><input type="text" placeholder="🔍 Cari Nama atau KP..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchPanel} onChange={(e) => setSearchPanel(e.target.value)} /><select className="w-full md:w-48 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonPanel} onChange={(e) => setFilterZonPanel(e.target.value)}><option value="SEMUA">Kesemua Zon</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option></select></div>
                     </div>
-
                     <div className="overflow-x-auto min-h-[300px]">
-                      <table className="w-full text-left text-sm border-collapse">
-                        <thead className="bg-slate-950 shadow"><tr className="text-amber-400 uppercase text-xs border-b border-slate-800"><th className="p-4">Nama Penuh</th><th className="p-4">No. KP</th><th className="p-4">Kata Laluan</th><th className="p-4">Jawatan Rasmi</th><th className="p-4 text-center">Tindakan</th></tr></thead>
-                        <tbody>
-                          {displayedPanels.length === 0 ? <tr><td colSpan="5" className="text-center p-8 text-slate-500 italic">Tiada rekod panel dijumpai.</td></tr> : 
-                          displayedPanels.map((p) => editModePanelKp === p.no_kp ? (
-                            <tr key={p.no_kp} className="bg-slate-800">
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-slate-400" disabled value={editPanelForm.no_kp} /></td>
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.katalaluan || ''} onChange={e => setEditPanelForm({...editPanelForm, katalaluan: e.target.value})} /></td>
-                              <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value.toUpperCase()})} /></td>
-                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
-                            </tr>
-                          ) : (
-                            <tr key={p.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                              <td className="p-4 font-bold">{p.nama_penuh}</td><td className="p-4 font-mono text-amber-300">{p.no_kp}</td><td className="p-4 font-mono text-slate-300">{p.katalaluan || '***'}</td><td className="p-4">{p.jawatan}</td>
-                              <td className="p-4 text-center"><button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <table className="w-full text-left text-sm border-collapse"><thead className="bg-slate-950 shadow"><tr className="text-amber-400 uppercase text-xs border-b border-slate-800"><th className="p-4">Nama Penuh</th><th className="p-4">No. KP</th><th className="p-4">Kata Laluan</th><th className="p-4">Jawatan Rasmi</th><th className="p-4 text-center">Tindakan</th></tr></thead><tbody>{displayedPanels.length === 0 ? <tr><td colSpan="5" className="text-center p-8 text-slate-500 italic">Tiada rekod panel dijumpai.</td></tr> : displayedPanels.map((p) => editModePanelKp === p.no_kp ? (<tr key={p.no_kp} className="bg-slate-800"><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value.toUpperCase()})} /></td><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-slate-400" disabled value={editPanelForm.no_kp} /></td><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.katalaluan || ''} onChange={e => setEditPanelForm({...editPanelForm, katalaluan: e.target.value})} /></td><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value.toUpperCase()})} /></td><td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td></tr>) : (<tr key={p.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="p-4 font-bold">{p.nama_penuh}</td><td className="p-4 font-mono text-amber-300">{p.no_kp}</td><td className="p-4 font-mono text-slate-300">{p.katalaluan || '***'}</td><td className="p-4">{p.jawatan}</td><td className="p-4 text-center"><button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td></tr>))}</tbody></table>
                     </div>
-
-                    {totalPagesPanel > 1 && (
-                       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800">
-                          <p className="text-xs text-slate-500 font-bold">Halaman {pagePanel} / {totalPagesPanel}</p>
-                          <div className="flex gap-2">
-                             <button onClick={() => setPagePanel(prev => Math.max(prev - 1, 1))} disabled={pagePanel === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button>
-                             <button onClick={() => setPagePanel(prev => Math.min(prev + 1, totalPagesPanel))} disabled={pagePanel === totalPagesPanel} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button>
-                          </div>
-                       </div>
-                    )}
+                    {totalPagesPanel > 1 && (<div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800"><p className="text-xs text-slate-500 font-bold">Halaman {pagePanel} / {totalPagesPanel}</p><div className="flex gap-2"><button onClick={() => setPagePanel(prev => Math.max(prev - 1, 1))} disabled={pagePanel === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button><button onClick={() => setPagePanel(prev => Math.min(prev + 1, totalPagesPanel))} disabled={pagePanel === totalPagesPanel} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button></div></div>)}
                   </div>
                 </div>
               )}
@@ -463,81 +391,29 @@
               {/* TAB 4: URUS CALON */}
               {activeTab === 'urus_calon' && (
                 <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                  <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
-                    <h2 className="text-xl font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-2">+ Tambah Calon Baharu Secara Manual</h2>
-                    <form onSubmit={handleRegisterCalon} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
-                      <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
-                      <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}>
-                        <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
-                      </select>
-                      <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-bold" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value})}>
-                        <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
-                      </select>
-                      <input type="date" required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.tarikh} onChange={e => setCalonForm({...calonForm, tarikh: e.target.value})} />
-                      <input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} />
-                      <input type="text" placeholder="SME Subjek (Cth: BM, SC)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} />
-                      <button type="submit" className="md:col-span-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold rounded p-3 text-sm shadow">DAFTAR CALON</button>
-                    </form>
-                  </div>
+                  <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow"><h2 className="text-xl font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-2">+ Tambah Calon Baharu Secara Manual</h2><form onSubmit={handleRegisterCalon} className="grid grid-cols-1 md:grid-cols-4 gap-4"><input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} /><input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} /><select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}><option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option></select><select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-bold" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value})}><option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option></select><input type="date" required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.tarikh} onChange={e => setCalonForm({...calonForm, tarikh: e.target.value})} /><input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} /><input type="text" placeholder="SME Subjek (Cth: BM, SC)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} /><button type="submit" className="md:col-span-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold rounded p-3 text-sm shadow">DAFTAR CALON</button></form></div>
                   
                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[500px]">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
-                      <div>
-                         <h2 className="text-lg font-bold text-amber-400">Pangkalan Data Calon</h2>
-                         <p className="text-xs text-slate-400 mt-1">Jumlah: {calonList.length} Calon</p>
-                      </div>
-                      <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                        <input type="text" placeholder="🔍 Cari Nama atau KP..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchCalon} onChange={(e) => setSearchCalon(e.target.value)} />
-                        <select className="w-full md:w-36 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonCalon} onChange={(e) => {setFilterZonCalon(e.target.value); setFilterSesiCalon('SEMUA');}}>
-                           <option value="SEMUA">Semua Zon</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}
-                        </select>
-                        <select className="w-full md:w-40 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none disabled:opacity-50" value={filterSesiCalon} disabled={filterZonCalon === 'SEMUA'} onChange={(e) => setFilterSesiCalon(e.target.value)}>
-                           <option value="SEMUA">Semua Sesi</option>{availableSesiCalonList.map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
+                      <div><h2 className="text-lg font-bold text-amber-400">Pangkalan Data Calon</h2><p className="text-xs text-slate-400 mt-1">Jumlah Keseluruhan: {calonList.length} Calon</p></div>
+                      <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto"><input type="text" placeholder="🔍 Cari Nama atau KP..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchCalon} onChange={(e) => setSearchCalon(e.target.value)} /><select className="w-full md:w-36 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonCalon} onChange={(e) => {setFilterZonCalon(e.target.value); setFilterSesiCalon('SEMUA');}}><option value="SEMUA">Semua Zon</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}</select><select className="w-full md:w-40 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none disabled:opacity-50" value={filterSesiCalon} disabled={filterZonCalon === 'SEMUA'} onChange={(e) => setFilterSesiCalon(e.target.value)}><option value="SEMUA">Semua Sesi</option>{availableSesiCalonList.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
                     </div>
 
                     {!showCalonData ? (
-                       <div className="flex flex-col items-center justify-center p-16 border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/50">
-                          <span className="text-5xl text-slate-700 mb-4">🗂️</span><h3 className="text-xl font-bold text-slate-400 mb-2">Paparan Data Disembunyikan</h3><p className="text-sm text-slate-500 text-center max-w-md">Sila buat pilihan Zon/Sesi, atau gunakan Kotak Carian untuk melihat rekod calon.</p>
-                       </div>
+                       <div className="flex flex-col items-center justify-center p-16 border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/50"><span className="text-5xl text-slate-700 mb-4">🗂️</span><h3 className="text-xl font-bold text-slate-400 mb-2">Paparan Data Disembunyikan</h3><p className="text-sm text-slate-500 text-center max-w-md">Sila buat pilihan Zon/Sesi, atau gunakan Kotak Carian untuk melihat rekod calon.</p></div>
                     ) : (
                        <div className="overflow-x-auto min-h-[300px]">
-                         <table className="w-full text-left text-sm border-collapse relative">
-                           <thead className="bg-slate-950 shadow"><tr className="text-amber-400 uppercase text-xs border-b border-slate-800"><th className="p-3">Nama Calon</th><th className="p-3">No. KP</th><th className="p-3">Zon & Sesi</th><th className="p-3">PPD</th><th className="p-3 text-center">Kehadiran</th><th className="p-3 text-center">Tindakan</th></tr></thead>
-                           <tbody>
-                             {displayedCalons.length === 0 ? <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada padanan calon ditemui.</td></tr> : 
-                             displayedCalons.map(c => editModeCalonKp === c.no_kp ? (
-                               <tr key={c.no_kp} className="bg-slate-800">
-                                 <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value})} /></td>
-                                 <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td>
-                                 <td className="p-2 flex gap-1"><select className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value})}><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option></select><input type="text" className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value})} /></td>
-                                 <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.ppd} onChange={e => setEditCalonForm({...editCalonForm, ppd: e.target.value})} /></td>
-                                 <td className="p-2 text-center text-xs text-slate-400">Mod Edit</td>
-                                 <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateCalon(c.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeCalonKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
-                               </tr>
-                             ) : (
-                               <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                 <td className="p-3 font-bold">{c.nama_penuh}</td><td className="p-3 font-mono text-slate-300">{c.no_kp}</td><td className="p-3 text-amber-300 font-bold">{c.zon_temuduga} <span className="text-slate-400 font-normal block text-xs mt-0.5">{c.sesi}</span></td><td className="p-3">{c.ppd}</td>
-                                 <td className="p-3 text-center"><button onClick={() => handleKehadiranToggle(c.no_kp, c.kehadiran)} className={`px-3 py-1 rounded text-xs font-bold w-24 transition-colors border ${c.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : c.kehadiran === 'TIDAK HADIR' ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>{c.kehadiran || 'BELUM'}</button></td>
-                                 <td className="p-3 text-center"><button onClick={() => { setEditModeCalonKp(c.no_kp); setEditCalonForm({...c}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeleteCalon(c.no_kp)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
-                               </tr>
-                             ))}
-                           </tbody>
-                         </table>
+                         <table className="w-full text-left text-sm border-collapse relative"><thead className="bg-slate-950 shadow"><tr className="text-amber-400 uppercase text-xs border-b border-slate-800"><th className="p-3">Nama Calon</th><th className="p-3">No. KP</th><th className="p-3">Zon & Sesi</th><th className="p-3">PPD</th><th className="p-3 text-center">Kehadiran</th><th className="p-3 text-center">Tindakan</th></tr></thead><tbody>{displayedCalons.length === 0 ? <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada padanan calon ditemui.</td></tr> : displayedCalons.map(c => editModeCalonKp === c.no_kp ? (<tr key={c.no_kp} className="bg-slate-800"><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value})} /></td><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td><td className="p-2 flex gap-1"><select className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value})}><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option></select><input type="text" className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value})} /></td><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.ppd} onChange={e => setEditCalonForm({...editCalonForm, ppd: e.target.value})} /></td><td className="p-2 text-center text-xs text-slate-400">Mod Edit</td><td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateCalon(c.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeCalonKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td></tr>) : (<tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="p-3 font-bold">{c.nama_penuh}</td><td className="p-3 font-mono text-slate-300">{c.no_kp}</td><td className="p-3 text-amber-300 font-bold">{c.zon_temuduga} <span className="text-slate-400 font-normal block text-xs mt-0.5">{c.sesi}</span></td><td className="p-3">{c.ppd}</td><td className="p-3 text-center"><button onClick={() => handleKehadiranToggle(c.no_kp, c.kehadiran)} className={`px-3 py-1 rounded text-xs font-bold w-24 transition-colors border ${c.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : c.kehadiran === 'TIDAK HADIR' ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>{c.kehadiran || 'BELUM'}</button></td><td className="p-3 text-center"><button onClick={() => { setEditModeCalonKp(c.no_kp); setEditCalonForm({...c}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeleteCalon(c.no_kp)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td></tr>))}</tbody></table>
                        </div>
                     )}
-                    {showCalonData && totalPagesCalon > 1 && (
-                       <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800"><p className="text-xs text-slate-500 font-bold">Halaman {pageCalon} / {totalPagesCalon}</p><div className="flex gap-2"><button onClick={() => setPageCalon(prev => Math.max(prev - 1, 1))} disabled={pageCalon === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button><button onClick={() => setPageCalon(prev => Math.min(prev + 1, totalPagesCalon))} disabled={pageCalon === totalPagesCalon} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button></div></div>
-                    )}
+                    {showCalonData && totalPagesCalon > 1 && (<div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800"><p className="text-xs text-slate-500 font-bold">Halaman {pageCalon} / {totalPagesCalon}</p><div className="flex gap-2"><button onClick={() => setPageCalon(prev => Math.max(prev - 1, 1))} disabled={pageCalon === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button><button onClick={() => setPageCalon(prev => Math.min(prev + 1, totalPagesCalon))} disabled={pageCalon === totalPagesCalon} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button></div></div>)}
                   </div>
                 </div>
               )}
 
-              {/* TAB 3 & 5 & 6 (URUS SETIA, CETAK, TETAPAN - KEKAL SAMA) */}
+              {/* TAB 3, 5, 6 (URUS SETIA, CETAK, TETAPAN) */}
               {activeTab === 'urus_setia' && (<div className="no-print space-y-8"><div className="bg-slate-900 border border-blue-500/30 p-8 rounded-xl shadow-md"><h2 className="text-xl font-bold text-blue-400 mb-6 border-b border-slate-800 pb-3">+ Daftar Akaun Urus Setia Baharu</h2><form onSubmit={handleRegisterUS} className="grid grid-cols-1 md:grid-cols-4 gap-4"><input type="text" required placeholder="Nama Penuh Urus Setia" className="p-4 bg-slate-950 border border-slate-700 rounded-lg text-base text-slate-100 col-span-2" value={usForm.nama_penuh} onChange={e => setUsForm({...usForm, nama_penuh: e.target.value.toUpperCase()})} /><input type="text" required placeholder="No. Kad Pengenalan / ID" className="p-4 bg-slate-950 border border-slate-700 rounded-lg text-base font-mono text-slate-100" value={usForm.no_kp} onChange={e => setUsForm({...usForm, no_kp: e.target.value})} /><div className="flex gap-2"><input type="text" required placeholder="Kata Laluan" className="w-full p-4 bg-slate-950 border border-slate-700 rounded-lg text-base font-mono text-slate-100" value={usForm.katalaluan} onChange={e => setUsForm({...usForm, katalaluan: e.target.value})} /></div><button type="submit" className="md:col-span-4 mt-2 bg-blue-500 hover:bg-blue-600 text-white font-extrabold rounded-xl py-4 text-lg shadow-lg">Daftar Akaun Urus Setia</button></form></div><div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg"><h2 className="text-lg font-bold text-amber-400 mb-6 border-b border-slate-800 pb-4">Senarai Akaun Urus Setia Berdaftar</h2><div className="overflow-x-auto"><table className="w-full text-left text-sm border-collapse"><thead><tr className="bg-slate-950 text-amber-400 uppercase text-xs border-b border-slate-800"><th className="p-4">Nama Penuh</th><th className="p-4">ID / No. KP</th><th className="p-4">Kata Laluan</th><th className="p-4 text-center">Tindakan</th></tr></thead><tbody>{urusSetiaList.map((u) => editModeUsKp === u.no_kp ? (<tr key={u.no_kp} className="bg-slate-800"><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-white" value={editUsForm.nama_penuh} onChange={e => setEditUsForm({...editUsForm, nama_penuh: e.target.value.toUpperCase()})} /></td><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-slate-400" disabled value={editUsForm.no_kp} /></td><td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-white" value={editUsForm.katalaluan} onChange={e => setEditUsForm({...editUsForm, katalaluan: e.target.value})} /></td><td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateUS(u.no_kp)} className="bg-emerald-500 text-slate-900 px-3 py-1.5 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeUsKp(null)} className="bg-slate-600 text-white px-3 py-1.5 rounded font-bold text-xs">Batal</button></td></tr>) : (<tr key={u.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50"><td className="p-4 font-bold text-base">{u.nama_penuh}</td><td className="p-4 font-mono text-amber-300 text-base">{u.no_kp}</td><td className="p-4 font-mono text-slate-300 text-base">{u.katalaluan}</td><td className="p-4 text-center"><button onClick={() => startEditUS(u)} className="text-blue-400 font-bold text-sm mx-2 hover:underline">Edit</button> | <button onClick={() => handleDeleteUS(u.no_kp)} className="text-red-400 font-bold text-sm mx-2 hover:underline">Padam</button></td></tr>))}</tbody></table></div></div></div>)}
-              {activeTab === 'cetak' && (<div><div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print"><div><h1 className="text-2xl font-extrabold text-amber-400">Cetakan Rumusan Skor</h1><p className="text-slate-300 text-sm">Pilih Zon dan Sesi untuk mencari calon.</p></div><button onClick={() => window.print()} disabled={!currentRes} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-lg shadow-lg disabled:opacity-40">🖨️ Cetak Borang</button></div><div className="bg-slate-900 border border-slate-800 p-8 rounded-xl mb-8 shadow-sm no-print"><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">1. Pilih Zon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100" value={cetakZon} onChange={(e) => {setCetakZon(e.target.value); setCetakSesi(''); setSelectedCalon(null);}}><option value="">-- Pilih Zon --</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}</select></div><div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">2. Pilih Sesi</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={cetakSesi} disabled={!cetakZon} onChange={(e) => {setCetakSesi(e.target.value); setSelectedCalon(null);}}><option value="">-- Pilih Sesi --</option>{cetakSesiList.map(s => <option key={s} value={s}>{s}</option>)}</select></div><div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">3. Pilih Nama Calon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={selectedCalon?.no_kp || ''} disabled={!cetakSesi} onChange={(e) => setSelectedCalon(calonList.find(c => c.no_kp === e.target.value) || null)}><option value="">-- Pilih Calon --</option>{cetakCalonFiltered.map(c => <option key={c.no_kp} value={c.no_kp}>{c.nama_penuh}</option>)}</select></div></div></div>{selectedCalon && currentRes && (<div className="bg-white p-8 border rounded-xl print-area text-slate-900"><div className="text-center mb-6"><img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" /><h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan</h3><h4 className="text-xs font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4><h2 className="text-base font-extrabold uppercase mt-2 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">BORANG RUMUSAN SKOR INDIVIDU TEMU DUGA SISC+</h2></div><table className="w-full text-sm border-collapse border border-slate-400 mb-6 font-semibold"><tbody><tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td><td className="p-2.5 uppercase font-bold">{selectedCalon.nama_penuh}</td></tr><tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">NO KAD PENGENALAN</td><td className="p-2.5 font-mono font-bold">{selectedCalon.no_kp}</td></tr><tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD & SUBJEK</td><td className="p-2.5 uppercase">{selectedCalon.ppd || '-'} ({selectedCalon.sme_subjek || '-'})</td></tr></tbody></table><div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"><div><table className="w-full text-sm border-collapse border border-slate-400"><thead><tr className="bg-slate-100 border-b border-slate-400 font-bold text-center"><th className="p-2 border-r border-slate-400 text-left">KOMPETENSI</th><th className="p-2 border-r border-slate-400">MARKAH</th></tr></thead><tbody className="font-semibold text-center"><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">BIMBINGAN (25%)</td><td className="p-2">{scoresMap.skor_bimbingan.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">INSTRUKSIONAL (20%)</td><td className="p-2">{scoresMap.skor_instruksional.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">STRATEGIK (20%)</td><td className="p-2">{scoresMap.skor_pemikiran_strategik.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">ANALISIS DATA (15%)</td><td className="p-2">{scoresMap.skor_analisis_data.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">INTERPERSONAL (10%)</td><td className="p-2">{scoresMap.skor_interpersonal.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">EVIDENS (10%)</td><td className="p-2">{scoresMap.skor_evidens.toFixed(1)}</td></tr><tr className="bg-slate-200 font-extrabold"><td className="p-2 border-r border-slate-400 text-left">JUMLAH MARKAH</td><td className="p-2 text-base text-blue-900">{totalMarkah}%</td></tr></tbody></table><div className="mt-4 border border-slate-400 p-3 rounded min-h-[80px] text-sm"><p className="font-bold underline mb-1">Ulasan:</p><p className="italic text-slate-800 text-justify">{currentRes?.ulasan_panel || '-'}</p></div></div><div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400"><h4 className="text-xs font-bold text-center mb-2 uppercase">MARKAH vs KOMPETENSI</h4><RadarChart dataScores={scoresMap} /></div></div><div className="mt-12 flex justify-between items-end text-sm text-slate-800"><div><p className="font-bold text-slate-500 uppercase text-xs mb-1">Dicetak Oleh:</p><p className="font-bold uppercase text-base">PENTADBIR SISTEM (ADMIN)</p><p className="uppercase text-xs text-slate-500 mt-0.5">BAHAGIAN PROFESIONALISME GURU</p></div><div className="text-right"><p className="font-bold text-slate-500 uppercase text-xs mb-1">Dinilai & Disahkan Oleh:</p><p className="font-bold uppercase text-base">{currentRes?.nama_panel || '-'}</p><p className="uppercase text-xs text-slate-500 mt-0.5">{panelPenilai ? panelPenilai.jawatan : '-'}</p><p className="mt-1 text-xs font-semibold">Tarikh: {currentRes?.created_at ? new Date(currentRes.created_at).toLocaleDateString('en-GB') : '-'}</p></div></div><div className="mt-8 text-xs text-slate-400 italic border-t pt-3 text-center">* Dokumen ini dijana secara automatik oleh Sistem Pengurusan Temuduga SISC+ dan tidak memerlukan tandatangan fizikal.</div></div>)}</div>)}
+              {activeTab === 'cetak' && (<div><div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print"><div><h1 className="text-2xl font-extrabold text-amber-400">Cetakan Rumusan Skor</h1><p className="text-slate-300 text-sm">Pilih Zon dan Sesi untuk mencari calon.</p></div><button onClick={() => window.print()} disabled={!currentRes} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-lg shadow-lg disabled:opacity-40">🖨️ Cetak Borang</button></div><div className="bg-slate-900 border border-slate-800 p-8 rounded-xl mb-8 shadow-sm no-print"><div className="grid grid-cols-1 md:grid-cols-3 gap-6"><div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">1. Pilih Zon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100" value={cetakZon} onChange={(e) => {setCetakZon(e.target.value); setCetakSesi(''); setSelectedCalon(null);}}><option value="">-- Pilih Zon --</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}</select></div><div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">2. Pilih Sesi</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={cetakSesi} disabled={!cetakZon} onChange={(e) => {setCetakSesi(e.target.value); setSelectedCalon(null);}}><option value="">-- Pilih Sesi --</option>{cetakSesiList.map(s => <option key={s} value={s}>{s}</option>)}</select></div><div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">3. Pilih Nama Calon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={selectedCalon?.no_kp || ''} disabled={!cetakSesi} onChange={(e) => setSelectedCalon(calonList.find(c => c.no_kp === e.target.value) || null)}><option value="">-- Pilih Calon --</option>{cetakCalonFiltered.map(c => <option key={c.no_kp} value={c.no_kp}>{c.nama_penuh}</option>)}</select></div></div></div>{selectedCalon && currentRes && (<div className="bg-white p-8 border rounded-xl print-area text-slate-900"><div className="text-center mb-6"><img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" /><h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan</h3><h4 className="text-xs font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4><h2 className="text-base font-extrabold uppercase mt-2 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">BORANG RUMUSAN SKOR INDIVIDU TEMU DUGA SISC+</h2></div><table className="w-full text-sm border-collapse border border-slate-400 mb-6 font-semibold"><tbody><tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td><td className="p-2.5 uppercase font-bold">{selectedCalon.nama_penuh}</td></tr><tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">NO KAD PENGENALAN</td><td className="p-2.5 font-mono font-bold">{selectedCalon.no_kp}</td></tr><tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD & SUBJEK</td><td className="p-2.5 uppercase">{selectedCalon.ppd || '-'} ({selectedCalon.sme_subjek || '-'})</td></tr></tbody></table><div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6"><div><table className="w-full text-sm border-collapse border border-slate-400"><thead><tr className="bg-slate-100 border-b border-slate-400 font-bold text-center"><th className="p-2 border-r border-slate-400 text-left">KOMPETENSI</th><th className="p-2 border-r border-slate-400">MARKAH</th></tr></thead><tbody className="font-semibold text-center"><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">BIMBINGAN (25%)</td><td className="p-2">{scoresMap.skor_bimbingan.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">INSTRUKSIONAL (20%)</td><td className="p-2">{scoresMap.skor_instruksional.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">STRATEGIK (20%)</td><td className="p-2">{scoresMap.skor_pemikiran_strategik.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">ANALISIS DATA (15%)</td><td className="p-2">{scoresMap.skor_analisis_data.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">INTERPERSONAL (10%)</td><td className="p-2">{scoresMap.skor_interpersonal.toFixed(1)}</td></tr><tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">EVIDENS (10%)</td><td className="p-2">{scoresMap.skor_evidens.toFixed(1)}</td></tr><tr className="bg-slate-200 font-extrabold"><td className="p-2 border-r border-slate-400 text-left">JUMLAH MARKAH</td><td className="p-2 text-base text-blue-900">{totalMarkah}%</td></tr></tbody></table><div className="mt-4 border border-slate-400 p-3 rounded min-h-[80px] text-sm"><p className="font-bold underline mb-1">Ulasan:</p><p className="italic text-slate-800 text-justify">{currentRes?.ulasan_panel || '-'}</p></div></div><div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400"><h4 className="text-xs font-bold text-center mb-2 uppercase">MARKAH vs KOMPETENSI</h4><RadarChartKeseluruhan results={[currentRes]} /></div></div><div className="mt-12 flex justify-between items-end text-sm text-slate-800"><div><p className="font-bold text-slate-500 uppercase text-xs mb-1">Dicetak Oleh:</p><p className="font-bold uppercase text-base">PENTADBIR SISTEM (ADMIN)</p><p className="uppercase text-xs text-slate-500 mt-0.5">BAHAGIAN PROFESIONALISME GURU</p></div><div className="text-right"><p className="font-bold text-slate-500 uppercase text-xs mb-1">Dinilai & Disahkan Oleh:</p><p className="font-bold uppercase text-base">{currentRes?.nama_panel || '-'}</p><p className="uppercase text-xs text-slate-500 mt-0.5">{panelPenilai ? panelPenilai.jawatan : '-'}</p><p className="mt-1 text-xs font-semibold">Tarikh: {currentRes?.created_at ? new Date(currentRes.created_at).toLocaleDateString('en-GB') : '-'}</p></div></div><div className="mt-8 text-xs text-slate-400 italic border-t pt-3 text-center">* Dokumen ini dijana secara automatik oleh Sistem Pengurusan Temuduga SISC+ dan tidak memerlukan tandatangan fizikal.</div></div>)}</div>)}
               {activeTab === 'tetapan' && (<div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-2xl mx-auto shadow-2xl"><h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Tetapan Semula Katalaluan Admin Utama</h2><form onSubmit={handleResetPassword} className="space-y-6"><input type="email" required placeholder="Emel Rasmi (Cth: admin@moe.gov.my)" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} /><button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-4 rounded-xl text-lg">Hantar Pautan Ke Emel</button></form></div>)}
             </div>
           </div>
