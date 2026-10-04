@@ -11,6 +11,8 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Babel Compiler -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
@@ -19,29 +21,61 @@
         .no-print { display: none !important; }
         body { background: white !important; color: black !important; font-family: 'Arial', sans-serif; }
       }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #0f172a; }
+      ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
   </head>
   <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useState, useEffect } = React;
+      const { useState, useEffect, useRef } = React;
       const SUPABASE_URL = 'https://beyxrxnuuwegkvziglmg.supabase.co';
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
       const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+      // KOMPONEN CARTA RADAR PRESTASI (EKSKLUSIF UNTUK KETUA UTAMA)
+      function RadarChartPrestasi({ results, title }) {
+        const canvasRef = useRef(null);
+        const chartInstanceRef = useRef(null);
+        useEffect(() => {
+          if (!canvasRef.current) return;
+          const ctx = canvasRef.current.getContext('2d');
+          if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+          let avgScores = [0,0,0,0,0,0];
+          if(results.length > 0) {
+            let sums = [0,0,0,0,0,0];
+            results.forEach(r => {
+              sums[0] += ((r.skor_bimbingan||0)/5)*25; sums[1] += ((r.skor_instruksional||0)/5)*20;
+              sums[2] += ((r.skor_pemikiran_strategik||0)/5)*20; sums[3] += ((r.skor_analisis_data||0)/5)*15;
+              sums[4] += ((r.skor_interpersonal||0)/5)*10; sums[5] += ((r.skor_evidens||0)/5)*10;
+            });
+            avgScores = sums.map(s => s / results.length);
+          }
+          chartInstanceRef.current = new Chart(ctx, {
+            type: 'radar',
+            data: { 
+              labels: ['BIMBINGAN', 'INSTRUKSIONAL', 'STRATEGIK', 'ANALISIS', 'INTERPERSONAL', 'EVIDENS'], 
+              datasets: [{ label: title, data: avgScores, backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', borderWidth: 2, pointBackgroundColor: '#F59E0B' }] 
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { r: { angleLines: { color: '#334155' }, grid: { color: '#1e293b' }, pointLabels: { font: { size: 10, weight: 'bold' }, color: '#94a3b8' }, suggestedMin: 0, suggestedMax: 25 } }, plugins: { legend: { display: false } } }
+          });
+          return () => { if (chartInstanceRef.current) chartInstanceRef.current.destroy(); };
+        }, [results, title]);
+        return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
+      }
+
       function PanelApp() {
-        // State Log Masuk & Profil
         const [activePanel, setActivePanel] = useState(null);
         const [inputKP, setInputKP] = useState('');
         const [inputKatalaluan, setInputKatalaluan] = useState('');
         const [loginMsg, setLoginMsg] = useState({ type: '', text: '' });
 
-        // State Penugasan (Lobi)
         const [penugasanList, setPenugasanList] = useState([]);
         const [activePenugasan, setActivePenugasan] = useState(null);
         
-        // State Modul Dalaman
         const [activeTab, setActiveTab] = useState('penilaian');
         const [allCandidates, setAllCandidates] = useState([]);
         const [allScores, setAllScores] = useState([]);
@@ -53,6 +87,11 @@
         const [loading, setLoading] = useState(false);
         const [msg, setMsg] = useState({ type: '', text: '' });
 
+        // STATE BAHARU UNTUK TAB RUMUSAN KESELURUHAN (KETUA PANEL UTAMA)
+        const [filterZonRumusan, setFilterZonRumusan] = useState('KESELURUHAN');
+        const [searchRumusan, setSearchRumusan] = useState('');
+        const [pageRumusan, setPageRumusan] = useState(1);
+
         const RUBRIK = [
           { id: 'skor_bimbingan', nama: '1. Kompetensi Bimbingan Profesional (25%)', wajaran: 25, deskriptor: { 5: "Mengemudi sesi bimbingan berasaskan keperluan guru secara mendalam. Mencetus perubahan amalan guru.", 4: "Melaksanakan sesi bimbingan secara sistematik dan berkesan.", 3: "Melaksanakan sesi bimbingan mengikut struktur yang ditetapkan.", 2: "Melaksanakan sebahagian langkah bimbingan dengan betul.", 1: "Memberi arahan sebagai pendekatan utama tanpa soalan reflektif." } },
           { id: 'skor_instruksional', nama: '2. Kompetensi Instruksional (20%)', wajaran: 20, deskriptor: { 5: "Mentafsir kurikulum dengan tepat dan membimbing guru memilih strategi & pentaksiran selari.", 4: "Mentafsir kurikulum dengan tepat dan mencadangkan strategi pedagogi yang sesuai.", 3: "Menjelaskan struktur utama dokumen kurikulum dengan betul.", 2: "Mengenal pasti sebahagian komponen kurikulum, penerangan masih umum.", 1: "Tidak dapat menjelaskan struktur utama dokumen kurikulum secara berkesan." } },
@@ -62,29 +101,19 @@
           { id: 'skor_evidens', nama: '6. Evidens Profesional (10%)', wajaran: 10, deskriptor: { 5: "Evidens amat relevan, disahkan, impak intervensi & perubahan guru terbukti jelas.", 4: "Evidens relevan dengan pengalaman bimbingan yang kukuh dan impak dapat dikenal pasti.", 3: "Evidens berkaitan pengalaman profesional dan penglibatan calon jelas.", 2: "Evidens kurang relevan dengan peranan sebenar pembimbing SISC+.", 1: "Evidens sangat minimum dan kesahihan tidak dapat dipastikan." } }
         ];
 
-        // LOG MASUK & SEMAKAN PENUGASAN
         const handleLogin = async (e) => {
           e.preventDefault();
           setLoginMsg({ type: '', text: '' });
-          
           const { data: panelData, error: panelError } = await supabase.from('panel_penemuduga').select('*').eq('no_kp', inputKP.trim()).eq('katalaluan', inputKatalaluan.trim()).single();
-
           if (panelError || !panelData) {
             setLoginMsg({ type: 'error', text: 'Maklumat log masuk tidak tepat. Sila semak No. KP dan Kata Laluan.' });
             return;
           }
-
           const { data: tugasData } = await supabase.from('penugasan_panel').select('*').eq('no_kp_panel', panelData.no_kp);
-
           setActivePanel(panelData);
-          if (tugasData && tugasData.length > 0) {
-            setPenugasanList(tugasData);
-          } else {
-            setPenugasanList([]);
-          }
+          if (tugasData && tugasData.length > 0) setPenugasanList(tugasData); else setPenugasanList([]);
         };
 
-        // PILIH PENUGASAN DARI LOBI
         const handlePilihPenugasan = (tugas) => {
           setActivePenugasan(tugas);
           setActiveTab('penilaian');
@@ -94,17 +123,17 @@
         const fetchDataSistem = async () => {
           const { data: dataCalon } = await supabase.from('calon').select('*').order('nama_penuh', { ascending: true });
           if (dataCalon) setAllCandidates(dataCalon);
-          
           const { data: dataSkor } = await supabase.from('penilaian_skor').select('*').order('jumlah_markah', { ascending: false });
           if (dataSkor) setAllScores(dataSkor);
         };
 
-        // LOGIK PENILAIAN CALON
         const calonZonSesi = allCandidates.filter(c => {
            if(!activePenugasan) return false;
            const matchZon = activePenugasan.zon_bertugas === 'SEMUA ZON' || c.zon_temuduga === activePenugasan.zon_bertugas;
-           const matchSesi = String(c.sesi).trim().toUpperCase() === String(activePenugasan.sesi_bertugas).trim().toUpperCase();
-           return matchZon && matchSesi;
+           // Gunakan split untuk ambil bahagian SESI sahaja dari format "SESI 1 (12/10/2026)" jika ada
+           const sesiCalon = c.sesi ? c.sesi.split(' (')[0].trim().toUpperCase() : '';
+           const sesiTugas = activePenugasan.sesi_bertugas ? activePenugasan.sesi_bertugas.split(' (')[0].trim().toUpperCase() : '';
+           return matchZon && sesiCalon === sesiTugas;
         });
 
         const handleSelectKP = (kp) => {
@@ -112,8 +141,6 @@
           const calonFound = calonZonSesi.find(c => String(c.no_kp).trim() === String(kp).trim());
           setSelectedCalon(calonFound || null);
           setMsg({type:'', text:''});
-          
-          // Reset Form
           setScores({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 });
           setUlasan('');
         };
@@ -165,14 +192,28 @@
             setMsg({ type: 'success', text: `Penilaian calon ${selectedCalon.nama_penuh} berjaya direkodkan!` });
             setScores({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 });
             setUlasan(''); setSelectedCalon(null); setSelectedKP('');
-            fetchDataSistem(); // Refresh data for leaderboards
+            fetchDataSistem(); 
           }
           setLoading(false);
         };
 
-        // KOMPONEN UI
+        // KAWALAN PAPARAN (PERANAN)
         const isKetuaZon = activePenugasan?.peranan === 'Ketua Zon Panel Penemuduga' || activePenugasan?.peranan === 'Ketua Panel Utama';
         const isKetuaUtama = activePenugasan?.peranan === 'Ketua Panel Utama';
+
+        // LOGIK PENAPISAN & PAGINATION UNTUK TAB KETUA UTAMA (RUMUSAN KESELURUHAN)
+        const ITEMS_PER_PAGE = 10;
+        const filteredRumusan = allScores.filter(skor => {
+            const cDetail = allCandidates.find(c => c.no_kp === skor.no_kp_calon);
+            const namaCalon = cDetail ? cDetail.nama_penuh : skor.no_kp_calon;
+            const matchZon = filterZonRumusan === 'KESELURUHAN' || skor.zon === filterZonRumusan;
+            const matchSearch = namaCalon.toUpperCase().includes(searchRumusan.toUpperCase()) || skor.no_kp_calon.includes(searchRumusan);
+            return matchZon && matchSearch;
+        });
+        const totalPagesRumusan = Math.ceil(filteredRumusan.length / ITEMS_PER_PAGE) || 1;
+        const displayedRumusan = filteredRumusan.slice((pageRumusan - 1) * ITEMS_PER_PAGE, pageRumusan * ITEMS_PER_PAGE);
+
+        useEffect(() => { setPageRumusan(1); }, [searchRumusan, filterZonRumusan]);
 
         const TabNavButton = ({ id, label }) => (
           <button onClick={() => { setActiveTab(id); setMsg({type:'',text:''}); }} className={`px-5 py-2.5 rounded-lg text-sm font-extrabold transition-all shadow-md ${activeTab === id ? 'bg-amber-500 text-slate-950 scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'}`}>
@@ -183,7 +224,7 @@
         return (
           <div className="min-h-screen flex flex-col">
             
-            {/* HEADER MEWAH */}
+            {/* HEADER */}
             <div className="w-full flex flex-col no-print">
               <div className="bg-white w-full py-4 px-6 md:px-10 flex flex-col md:flex-row justify-between items-center shadow-md z-10 gap-4">
                 <div className="flex items-center gap-4">
@@ -212,13 +253,9 @@
 
             <div className="p-6 max-w-6xl mx-auto w-full flex-grow mt-4">
               
-              {/* SKRIN 1: LOG MASUK */}
               {!activePanel ? (
                 <div className="bg-slate-900 border border-slate-800 p-10 rounded-2xl max-w-lg mx-auto my-12 shadow-2xl">
-                  <div className="text-center mb-8">
-                    <h2 className="text-3xl font-extrabold text-amber-400">Log Masuk Panel</h2>
-                    <p className="text-slate-400 text-base mt-2">Sila masukkan kelayakan akses anda.</p>
-                  </div>
+                  <div className="text-center mb-8"><h2 className="text-3xl font-extrabold text-amber-400">Log Masuk Panel</h2><p className="text-slate-400 text-base mt-2">Sila masukkan kelayakan akses anda.</p></div>
                   {loginMsg.text && (<div className="p-4 mb-6 rounded text-sm font-bold bg-red-900/80 text-red-200 border border-red-500 text-center">{loginMsg.text}</div>)}
                   <form onSubmit={handleLogin} className="space-y-6">
                     <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-4 border border-slate-700 rounded-xl bg-slate-950 text-slate-100 text-lg font-mono font-bold text-center tracking-widest" value={inputKP} onChange={(e) => setInputKP(e.target.value)} />
@@ -226,36 +263,20 @@
                     <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg shadow-lg">Sahkan & Masuk</button>
                   </form>
                 </div>
-              ) : 
-              
-              /* SKRIN 2: LOBI PENUGASAN */
-              !activePenugasan ? (
+              ) : !activePenugasan ? (
                 <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                  <div className="text-center mb-10">
-                     <p className="text-amber-400 font-extrabold uppercase tracking-wider mb-2">Selamat Datang,</p>
-                     <h2 className="text-3xl font-extrabold text-white">{activePanel.nama_penuh}</h2>
-                     <p className="text-slate-400 mt-2">Sila pilih Surat Penugasan anda untuk memulakan sesi.</p>
-                  </div>
-                  
+                  <div className="text-center mb-10"><p className="text-amber-400 font-extrabold uppercase tracking-wider mb-2">Selamat Datang,</p><h2 className="text-3xl font-extrabold text-white">{activePanel.nama_penuh}</h2><p className="text-slate-400 mt-2">Sila pilih Surat Penugasan anda untuk memulakan sesi.</p></div>
                   {penugasanList.length === 0 ? (
-                     <div className="bg-red-900/30 border border-red-500/50 p-8 rounded-2xl text-center max-w-2xl mx-auto">
-                        <span className="text-4xl block mb-4">⚠️</span>
-                        <h3 className="text-xl font-bold text-red-400 mb-2">Tiada Penugasan Aktif</h3>
-                        <p className="text-slate-300">Anda belum diberikan sebarang penugasan zon atau sesi oleh Admin. Sila hubungi Urus Setia untuk tindakan lanjut.</p>
-                     </div>
+                     <div className="bg-red-900/30 border border-red-500/50 p-8 rounded-2xl text-center max-w-2xl mx-auto"><span className="text-4xl block mb-4">⚠️</span><h3 className="text-xl font-bold text-red-400 mb-2">Tiada Penugasan Aktif</h3><p className="text-slate-300">Anda belum diberikan sebarang penugasan zon atau sesi oleh Admin. Sila hubungi Urus Setia untuk tindakan lanjut.</p></div>
                   ) : (
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {penugasanList.map(tugas => (
                            <div key={tugas.id} onClick={() => handlePilihPenugasan(tugas)} className="group bg-slate-900 border border-slate-700 hover:border-amber-400 p-8 rounded-2xl shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer relative overflow-hidden flex flex-col items-center text-center">
                               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                              <span className="text-4xl mb-4 group-hover:scale-110 transition-transform">
-                                 {tugas.peranan === 'Ketua Panel Utama' ? '👑' : tugas.peranan === 'Ketua Zon Panel Penemuduga' ? '⭐' : '📝'}
-                              </span>
+                              <span className="text-4xl mb-4 group-hover:scale-110 transition-transform">{tugas.peranan === 'Ketua Panel Utama' ? '👑' : tugas.peranan === 'Ketua Zon Panel Penemuduga' ? '⭐' : '📝'}</span>
                               <h3 className="text-2xl font-extrabold text-amber-400 mb-1">{tugas.zon_bertugas}</h3>
                               <p className="text-white font-bold text-lg mb-4">{tugas.sesi_bertugas}</p>
-                              <div className="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider mb-6 w-full border border-slate-700">
-                                 {tugas.peranan}
-                              </div>
+                              <div className="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider mb-6 w-full border border-slate-700">{tugas.peranan}</div>
                               <button className="mt-auto bg-slate-800 text-amber-400 font-extrabold px-6 py-3 rounded-lg w-full group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors shadow-lg text-sm">Masuk Bilik</button>
                            </div>
                         ))}
@@ -263,12 +284,10 @@
                   )}
                 </div>
               ) : (
-
-              /* SKRIN 3: MODUL UTAMA (BERDASARKAN TAB) */
               <div>
                   {msg.text && (<div className={`p-5 mb-8 rounded-xl text-base font-bold text-center shadow-lg ${msg.type === 'error' ? 'bg-red-900/90 text-red-200 border border-red-500' : 'bg-emerald-900/90 text-emerald-200 border border-emerald-500'}`}>{msg.text}</div>)}
 
-                  {/* TAB A: PENILAIAN CALON (AKSES SEMUA) */}
+                  {/* TAB A: PENILAIAN CALON */}
                   {activeTab === 'penilaian' && (
                      <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-lg flex flex-col md:flex-row gap-6 items-center">
@@ -316,10 +335,7 @@
                            </div>
 
                            <div className="bg-slate-900 border border-amber-500/40 text-white p-8 rounded-2xl flex justify-between items-center shadow-2xl sticky bottom-6 z-10 backdrop-blur-md bg-opacity-95">
-                              <div>
-                              <p className="text-sm text-slate-400 uppercase font-bold tracking-wider">Jumlah Markah</p>
-                              <div className="text-5xl font-extrabold text-amber-400 mt-1">{calculateTotal()}%</div>
-                              </div>
+                              <div><p className="text-sm text-slate-400 uppercase font-bold tracking-wider">Jumlah Markah</p><div className="text-5xl font-extrabold text-amber-400 mt-1">{calculateTotal()}%</div></div>
                               <button type="submit" disabled={loading} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold px-10 py-5 rounded-xl text-xl shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all disabled:opacity-50">
                               {loading ? 'Menyimpan...' : 'Simpan & Hantar Penilaian'}
                               </button>
@@ -334,39 +350,21 @@
                      <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         <div className="bg-slate-900 border border-emerald-500/30 p-8 rounded-2xl shadow-lg">
                            <div className="flex justify-between items-end border-b border-slate-800 pb-4 mb-6">
-                              <div>
-                                 <h2 className="text-2xl font-extrabold text-emerald-400">Pemantauan Eksekutif Zon</h2>
-                                 <p className="text-slate-400 mt-1">Menyenaraikan status pemarkahan calon bagi {activePenugasan.zon_bertugas} ({activePenugasan.sesi_bertugas})</p>
-                              </div>
-                              <div className="text-right hidden md:block">
-                                 <p className="text-xs font-bold uppercase text-slate-500 mb-1">Jumlah Calon Zon</p>
-                                 <p className="text-3xl font-extrabold text-white">{calonZonSesi.length}</p>
-                              </div>
+                              <div><h2 className="text-2xl font-extrabold text-emerald-400">Pemantauan Eksekutif Zon</h2><p className="text-slate-400 mt-1">Menyenaraikan status pemarkahan calon bagi {activePenugasan.zon_bertugas} ({activePenugasan.sesi_bertugas})</p></div>
+                              <div className="text-right hidden md:block"><p className="text-xs font-bold uppercase text-slate-500 mb-1">Jumlah Calon Zon</p><p className="text-3xl font-extrabold text-white">{calonZonSesi.length}</p></div>
                            </div>
-
                            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
                               <table className="w-full text-left text-sm border-collapse">
-                                 <thead className="sticky top-0 bg-slate-950 shadow z-10">
-                                    <tr className="text-emerald-400 uppercase text-xs border-b border-slate-800">
-                                       <th className="p-4">Nama Calon</th><th className="p-4 text-center">Status</th><th className="p-4 text-center">Markah</th><th className="p-4">Dinilai Oleh</th>
-                                    </tr>
-                                 </thead>
+                                 <thead className="sticky top-0 bg-slate-950 shadow z-10"><tr className="text-emerald-400 uppercase text-xs border-b border-slate-800"><th className="p-4">Nama Calon</th><th className="p-4 text-center">Status</th><th className="p-4 text-center">Markah</th><th className="p-4">Dinilai Oleh</th></tr></thead>
                                  <tbody>
                                     {calonZonSesi.length === 0 ? <tr><td colSpan="4" className="text-center p-8 text-slate-500 italic">Tiada calon berdaftar untuk zon dan sesi ini.</td></tr> : 
                                     calonZonSesi.map(c => {
                                        const skor = allScores.find(s => s.no_kp_calon === c.no_kp);
                                        return (
                                           <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                             <td className="p-4">
-                                                <p className="font-bold text-slate-200 text-base">{c.nama_penuh}</p>
-                                                <p className="font-mono text-xs text-slate-500 mt-1">{c.no_kp}</p>
-                                             </td>
-                                             <td className="p-4 text-center">
-                                                {skor ? <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded text-xs font-bold">SELESAI</span> : <span className="bg-slate-800 text-slate-400 px-3 py-1 rounded text-xs font-bold">BELUM</span>}
-                                             </td>
-                                             <td className="p-4 text-center">
-                                                {skor ? <span className={`text-xl font-extrabold ${skor.status_lulus ? 'text-amber-400' : 'text-rose-400'}`}>{skor.jumlah_markah}%</span> : '-'}
-                                             </td>
+                                             <td className="p-4"><p className="font-bold text-slate-200 text-base">{c.nama_penuh}</p><p className="font-mono text-xs text-slate-500 mt-1">{c.no_kp}</p></td>
+                                             <td className="p-4 text-center">{skor ? <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded text-xs font-bold">SELESAI</span> : <span className="bg-slate-800 text-slate-400 px-3 py-1 rounded text-xs font-bold">BELUM</span>}</td>
+                                             <td className="p-4 text-center">{skor ? <span className={`text-xl font-extrabold ${skor.status_lulus ? 'text-amber-400' : 'text-rose-400'}`}>{skor.jumlah_markah}%</span> : '-'}</td>
                                              <td className="p-4 text-xs font-bold text-slate-300">{skor ? skor.nama_panel : '-'}</td>
                                           </tr>
                                        );
@@ -378,53 +376,78 @@
                      </div>
                   )}
 
-                  {/* TAB C: RUMUSAN KESELURUHAN (AKSES KETUA UTAMA SAHAJA) */}
+                  {/* TAB C: ANALITIK PRESTASI KESELURUHAN (BAHARU - EKSKLUSIF KETUA UTAMA) */}
                   {activeTab === 'rumusan' && isKetuaUtama && (
                      <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                        <div className="bg-slate-900 border border-amber-500/30 p-8 rounded-2xl shadow-lg">
+                        
+                        {/* Bar Kawalan Tapisan */}
+                        <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
+                           <div>
+                              <h2 className="text-xl font-extrabold text-amber-400 flex items-center gap-2"><span className="text-2xl">📊</span> Analitik Prestasi Keseluruhan</h2>
+                              <p className="text-slate-400 text-sm mt-1">Pemantauan taburan markah dan purata kompetensi mengikut zon.</p>
+                           </div>
+                           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                              <input type="text" placeholder="🔍 Cari Nama Calon..." className="w-full md:w-64 p-3 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchRumusan} onChange={(e) => setSearchRumusan(e.target.value)} />
+                              <select className="w-full md:w-48 p-3 border border-slate-700 rounded-lg bg-slate-950 text-amber-400 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonRumusan} onChange={(e) => setFilterZonRumusan(e.target.value)}>
+                                 <option value="KESELURUHAN">Paparan Keseluruhan</option>
+                                 <option value="UTARA">Zon Utara Sahaja</option>
+                                 <option value="TIMUR">Zon Timur Sahaja</option>
+                                 <option value="TENGAH">Zon Tengah Sahaja</option>
+                                 <option value="SELATAN">Zon Selatan Sahaja</option>
+                                 <option value="SABAH">Zon Sabah Sahaja</option>
+                                 <option value="SARAWAK">Zon Sarawak Sahaja</option>
+                              </select>
+                           </div>
+                        </div>
+
+                        {/* Carta Radar Dinamik */}
+                        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center">
+                           <h3 className="w-full text-center text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">
+                              Purata Kompetensi: {filterZonRumusan === 'KESELURUHAN' ? 'Semua Zon' : `Zon ${filterZonRumusan}`}
+                           </h3>
+                           <RadarChartPrestasi results={filteredRumusan} title={`Purata ${filterZonRumusan}`} />
+                        </div>
+
+                        {/* Jadual Senarai Pencapaian Calon */}
+                        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-lg">
                            <div className="flex justify-between items-end border-b border-slate-800 pb-4 mb-6">
-                              <div>
-                                 <h2 className="text-2xl font-extrabold text-amber-400 flex items-center gap-2"><span className="text-3xl">🏆</span> Papan Pendahulu Nasional (Ranking)</h2>
-                                 <p className="text-slate-400 mt-1">Susunan pencapaian tertinggi kesemua calon yang telah dinilai di seluruh negara.</p>
-                              </div>
-                              <div className="text-right hidden md:block">
-                                 <p className="text-xs font-bold uppercase text-slate-500 mb-1">Calon Selesai Dinilai</p>
-                                 <p className="text-3xl font-extrabold text-emerald-400">{allScores.length}</p>
-                              </div>
+                              <h3 className="text-lg font-bold text-slate-200 uppercase tracking-wide">Senarai Pencapaian Calon</h3>
+                              <p className="text-xs font-bold uppercase text-slate-500">Jumlah Rekod: {filteredRumusan.length}</p>
                            </div>
 
-                           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                           <div className="overflow-x-auto min-h-[300px]">
                               <table className="w-full text-left text-sm border-collapse">
-                                 <thead className="sticky top-0 bg-slate-950 shadow z-10">
-                                    <tr className="text-amber-400 uppercase text-xs border-b border-slate-800">
-                                       <th className="p-4 text-center">#</th><th className="p-4">Nama Calon</th><th className="p-4">Zon & Sesi</th><th className="p-4 text-center">Markah</th><th className="p-4 text-center">Keputusan</th>
-                                    </tr>
-                                 </thead>
+                                 <thead className="bg-slate-950 shadow z-10"><tr className="text-amber-400 uppercase text-xs border-b border-slate-800"><th className="p-4 text-center">Kedudukan</th><th className="p-4">Nama Calon</th><th className="p-4">Zon / PPD</th><th className="p-4 text-center">Markah</th><th className="p-4 text-center">Status</th></tr></thead>
                                  <tbody>
-                                    {allScores.length === 0 ? <tr><td colSpan="5" className="text-center p-8 text-slate-500 italic">Belum ada sebarang penilaian direkodkan.</td></tr> : 
-                                    allScores.map((skor, idx) => {
+                                    {displayedRumusan.length === 0 ? <tr><td colSpan="5" className="text-center p-8 text-slate-500 italic">Tiada rekod calon yang menepati carian zon ini.</td></tr> : 
+                                    displayedRumusan.map((skor, idx) => {
                                        const cDetail = allCandidates.find(c => c.no_kp === skor.no_kp_calon);
+                                       // Kedudukan sebenar mengira offset halaman
+                                       const rank = ((pageRumusan - 1) * ITEMS_PER_PAGE) + idx + 1;
                                        return (
                                           <tr key={skor.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                             <td className="p-4 text-center text-lg font-extrabold text-slate-500">{idx + 1}</td>
-                                             <td className="p-4">
-                                                <p className="font-bold text-slate-200 text-base">{cDetail ? cDetail.nama_penuh : 'Data Calon Hilang'}</p>
-                                                <p className="font-mono text-xs text-slate-500 mt-1">{skor.no_kp_calon}</p>
-                                             </td>
-                                             <td className="p-4">
-                                                <p className="font-bold text-amber-300">{skor.zon}</p>
-                                                <p className="text-xs text-slate-400 mt-0.5">{cDetail ? cDetail.sesi : '-'}</p>
-                                             </td>
+                                             <td className="p-4 text-center text-lg font-extrabold text-slate-500">{rank}</td>
+                                             <td className="p-4"><p className="font-bold text-slate-200 text-base">{cDetail ? cDetail.nama_penuh : 'Data Calon Hilang'}</p><p className="font-mono text-xs text-slate-500 mt-1">{skor.no_kp_calon}</p></td>
+                                             <td className="p-4"><p className="font-bold text-amber-300">{skor.zon}</p><p className="text-xs text-slate-400 mt-0.5">{cDetail ? cDetail.ppd : '-'}</p></td>
                                              <td className="p-4 text-center text-xl font-extrabold text-white">{skor.jumlah_markah}%</td>
-                                             <td className="p-4 text-center">
-                                                {skor.status_lulus ? <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded text-xs font-bold tracking-widest">LAYAK</span> : <span className="bg-rose-900/40 text-rose-400 border border-rose-500/30 px-3 py-1 rounded text-xs font-bold tracking-widest">GAGAL</span>}
-                                             </td>
+                                             <td className="p-4 text-center">{skor.status_lulus ? <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded text-xs font-bold tracking-widest">LAYAK</span> : <span className="bg-rose-900/40 text-rose-400 border border-rose-500/30 px-3 py-1 rounded text-xs font-bold tracking-widest">GAGAL</span>}</td>
                                           </tr>
                                        );
                                     })}
                                  </tbody>
                               </table>
                            </div>
+                           
+                           {/* Kawalan Pagination */}
+                           {totalPagesRumusan > 1 && (
+                              <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800">
+                                 <p className="text-xs text-slate-500 font-bold">Halaman {pageRumusan} / {totalPagesRumusan}</p>
+                                 <div className="flex gap-2">
+                                    <button onClick={() => setPageRumusan(prev => Math.max(prev - 1, 1))} disabled={pageRumusan === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button>
+                                    <button onClick={() => setPageRumusan(prev => Math.min(prev + 1, totalPagesRumusan))} disabled={pageRumusan === totalPagesRumusan} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button>
+                                 </div>
+                              </div>
+                           )}
                         </div>
                      </div>
                   )}
