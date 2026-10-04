@@ -23,8 +23,6 @@
         .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; }
         @page { size: A4 landscape; margin: 10mm; }
       }
-      
-      /* CSS Animasi Kad Flip 3D */
       .flip-card { perspective: 1000px; }
       .flip-card-inner { position: relative; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; }
       .flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
@@ -44,7 +42,6 @@
       // ==========================================
       // KOMPONEN CARTA ANALITIK (CHART.JS)
       // ==========================================
-
       function RadarChartNasional({ results }) {
         const canvasRef = useRef(null);
         const chartInstanceRef = useRef(null);
@@ -69,10 +66,7 @@
             type: 'radar',
             data: {
               labels: ['BIMBINGAN', 'INSTRUKSIONAL', 'STRATEGIK', 'ANALISIS', 'INTERPERSONAL', 'EVIDENS'],
-              datasets: [{
-                label: 'Purata Nasional', data: avgScores,
-                backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', borderWidth: 2, pointBackgroundColor: '#F59E0B'
-              }]
+              datasets: [{ label: 'Purata Nasional', data: avgScores, backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', borderWidth: 2, pointBackgroundColor: '#F59E0B' }]
             },
             options: { responsive: true, maintainAspectRatio: false, scales: { r: { angleLines: { color: '#334155' }, grid: { color: '#1e293b' }, pointLabels: { font: { size: 10, weight: 'bold' }, color: '#94a3b8' }, suggestedMin: 0, suggestedMax: 25 } }, plugins: { legend: { display: false } } }
           });
@@ -95,14 +89,7 @@
 
           chartRef.current = new Chart(ctx, {
             type: 'doughnut',
-            data: {
-              labels: ['Layak (>=75%)', 'Belum Layak'],
-              datasets: [{
-                data: results.length === 0 ? [1] : [lulus, gagal],
-                backgroundColor: results.length === 0 ? ['#334155'] : ['#10B981', '#BE123C'],
-                borderWidth: 0, hoverOffset: 4
-              }]
-            },
+            data: { labels: ['Layak (>=75%)', 'Belum Layak'], datasets: [{ data: results.length === 0 ? [1] : [lulus, gagal], backgroundColor: results.length === 0 ? ['#334155'] : ['#10B981', '#BE123C'], borderWidth: 0, hoverOffset: 4 }] },
             options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { color: '#cbd5e1' } } } }
           });
           return () => { if (chartRef.current) chartRef.current.destroy(); };
@@ -139,13 +126,7 @@
 
           chartRef.current = new Chart(ctx, {
             type: 'bar',
-            data: {
-              labels: zons,
-              datasets: [
-                { label: 'Selesai Dinilai', data: selesaiData, backgroundColor: '#D4AF37' },
-                { label: 'Belum Dinilai', data: belumData, backgroundColor: '#334155' }
-              ]
-            },
+            data: { labels: zons, datasets: [ { label: 'Selesai Dinilai', data: selesaiData, backgroundColor: '#D4AF37' }, { label: 'Belum Dinilai', data: belumData, backgroundColor: '#334155' } ] },
             options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true, grid: { display: false }, ticks:{color:'#94a3b8'} }, y: { stacked: true, grid: { color: '#1e293b' }, ticks:{color:'#94a3b8'} } }, plugins: { legend: { position: 'top', labels: { color: '#cbd5e1' } } } }
           });
           return () => { if (chartRef.current) chartRef.current.destroy(); };
@@ -162,11 +143,15 @@
         const [panelList, setPanelList] = useState([]);
         const [resultsList, setResultsList] = useState([]);
         const [urusSetiaList, setUrusSetiaList] = useState([]);
+        
+        // State Baharu untuk Penugasan Panel
+        const [penugasanList, setPenugasanList] = useState([]);
+        const [penugasanForm, setPenugasanForm] = useState({ no_kp_panel: '', zon_bertugas: 'UTARA', sesi_bertugas: '', peranan: 'Panel Penemuduga' });
 
-        const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [editModePanelKp, setEditModePanelKp] = useState(null);
         const [editPanelForm, setEditPanelForm] = useState({});
-        const [panelForm, setPanelForm] = useState({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA', katalaluan: '' });
+        // Zon dibuang dari pendaftaran asas kerana zon kini diuruskan di jadual penugasan
+        const [panelForm, setPanelForm] = useState({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', katalaluan: '' });
 
         const [usForm, setUsForm] = useState({ nama_penuh: '', no_kp: '', katalaluan: '' });
         const [editModeUsKp, setEditModeUsKp] = useState(null);
@@ -189,25 +174,58 @@
         const fetchData = async () => {
           const { data: dataCalon } = await supabase.from('calon').select('*').order('created_at', { ascending: false });
           if (dataCalon) setCalonList(dataCalon);
+          
           const { data: dataPanel } = await supabase.from('panel_penemuduga').select('*').order('created_at', { ascending: false });
           if (dataPanel) setPanelList(dataPanel);
+          
+          const { data: dataTugas } = await supabase.from('penugasan_panel').select('*').order('id', { ascending: false });
+          if (dataTugas) setPenugasanList(dataTugas);
+          
           const { data: dataUS } = await supabase.from('urus_setia').select('*').order('id', { ascending: false });
           if (dataUS) setUrusSetiaList(dataUS);
+          
           const { data: dataSkor } = await supabase.from('penilaian_skor').select('*').order('created_at', { ascending: false });
           if (dataSkor) setResultsList(dataSkor);
         };
 
-        // --- CRUD Fungsi (Dikekalkan sepenuhnya) ---
-        const handleRegisterPanel = async (e) => { e.preventDefault(); const { error } = await supabase.from('panel_penemuduga').insert([panelForm]); if (error) setMsg({ type: 'error', text: 'Gagal mendaftar panel: ' + error.message }); else { setMsg({ type: 'success', text: 'Panel didaftarkan!' }); setPanelForm({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', zon_temuduga: 'UTARA', katalaluan: '' }); fetchData(); } };
+        // --- PENGURUSAN PANEL & PENUGASAN ---
+        const handleRegisterPanel = async (e) => { 
+          e.preventDefault(); 
+          // Berikan nilai 'N/A' untuk zon_temuduga supaya jadual lama tidak ralat
+          const payload = { ...panelForm, zon_temuduga: 'N/A' };
+          const { error } = await supabase.from('panel_penemuduga').insert([payload]); 
+          if (error) setMsg({ type: 'error', text: 'Gagal mendaftar panel: ' + error.message }); 
+          else { setMsg({ type: 'success', text: 'Profil Panel didaftarkan!' }); setPanelForm({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', katalaluan: '' }); fetchData(); } 
+        };
         const startEditPanel = (panel) => { setEditModePanelKp(panel.no_kp); setEditPanelForm({ ...panel }); };
         const handleUpdatePanel = async (kp) => { const { error } = await supabase.from('panel_penemuduga').update(editPanelForm).eq('no_kp', kp); if (error) alert('Gagal: ' + error.message); else { setEditModePanelKp(null); fetchData(); } };
-        const handleDeletePanel = async (kp, nama) => { if (!window.confirm(`Padam profil panel: ${nama}?`)) return; const { error } = await supabase.from('panel_penemuduga').delete().eq('no_kp', kp); if (!error) fetchData(); };
+        const handleDeletePanel = async (kp, nama) => { if (!window.confirm(`Padam profil panel: ${nama}?`)) return; await supabase.from('panel_penemuduga').delete().eq('no_kp', kp); fetchData(); };
 
+        const handleRegisterPenugasan = async (e) => {
+          e.preventDefault();
+          if(!penugasanForm.no_kp_panel) return alert("Sila pilih nama panel terlebih dahulu.");
+          const { error } = await supabase.from('penugasan_panel').insert([{
+            no_kp_panel: penugasanForm.no_kp_panel,
+            zon_bertugas: penugasanForm.zon_bertugas,
+            sesi_bertugas: penugasanForm.sesi_bertugas.toUpperCase(),
+            peranan: penugasanForm.peranan
+          }]);
+          if (error) setMsg({ type: 'error', text: 'Gagal menambah penugasan: ' + error.message });
+          else { setMsg({ type: 'success', text: 'Satu penugasan baharu berjaya ditambahkan kepada panel!' }); setPenugasanForm({ ...penugasanForm, sesi_bertugas: '' }); fetchData(); }
+        };
+        const handleDeletePenugasan = async (id) => {
+          if (!window.confirm('Anda pasti ingin memadam rekod penugasan ini?')) return;
+          await supabase.from('penugasan_panel').delete().eq('id', id);
+          fetchData();
+        };
+
+        // --- PENGURUSAN URUS SETIA ---
         const handleRegisterUS = async (e) => { e.preventDefault(); const { error } = await supabase.from('urus_setia').insert([usForm]); if (!error) { setMsg({ type: 'success', text: 'Urus Setia didaftarkan!' }); setUsForm({ nama_penuh: '', no_kp: '', katalaluan: '' }); fetchData(); } };
         const startEditUS = (us) => { setEditModeUsKp(us.no_kp); setEditUsForm({ ...us }); };
         const handleUpdateUS = async (kp) => { await supabase.from('urus_setia').update(editUsForm).eq('no_kp', kp); setEditModeUsKp(null); fetchData(); };
         const handleDeleteUS = async (kp) => { if(window.confirm('Padam?')) { await supabase.from('urus_setia').delete().eq('no_kp', kp); fetchData(); } };
 
+        // --- PENGURUSAN CALON ---
         const handleRegisterCalon = async (e) => { e.preventDefault(); const { error } = await supabase.from('calon').insert([calonForm]); if (!error) { setMsg({ type: 'success', text: 'Calon didaftar!' }); setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' }); fetchData(); } };
         const handleUpdateCalon = async (kp_lama) => { await supabase.from('calon').update(editCalonForm).eq('no_kp', kp_lama); setEditModeCalonKp(null); fetchData(); };
         const handleDeleteCalon = async (kp) => { if (window.confirm('Padam calon?')) { await supabase.from('calon').delete().eq('no_kp', kp); fetchData(); } };
@@ -226,7 +244,6 @@
         const totalMarkah = currentRes ? currentRes.jumlah_markah : 0;
         const panelPenilai = currentRes ? panelList.find(p => p.nama_penuh === currentRes.nama_panel) : null;
 
-        const displayedPanels = filterZonPanel === 'SEMUA' ? panelList : panelList.filter(p => p.zon_temuduga === filterZonPanel);
         const availableZonCalonList = [...new Set(calonList.map(c => c.zon_temuduga).filter(Boolean))].sort();
         const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || c.zon_temuduga === filterZonCalon).map(c => c.sesi).filter(Boolean))].sort();
         const displayedCalons = calonList.filter(c => {
@@ -239,9 +256,7 @@
 
         // Data for Top Panels Leaderboard
         const topPanels = panelList.map(p => ({
-           nama: p.nama_penuh,
-           zon: p.zon_temuduga,
-           count: resultsList.filter(r => r.nama_panel === p.nama_penuh).length
+           nama: p.nama_penuh, count: resultsList.filter(r => r.nama_panel === p.nama_penuh).length
         })).sort((a,b) => b.count - a.count).slice(0, 5);
 
         // UI Komponen
@@ -275,17 +290,11 @@
             <div className="p-8 max-w-7xl mx-auto w-full flex-grow mt-4">
               {msg.text && ( <div className={`p-4 mb-6 rounded-lg text-base font-bold no-print ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border-red-500' : 'bg-emerald-900/80 text-emerald-200 border-emerald-500'}`}>{msg.text}</div> )}
 
-              {/* =======================================
-                  TAB 1: DASHBOARD (ANALITIK EKSEKUTIF)
-                  ======================================= */}
+              {/* TAB 1: DASHBOARD */}
               {activeTab === 'dashboard' && (
                 <div className="no-print space-y-8">
                   <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide">Pusat Kawalan Eksekutif SISC+</h1>
-                  
-                  {/* BARISAN 1: KAD FLIP 3D */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    
-                    {/* Kad 1: Calon */}
                     <div className="flip-card h-36 bg-transparent">
                       <div className="flip-card-inner">
                         <div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center">
@@ -300,26 +309,18 @@
                         </div>
                       </div>
                     </div>
-
-                    {/* Kad 2: Panel */}
                     <div className="flip-card h-36 bg-transparent">
                       <div className="flip-card-inner">
                         <div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center">
-                          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Panel Penemuduga</p>
+                          <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Akaun Penemuduga</p>
                           <p className="text-5xl font-extrabold text-blue-400 mt-2">{panelList.length}</p>
                         </div>
-                        <div className="flip-card-back bg-slate-800 border border-blue-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center">
-                           <p className="text-blue-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Taburan Panel</p>
-                           <div className="text-sm text-slate-200">
-                             <p>Utara/Timur: <span className="font-bold">{panelList.filter(p=>p.zon_temuduga==='UTARA'||p.zon_temuduga==='TIMUR').length}</span></p>
-                             <p>Tengah/Selatan: <span className="font-bold">{panelList.filter(p=>p.zon_temuduga==='TENGAH'||p.zon_temuduga==='SELATAN').length}</span></p>
-                             <p>Sabah/Sarawak: <span className="font-bold">{panelList.filter(p=>p.zon_temuduga==='SABAH'||p.zon_temuduga==='SARAWAK').length}</span></p>
-                           </div>
+                        <div className="flip-card-back bg-slate-800 border border-blue-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center text-center">
+                           <p className="text-blue-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Jumlah Penugasan Sesi</p>
+                           <p className="text-3xl font-extrabold text-white mt-1">{penugasanList.length}</p>
                         </div>
                       </div>
                     </div>
-
-                    {/* Kad 3: Selesai */}
                     <div className="flip-card h-36 bg-transparent">
                       <div className="flip-card-inner">
                         <div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center">
@@ -333,8 +334,6 @@
                         </div>
                       </div>
                     </div>
-
-                    {/* Kad 4: Kemajuan */}
                     <div className="flip-card h-36 bg-transparent">
                       <div className="flip-card-inner">
                         <div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center">
@@ -350,32 +349,22 @@
                     </div>
                   </div>
 
-                  {/* BARISAN 2: CARTA UTAMA */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                     
-                     {/* Carta Keputusan Lulus Gagal */}
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
                         <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Analisis Kelulusan Calon</h2>
                         <DoughnutChartLulus results={resultsList} />
                      </div>
-
-                     {/* Carta Radar Purata Nasional */}
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center">
                         <h2 className="w-full text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Purata Kompetensi Nasional</h2>
                         <RadarChartNasional results={resultsList} />
                      </div>
                   </div>
 
-                  {/* BARISAN 3: KEMAJUAN ZON & LEADERBOARD */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                     
-                     {/* Kemajuan Zon (Stacked Bar) */}
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg md:col-span-2">
                         <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Prestasi Temu Duga Mengikut Zon</h2>
                         <StackedBarZon calonList={calonList} resultsList={resultsList} />
                      </div>
-
-                     {/* Papan Pendahulu Panel */}
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
                         <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide flex items-center gap-2">
                            <span className="text-amber-400">🏆</span> Top 5 Penilai
@@ -385,10 +374,7 @@
                               <li key={idx} className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
                                  <div className="flex items-center gap-3">
                                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-400">{idx+1}</span>
-                                    <div>
-                                       <p className="text-sm font-bold text-slate-200 truncate w-32 md:w-40">{p.nama}</p>
-                                       <p className="text-xs text-amber-500 uppercase">{p.zon}</p>
-                                    </div>
+                                    <div><p className="text-sm font-bold text-slate-200 truncate w-32 md:w-40">{p.nama}</p></div>
                                  </div>
                                  <div className="text-lg font-extrabold text-emerald-400 bg-emerald-900/30 px-3 py-1 rounded">{p.count}</div>
                               </li>
@@ -396,80 +382,131 @@
                         </ul>
                      </div>
                   </div>
-
                 </div>
               )}
 
               {/* =======================================
-                  TAB 2 - 6: FUNGSI SEDIA ADA DIKEKALKAN
+                  TAB 2: URUS PANEL & PENUGASAN (DIKEMAS KINI)
                   ======================================= */}
-              
-              {/* TAB 2: URUS PANEL */}
               {activeTab === 'panel' && (
                 <div className="no-print space-y-8">
-                  <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl shadow-md">
-                    <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">+ Daftar Panel Penemuduga Baharu</h2>
-                    <form onSubmit={handleRegisterPanel} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <input type="text" required placeholder="Nama Penuh" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
-                      <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
-                      <input type="text" required placeholder="Kata Laluan Sementara (Cth: BPG2026)" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.katalaluan} onChange={(e) => setPanelForm({...panelForm, katalaluan: e.target.value})} />
-                      <input type="text" required placeholder="Jawatan" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
-                      <input type="text" required placeholder="Tempat Bertugas" className="w-full p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
-                      <div className="flex gap-4">
-                        <select className="w-1/2 p-4 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 font-bold" value={panelForm.zon_temuduga} onChange={(e) => setPanelForm({...panelForm, zon_temuduga: e.target.value})}>
-                          <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
-                        </select>
-                        <button type="submit" className="w-1/2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg">Daftar Panel</button>
-                      </div>
-                    </form>
-                  </div>
-                  <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
-                    <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b border-slate-800 pb-4">
-                      <h2 className="text-lg font-bold text-amber-400">Senarai Panel Penemuduga</h2>
-                      <div className="flex items-center gap-3">
-                        <label className="text-sm font-bold text-slate-300">Tapis Zon:</label>
-                        <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold" value={filterZonPanel} onChange={(e) => setFilterZonPanel(e.target.value)}>
-                          <option value="SEMUA">Kesemua Zon</option><option value="UTARA">Utara</option><option value="TIMUR">Timur</option><option value="TENGAH">Tengah</option><option value="SELATAN">Selatan</option><option value="SABAH">Sabah</option><option value="SARAWAK">Sarawak</option>
-                        </select>
-                      </div>
+                  
+                  {/* Borang Input Atas (Grid 2 Kolum) */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    
+                    {/* Borang 1: Pendaftaran Profil Akaun */}
+                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-md">
+                      <h2 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Panel</h2>
+                      <form onSubmit={handleRegisterPanel} className="space-y-4">
+                        <input type="text" required placeholder="Nama Penuh Panel" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
+                        <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
+                        <input type="text" required placeholder="Kata Laluan Log Masuk" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.katalaluan} onChange={(e) => setPanelForm({...panelForm, katalaluan: e.target.value})} />
+                        <input type="text" required placeholder="Jawatan Rasmi" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
+                        <input type="text" required placeholder="Tempat Bertugas / Jabatan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
+                        <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Daftar Akaun Panel</button>
+                      </form>
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-sm border-collapse">
-                        <thead>
-                          <tr className="bg-slate-950 text-amber-400 uppercase text-xs border-b border-slate-800">
-                            <th className="p-4">Nama Panel</th><th className="p-4">No. KP</th><th className="p-4">Kata Laluan</th><th className="p-4">Jawatan</th><th className="p-4">Zon</th><th className="p-4 text-center">Tindakan</th>
+
+                    {/* Borang 2: Agihan Penugasan & Peranan */}
+                    <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow-md">
+                      <h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">2. Agihan Surat Penugasan & Peranan</h2>
+                      <form onSubmit={handleRegisterPenugasan} className="space-y-4">
+                        <label className="block text-xs text-slate-400 font-bold uppercase">Pilih Nama Panel Berdaftar</label>
+                        <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanForm.no_kp_panel} onChange={(e) => setPenugasanForm({...penugasanForm, no_kp_panel: e.target.value})}>
+                          <option value="">-- Sila Pilih Profil Panel --</option>
+                          {panelList.map(p => <option key={p.no_kp} value={p.no_kp}>{p.nama_penuh} ({p.no_kp})</option>)}
+                        </select>
+
+                        <div className="flex gap-4">
+                          <div className="w-1/2">
+                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Zon Bertugas</label>
+                            <select className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.zon_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, zon_bertugas: e.target.value})}>
+                              <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON (K. Utama)</option>
+                            </select>
+                          </div>
+                          <div className="w-1/2">
+                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Sesi / Tarikh</label>
+                            <input type="text" required placeholder="Cth: SESI 1" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})} />
+                          </div>
+                        </div>
+
+                        <label className="block text-xs text-slate-400 font-bold uppercase">Tetapkan Tahap Akses / Peranan</label>
+                        <select className="w-full p-3 border border-emerald-500/50 rounded bg-slate-950 text-emerald-300 text-sm font-bold" value={penugasanForm.peranan} onChange={(e) => setPenugasanForm({...penugasanForm, peranan: e.target.value})}>
+                          <option value="Panel Penemuduga">Panel Penemuduga (Penilai Biasa)</option>
+                          <option value="Ketua Zon Panel Penemuduga">Ketua Zon Panel Penemuduga</option>
+                          <option value="Ketua Panel Utama">Ketua Panel Utama</option>
+                        </select>
+                        <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Tambah Penugasan</button>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Jadual 1: Senarai Penugasan Semasa */}
+                  <div className="bg-slate-900 border border-emerald-500/20 p-6 rounded-xl shadow-lg mt-8">
+                    <h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">Senarai Agihan Penugasan Aktif</h2>
+                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <table className="w-full text-left text-sm border-collapse relative">
+                        <thead className="sticky top-0 bg-slate-950 shadow">
+                          <tr className="text-emerald-400 uppercase text-xs border-b border-slate-800">
+                            <th className="p-3">Nama Pegawai (Panel)</th><th className="p-3">Zon & Sesi</th><th className="p-3">Tahap Peranan</th><th className="p-3 text-center">Tindakan</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {displayedPanels.map((p) => editModePanelKp === p.no_kp ? (
+                          {penugasanList.map(tugas => {
+                            const pDetail = panelList.find(p => p.no_kp === tugas.no_kp_panel);
+                            return (
+                              <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
+                                <td className="p-3 font-bold">{pDetail ? pDetail.nama_penuh : tugas.no_kp_panel}</td>
+                                <td className="p-3 font-mono text-slate-300">{tugas.zon_bertugas} - {tugas.sesi_bertugas}</td>
+                                <td className="p-3 text-emerald-300 font-semibold">{tugas.peranan}</td>
+                                <td className="p-3 text-center"><button onClick={() => handleDeletePenugasan(tugas.id)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Batal Tugas</button></td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Jadual 2: Rekod Profil Asas Panel */}
+                  <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg mt-8">
+                    <h2 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-800 pb-3">Pangkalan Data Profil Panel</h2>
+                    <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                      <table className="w-full text-left text-sm border-collapse relative">
+                        <thead className="sticky top-0 bg-slate-950 shadow">
+                          <tr className="text-amber-400 uppercase text-xs border-b border-slate-800">
+                            <th className="p-3">Nama Penuh</th><th className="p-3">No. KP</th><th className="p-3">Kata Laluan</th><th className="p-3">Jawatan Rasmi</th><th className="p-3 text-center">Tindakan</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {panelList.map((p) => editModePanelKp === p.no_kp ? (
                             <tr key={p.no_kp} className="bg-slate-800">
                               <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
                               <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-slate-400" disabled value={editPanelForm.no_kp} /></td>
                               <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.katalaluan || ''} onChange={e => setEditPanelForm({...editPanelForm, katalaluan: e.target.value})} /></td>
                               <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value.toUpperCase()})} /></td>
-                              <td className="p-2">
-                                <select className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.zon_temuduga} onChange={e => setEditPanelForm({...editPanelForm, zon_temuduga: e.target.value})}>
-                                  <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
-                                </select>
-                              </td>
-                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.no_kp)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelKp(null)} className="bg-slate-600 hover:bg-slate-500 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
+                              <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
                             </tr>
                           ) : (
                             <tr key={p.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                              <td className="p-4 font-bold">{p.nama_penuh}</td><td className="p-4 font-mono text-amber-300">{p.no_kp}</td>
-                              <td className="p-4 font-mono text-slate-300">{p.katalaluan || '123456'}</td><td className="p-4">{p.jawatan}</td>
-                              <td className="p-4"><span className="bg-amber-500/20 text-amber-300 px-2 py-1 rounded text-xs font-bold">{p.zon_temuduga}</span></td>
-                              <td className="p-4 text-center"><button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
+                              <td className="p-3 font-bold">{p.nama_penuh}</td><td className="p-3 font-mono text-amber-300">{p.no_kp}</td>
+                              <td className="p-3 font-mono text-slate-300">{p.katalaluan || '***'}</td><td className="p-3">{p.jawatan}</td>
+                              <td className="p-3 text-center">
+                                <button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button>
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
+
                 </div>
               )}
 
-              {/* TAB 3: URUS SETIA */}
+              {/* =======================================
+                  TAB 3, 4, 5, 6: URUS SETIA, CALON, CETAK, TETAPAN (KEKAL SAMA)
+                  ======================================= */}
               {activeTab === 'urus_setia' && (
                 <div className="no-print space-y-8">
                   <div className="bg-slate-900 border border-blue-500/30 p-8 rounded-xl shadow-md">
@@ -504,7 +541,6 @@
                 </div>
               )}
 
-              {/* TAB 4: URUS CALON */}
               {activeTab === 'urus_calon' && (
                 <div className="no-print space-y-8">
                   <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
@@ -556,7 +592,6 @@
                 </div>
               )}
 
-              {/* TAB 5: CETAK RUMUSAN */}
               {activeTab === 'cetak' && (
                 <div>
                   <div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print">
@@ -616,7 +651,6 @@
                 </div>
               )}
 
-              {/* TAB 6: TETAPAN */}
               {activeTab === 'tetapan' && (
                 <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-2xl mx-auto shadow-2xl">
                   <h2 className="text-xl font-bold text-amber-400 mb-6 border-b border-slate-800 pb-3">Tetapan Semula Katalaluan Admin Utama</h2>
