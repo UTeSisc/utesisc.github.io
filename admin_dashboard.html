@@ -164,9 +164,14 @@
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [pagePanel, setPagePanel] = useState(1);
 
-        // Penugasan Panel Form
+        // Penugasan Form (Bersih: Sesi Berasingan Daripada Tarikh)
         const [penugasanForm, setPenugasanForm] = useState({ 
-          no_kp_panel: '', zon_bertugas: 'UTARA', sesi_bertugas: 'SEMUA SESI', tarikh_mula: '', tarikh_tamat: '', peranan: 'Panel Penemuduga' 
+          no_kp_panel: '', 
+          zon_bertugas: 'UTARA', 
+          sesi_bertugas: 'SEMUA SESI', 
+          tarikh_mula: '', 
+          tarikh_tamat: '', 
+          peranan: 'Panel Penemuduga' 
         });
         const [searchTugas, setSearchTugas] = useState('');
         const [filterZonTugas, setFilterZonTugas] = useState('SEMUA');
@@ -258,7 +263,7 @@
            } 
         };
 
-        // --- FUNGSI PENUGASAN PANEL ---
+        // --- FUNGSI PENUGASAN PANEL (SESI BERSIH DENGAN TARIKH DILABEL KEMAS) ---
         const handleRegisterPenugasan = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -267,13 +272,15 @@
           const formatTarikh = (tStr) => tStr ? tStr.split('-').reverse().join('/') : '';
           let tMula = formatTarikh(penugasanForm.tarikh_mula);
           let tTamat = formatTarikh(penugasanForm.tarikh_tamat);
-          let tarikhLabel = (tMula && tTamat) ? `(${tMula} - ${tTamat})` : tMula ? `(${tMula})` : '';
-          let sesiGabungan = `${penugasanForm.sesi_bertugas} ${tarikhLabel}`.trim();
+          
+          let tarikhLabel = (tMula && tTamat) ? `[${tMula} - ${tTamat}]` : tMula ? `[${tMula}]` : '';
+          let sesiSimpan = penugasanForm.sesi_bertugas; 
+          if(tarikhLabel) sesiSimpan += ` ${tarikhLabel}`;
 
           const payload = { 
              no_kp_panel: penugasanForm.no_kp_panel, 
              zon_bertugas: penugasanForm.zon_bertugas, 
-             sesi_bertugas: sesiGabungan, 
+             sesi_bertugas: sesiSimpan, 
              peranan: penugasanForm.peranan 
           };
           
@@ -421,7 +428,7 @@
         const top10Calon = [...resultsList].sort((a,b) => b.jumlah_markah - a.jumlah_markah).slice(0, 10);
         const ITEMS_PER_PAGE = 10;
         
-        // Tapis Penugasan Panel
+        // Tapis Penugasan
         const filteredPenugasan = penugasanList.filter(tugas => { 
            const pDetail = panelList.find(p => safeStr(p.no_kp) === safeStr(tugas.no_kp_panel)); 
            const namaPanel = pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel).toUpperCase(); 
@@ -641,7 +648,7 @@
                         <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
                         <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
                         <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}>
-                           <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
+                           <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">SARAWAK</option>
                         </select>
                         <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-bold" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value})}>
                            <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
