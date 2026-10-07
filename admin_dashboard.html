@@ -163,7 +163,7 @@
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [pagePanel, setPagePanel] = useState(1);
 
-        // Penugasan Form (DENGAN SESI + TEMPOH TARIKH MULA/TAMAT)
+        // Penugasan Form
         const [penugasanForm, setPenugasanForm] = useState({ 
           no_kp_panel: '', 
           zon_bertugas: 'UTARA', 
@@ -254,7 +254,7 @@
            } 
         };
 
-        // --- FUNGSI PENUGASAN (DENGAN SESI + TEMPOH TARIKH) ---
+        // --- FUNGSI PENUGASAN (DENGAN SESI MUKTAMAD + TEMPOH TARIKH) ---
         const handleRegisterPenugasan = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -853,7 +853,7 @@
                        </form>
                     </div>
 
-                    {/* BORANG AGIHAN PENUGASAN (DENGAN PILIHAN SESI SEKALIKUS & TEMPOH KALENDAR) */}
+                    {/* BORANG AGIHAN PENUGASAN (PILIHAN SESI RINGKAS & TEMPOH KALENDAR) */}
                     <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow-md">
                       <h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">2. Agihan Surat Penugasan & Peranan</h2>
                       <form onSubmit={handleRegisterPenugasan} className="space-y-4">
@@ -872,13 +872,11 @@
                           <div>
                             <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pilihan Sesi</label>
                             <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold text-amber-400" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})}>
-                              <option value="SEMUA SESI">SEMUA SESI (Rangkuman)</option>
-                              <option value="SESI 1">SESI 1 Sahaja</option>
-                              <option value="SESI 2">SESI 2 Sahaja</option>
-                              <option value="SESI 3">SESI 3 Sahaja</option>
-                              <option value="SESI 4">SESI 4 Sahaja</option>
-                              <option value="SESI 5">SESI 5 Sahaja</option>
-                              <option value="SESI KHAS">SESI KHAS Sahaja</option>
+                              <option value="SEMUA SESI">SEMUA SESI</option>
+                              <option value="SESI 1">SESI 1</option>
+                              <option value="SESI 2">SESI 2</option>
+                              <option value="SESI 3">SESI 3</option>
+                              <option value="SESI KHAS">SESI KHAS</option>
                             </select>
                           </div>
                           <div>
