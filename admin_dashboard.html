@@ -520,7 +520,7 @@
                           </div>
                           <div className="flip-card-back bg-slate-800 border border-emerald-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center">
                              <p className="text-emerald-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Status Kelulusan</p>
-                             <div className="flex justify-between text-sm text-slate-200"><span className="text-emerald-400">Layak (>=75%)</span><span className="font-bold">{resultsList.filter(r=>r.status_lulus).length}</span></div>
+                             <div className="flex justify-between text-sm text-slate-200"><span className="text-emerald-400">Layak (&gt;=75%)</span><span className="font-bold">{resultsList.filter(r=>r.status_lulus).length}</span></div>
                              <div className="flex justify-between text-sm text-slate-200 mt-1"><span className="text-rose-400">Belum Layak</span><span className="font-bold">{resultsList.filter(r=>!r.status_lulus).length}</span></div>
                           </div>
                        </div>
