@@ -163,8 +163,15 @@
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [pagePanel, setPagePanel] = useState(1);
 
-        // Penugasan Form
-        const [penugasanForm, setPenugasanForm] = useState({ no_kp_panel: '', zon_bertugas: 'UTARA', sesi_bertugas: 'SESI 1', tarikh_bertugas: '', peranan: 'Panel Penemuduga' });
+        // Penugasan Form (DENGAN SESI + TEMPOH TARIKH MULA/TAMAT)
+        const [penugasanForm, setPenugasanForm] = useState({ 
+          no_kp_panel: '', 
+          zon_bertugas: 'UTARA', 
+          sesi_bertugas: 'SEMUA SESI', 
+          tarikh_mula: '', 
+          tarikh_tamat: '', 
+          peranan: 'Panel Penemuduga' 
+        });
         const [searchTugas, setSearchTugas] = useState('');
         const [filterZonTugas, setFilterZonTugas] = useState('SEMUA');
         const [pageTugas, setPageTugas] = useState(1);
@@ -247,13 +254,18 @@
            } 
         };
 
-        // --- FUNGSI PENUGASAN ---
+        // --- FUNGSI PENUGASAN (DENGAN SESI + TEMPOH TARIKH) ---
         const handleRegisterPenugasan = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
           if(!penugasanForm.no_kp_panel) return alert("Sila pilih nama panel terlebih dahulu.");
-          let tarikhFormat = penugasanForm.tarikh_bertugas ? penugasanForm.tarikh_bertugas.split('-').reverse().join('/') : '';
-          let sesiGabungan = tarikhFormat ? `${penugasanForm.sesi_bertugas} (${tarikhFormat})` : penugasanForm.sesi_bertugas;
+          
+          const formatTarikh = (tStr) => tStr ? tStr.split('-').reverse().join('/') : '';
+          let tMula = formatTarikh(penugasanForm.tarikh_mula);
+          let tTamat = formatTarikh(penugasanForm.tarikh_tamat);
+          
+          let tarikhLabel = (tMula && tTamat) ? `(${tMula} - ${tTamat})` : tMula ? `(${tMula})` : '';
+          let sesiGabungan = `${penugasanForm.sesi_bertugas} ${tarikhLabel}`.trim();
 
           const payload = { 
              no_kp_panel: penugasanForm.no_kp_panel, 
@@ -267,7 +279,7 @@
              setMsg({ type: 'error', text: 'Gagal menambah penugasan: ' + error.message });
           } else {
              setMsg({ type: 'success', text: 'Satu penugasan rasmi telah berjaya ditambahkan kepada panel!' }); 
-             setPenugasanForm({ ...penugasanForm, tarikh_bertugas: '' }); 
+             setPenugasanForm({ ...penugasanForm, tarikh_mula: '', tarikh_tamat: '' }); 
              fetchData(); 
           }
         };
@@ -841,7 +853,7 @@
                        </form>
                     </div>
 
-                    {/* BORANG AGIHAN PENUGASAN */}
+                    {/* BORANG AGIHAN PENUGASAN (DENGAN PILIHAN SESI SEKALIKUS & TEMPOH KALENDAR) */}
                     <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow-md">
                       <h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">2. Agihan Surat Penugasan & Peranan</h2>
                       <form onSubmit={handleRegisterPenugasan} className="space-y-4">
@@ -859,13 +871,23 @@
                           </div>
                           <div>
                             <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pilihan Sesi</label>
-                            <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})}>
-                              <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
+                            <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold text-amber-400" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})}>
+                              <option value="SEMUA SESI">SEMUA SESI (Rangkuman)</option>
+                              <option value="SESI 1">SESI 1 Sahaja</option>
+                              <option value="SESI 2">SESI 2 Sahaja</option>
+                              <option value="SESI 3">SESI 3 Sahaja</option>
+                              <option value="SESI 4">SESI 4 Sahaja</option>
+                              <option value="SESI 5">SESI 5 Sahaja</option>
+                              <option value="SESI KHAS">SESI KHAS Sahaja</option>
                             </select>
                           </div>
-                          <div className="md:col-span-2">
-                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Rasmi Sesi</label>
-                            <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_bertugas: e.target.value})} />
+                          <div>
+                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Mula Bertugas</label>
+                            <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_mula} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_mula: e.target.value})} />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Tamat Bertugas</label>
+                            <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_tamat} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_tamat: e.target.value})} />
                           </div>
                         </div>
                         <label className="block text-xs text-slate-400 font-bold uppercase mt-2">Tetapkan Tahap Akses / Peranan</label>
