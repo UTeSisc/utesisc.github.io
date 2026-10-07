@@ -85,9 +85,7 @@
         }
       };
 
-      // =========================================================================
-      // CARTA RADAR KOMPETENSI (SEKATA SKALA 0 - 5 & BEBAS ANGKAMERAPAT)
-      // =========================================================================
+      // CARTA RADAR KOMPETENSI
       function RadarChartPenilaian({ skor }) {
         const canvasRef = useRef(null);
         const chartRef = useRef(null);
@@ -152,9 +150,7 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      // ==========================================
       // APLIKASI UTAMA PANEL
-      // ==========================================
       function PanelApp() {
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [currentPanel, setCurrentPanel] = useState(null);
@@ -167,6 +163,19 @@
         const [selectedCalonKp, setSelectedCalonKp] = useState('');
         const [selectedCalon, setSelectedCalon] = useState(null);
         const [filterSesiTapis, setFilterSesiTapis] = useState('SEMUA');
+
+        // SUB-MODUL SELECTION STATE (1: Penilaian Keseluruhan, 2: Penilaian Berstesen)
+        const [subModul, setSubModul] = useState(1);
+
+        // PAPAN SUIS (TOGGLE) ACTIVE KOMPETENSI BAGI SUB-MODUL 2
+        const [activeKompetensi, setActiveKompetensi] = useState({
+          skor_bimbingan: true,
+          skor_instruksional: true,
+          skor_pemikiran_strategik: true,
+          skor_analisis_data: true,
+          skor_interpersonal: true,
+          skor_evidens: true
+        });
 
         const [scores, setScores] = useState({
           skor_bimbingan: 0,
@@ -221,9 +230,6 @@
           if (rData) setAllResults(rData);
         };
 
-        // =========================================================================
-        // PENAPISAN CALON PINTAR (CASE-INSENSITIVE & KEBAL PERBEZAAN HURUF)
-        // =========================================================================
         const calonBilik = selectedTugas ? calonList.filter(c => {
           const zonCalon = safeStr(c.zon_temuduga).toUpperCase().trim();
           const zonTugas = safeStr(selectedTugas.zon_bertugas).toUpperCase().trim();
@@ -234,7 +240,6 @@
           const sesiCalonStr = safeStr(c.sesi).toLowerCase().trim();
           const sesiFilterStr = filterSesiTapis.toLowerCase().trim();
 
-          // Jika pilih "SEMUA" di dropdown penapis
           if (sesiFilterStr === 'semua') {
             const sesiTugas = safeStr(selectedTugas.sesi_bertugas).toLowerCase();
             if (sesiTugas.includes("semua sesi")) return true;
@@ -243,7 +248,6 @@
             return sesiCalonStr.includes(namaSesiBersih);
           }
 
-          // Jika pilih Sesi spesifik (cth: pilih "SESI 1")
           return sesiCalonStr.includes(sesiFilterStr);
         }) : [];
 
@@ -252,7 +256,12 @@
           const c = calonList.find(cal => cal.no_kp === kp);
           setSelectedCalon(c || null);
 
-          const existingRes = allResults.find(r => safeStr(r.no_kp_calon).trim() === safeStr(kp).trim());
+          // Cari rekod penilaian panel semasa untuk calon ini
+          const existingRes = allResults.find(r => 
+             safeStr(r.no_kp_calon).trim() === safeStr(kp).trim() && 
+             safeStr(r.nama_panel).trim() === safeStr(currentPanel?.nama_penuh).trim()
+          );
+
           if (existingRes) {
             setScores({
               skor_bimbingan: existingRes.skor_bimbingan || 0,
@@ -263,20 +272,32 @@
               skor_evidens: existingRes.skor_evidens || 0,
               ulasan_panel: existingRes.ulasan_panel || ''
             });
-            setMsg({ type: 'success', text: 'Rekod penilaian calon ini telah dimuatkan. Anda boleh mengemas kini markah.' });
+
+            // Set Suis Active berdasarkan penilaian terdahulu
+            setActiveKompetensi({
+              skor_bimbingan: (existingRes.skor_bimbingan || 0) > 0,
+              skor_instruksional: (existingRes.skor_instruksional || 0) > 0,
+              skor_pemikiran_strategik: (existingRes.skor_pemikiran_strategik || 0) > 0,
+              skor_analisis_data: (existingRes.skor_analisis_data || 0) > 0,
+              skor_interpersonal: (existingRes.skor_interpersonal || 0) > 0,
+              skor_evidens: (existingRes.skor_evidens || 0) > 0
+            });
+
+            setMsg({ type: 'success', text: 'Rekod penilaian anda bagi calon ini telah dimuatkan.' });
           } else {
             setScores({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0, ulasan_panel: '' });
+            setActiveKompetensi({ skor_bimbingan: true, skor_instruksional: true, skor_pemikiran_strategik: true, skor_analisis_data: true, skor_interpersonal: true, skor_evidens: true });
             setMsg({ type: '', text: '' });
           }
         };
 
         const calcJumlahMarkah = () => {
-          const m1 = (Number(scores.skor_bimbingan) / 5) * 25;
-          const m2 = (Number(scores.skor_instruksional) / 5) * 20;
-          const m3 = (Number(scores.skor_pemikiran_strategik) / 5) * 20;
-          const m4 = (Number(scores.skor_analisis_data) / 5) * 15;
-          const m5 = (Number(scores.skor_interpersonal) / 5) * 10;
-          const m6 = (Number(scores.skor_evidens) / 5) * 10;
+          const m1 = activeKompetensi.skor_bimbingan ? (Number(scores.skor_bimbingan) / 5) * 25 : 0;
+          const m2 = activeKompetensi.skor_instruksional ? (Number(scores.skor_instruksional) / 5) * 20 : 0;
+          const m3 = activeKompetensi.skor_pemikiran_strategik ? (Number(scores.skor_pemikiran_strategik) / 5) * 20 : 0;
+          const m4 = activeKompetensi.skor_analisis_data ? (Number(scores.skor_analisis_data) / 5) * 15 : 0;
+          const m5 = activeKompetensi.skor_interpersonal ? (Number(scores.skor_interpersonal) / 5) * 10 : 0;
+          const m6 = activeKompetensi.skor_evidens ? (Number(scores.skor_evidens) / 5) * 10 : 0;
           return Number((m1 + m2 + m3 + m4 + m5 + m6).toFixed(1));
         };
 
@@ -284,12 +305,12 @@
           if (!selectedCalon) return alert("Sila pilih calon terlebih dahulu.");
           const total = calcJumlahMarkah();
           
-          const sBimb = Number(scores.skor_bimbingan);
-          const sInst = Number(scores.skor_instruksional);
-          const sStrat = Number(scores.skor_pemikiran_strategik);
-          const sData = Number(scores.skor_analisis_data);
-          const sInter = Number(scores.skor_interpersonal);
-          const sEvi = Number(scores.skor_evidens);
+          const sBimb = activeKompetensi.skor_bimbingan ? Number(scores.skor_bimbingan) : 0;
+          const sInst = activeKompetensi.skor_instruksional ? Number(scores.skor_instruksional) : 0;
+          const sStrat = activeKompetensi.skor_pemikiran_strategik ? Number(scores.skor_pemikiran_strategik) : 0;
+          const sData = activeKompetensi.skor_analisis_data ? Number(scores.skor_analisis_data) : 0;
+          const sInter = activeKompetensi.skor_interpersonal ? Number(scores.skor_interpersonal) : 0;
+          const sEvi = activeKompetensi.skor_evidens ? Number(scores.skor_evidens) : 0;
 
           let kekuatanArr = [];
           if (sBimb >= 4) kekuatanArr.push("penguasaan bimbingan dan pementoran reflektif secara mendalam");
@@ -300,19 +321,19 @@
           if (sEvi >= 4) kekuatanArr.push("portfolio bimbingan rasmi yang autentik serta berteraskan bukti kukuh");
 
           let peningkatanArr = [];
-          if (sBimb <= 2) peningkatanArr.push("teknik penyoalan reflektif bagi mengelakkan pendekatan berunsur arahan");
-          if (sInst <= 2) peningkatanArr.push("penghubungkaitan standard pembelajaran dengan intervensi PdP");
-          if (sStrat <= 2) peningkatanArr.push("pertimbangan risiko dan analisis punca akar masalah secara mendalam");
-          if (sData <= 2) peningkatanArr.push("penggunaan triangulasi pelbagai sumber data secara berfokus");
-          if (sInter <= 2) peningkatanArr.push("penyampaian hujah secara tersusun serta kawalan emosi yang konsisten");
-          if (sEvi <= 2) peningkatanArr.push("penyusunan bukti impak bimbingan yang lebih relevan dengan peranan SISC+");
+          if (sBimb > 0 && sBimb <= 2) peningkatanArr.push("teknik penyoalan reflektif bagi mengelakkan pendekatan berunsur arahan");
+          if (sInst > 0 && sInst <= 2) peningkatanArr.push("penghubungkaitan standard pembelajaran dengan intervensi PdP");
+          if (sStrat > 0 && sStrat <= 2) peningkatanArr.push("pertimbangan risiko dan analisis punca akar masalah secara mendalam");
+          if (sData > 0 && sData <= 2) peningkatanArr.push("penggunaan triangulasi pelbagai sumber data secara berfokus");
+          if (sInter > 0 && sInter <= 2) peningkatanArr.push("penyampaian hujah secara tersusun serta kawalan emosi yang konsisten");
+          if (sEvi > 0 && sEvi <= 2) peningkatanArr.push("penyusunan bukti impak bimbingan yang lebih relevan dengan peranan SISC+");
 
-          let ulasanPenuh = `Calon ${selectedCalon.nama_penuh} telah melalui sesi temu duga penilaian kompetensi SISC+ dan mencapai markah keseluruhan sebanyak ${total}%.\n\n`;
+          let ulasanPenuh = `Calon ${selectedCalon.nama_penuh} telah melalui sesi temu duga penilaian kompetensi SISC+.\n\n`;
 
           if (kekuatanArr.length > 0) {
              ulasanPenuh += `Teras kekuatan calon terbukti menerusi ${kekuatanArr.join(", ")}. `;
           } else {
-             ulasanPenuh += `Calon mempamerkan penguasaan asas yang memadai dalam pengendalian sesi bimbingan. `;
+             ulasanPenuh += `Calon mempamerkan penguasaan asas yang memadai dalam pengendalian sesi bimbingan stesen ini. `;
           }
 
           if (peningkatanArr.length > 0) {
@@ -321,14 +342,16 @@
              ulasanPenuh += `Secara umumnya, calon berupaya memenuhi standard kompetensi unggul yang ditetapkan.\n\n`;
           }
 
-          if (total >= 85) {
-             ulasanPenuh += `RUMUSAN PANEL: Calon sangat cemerlang dan berpotensi tinggi untuk bertindak sebagai teraju utama pembimbing instruksional. Diperakukan LAYAK dengan cemerlang bagi pelantikan Pegawai SISC+.`;
-          } else if (total >= 75) {
-             ulasanPenuh += `RUMUSAN PANEL: Calon mempamerkan kompetensi yang kukuh dan memenuhi kriteria kelayakan. Diperakukan LAYAK untuk dilantik sebagai Pegawai SISC+.`;
-          } else if (total >= 60) {
-             ulasanPenuh += `RUMUSAN PANEL: Calon mencapai tahap sederhana tetapi masih memerlukan peningkatan dalam aspek teras. BELUM DISYORKAN untuk pelantikan semasa.`;
+          if (subModul === 1) {
+             if (total >= 85) {
+                ulasanPenuh += `RUMUSAN PANEL: Calon sangat cemerlang dan berpotensi tinggi untuk bertindak sebagai teraju utama pembimbing instruksional. Diperakukan LAYAK dengan cemerlang bagi pelantikan Pegawai SISC+.`;
+             } else if (total >= 75) {
+                ulasanPenuh += `RUMUSAN PANEL: Calon mempamerkan kompetensi yang kukuh dan memenuhi kriteria kelayakan. Diperakukan LAYAK untuk dilantik sebagai Pegawai SISC+.`;
+             } else {
+                ulasanPenuh += `RUMUSAN PANEL: Calon mencapai tahap sederhana. BELUM DISYORKAN untuk pelantikan semasa.`;
+             }
           } else {
-             ulasanPenuh += `RUMUSAN PANEL: Calon belum mencapai standard minimum kompetensi yang diperlukan bagi peranan SISC+. TIDAK LAYAK untuk pelantikan semasa.`;
+             ulasanPenuh += `RUMUSAN STESEN: Skor kompetensi yang dinilai di stesen ini telah direkodkan secara rasmi untuk penggabungan markah muktamad.`;
           }
 
           setScores(prev => ({ ...prev, ulasan_panel: ulasanPenuh }));
@@ -345,18 +368,21 @@
             no_kp_calon: selectedCalon.no_kp,
             nama_panel: currentPanel.nama_penuh,
             zon: selectedTugas.zon_bertugas,
-            skor_bimbingan: Number(scores.skor_bimbingan),
-            skor_instruksional: Number(scores.skor_instruksional),
-            skor_pemikiran_strategik: Number(scores.skor_pemikiran_strategik),
-            skor_analisis_data: Number(scores.skor_analisis_data),
-            skor_interpersonal: Number(scores.skor_interpersonal),
-            skor_evidens: Number(scores.skor_evidens),
+            skor_bimbingan: activeKompetensi.skor_bimbingan ? Number(scores.skor_bimbingan) : 0,
+            skor_instruksional: activeKompetensi.skor_instruksional ? Number(scores.skor_instruksional) : 0,
+            skor_pemikiran_strategik: activeKompetensi.skor_pemikiran_strategik ? Number(scores.skor_pemikiran_strategik) : 0,
+            skor_analisis_data: activeKompetensi.skor_analisis_data ? Number(scores.skor_analisis_data) : 0,
+            skor_interpersonal: activeKompetensi.skor_interpersonal ? Number(scores.skor_interpersonal) : 0,
+            skor_evidens: activeKompetensi.skor_evidens ? Number(scores.skor_evidens) : 0,
             jumlah_markah: total,
             status_lulus: isLulus,
             ulasan_panel: scores.ulasan_panel
           };
 
-          const existingRes = allResults.find(r => safeStr(r.no_kp_calon).trim() === safeStr(selectedCalon.no_kp).trim());
+          const existingRes = allResults.find(r => 
+             safeStr(r.no_kp_calon).trim() === safeStr(selectedCalon.no_kp).trim() &&
+             safeStr(r.nama_panel).trim() === safeStr(currentPanel.nama_penuh).trim()
+          );
 
           let err = null;
           if (existingRes) {
@@ -370,7 +396,7 @@
           if (err) {
             setMsg({ type: 'error', text: 'Gagal menyimpan penilaian: ' + err.message });
           } else {
-            setMsg({ type: 'success', text: `Penilaian untuk ${selectedCalon.nama_penuh} berjaya disimpan! (${total}%)` });
+            setMsg({ type: 'success', text: `Penilaian anda untuk ${selectedCalon.nama_penuh} berjaya disimpan!` });
             fetchPenugasanAndData(currentPanel.no_kp);
           }
         };
@@ -385,7 +411,8 @@
           setPassInput('');
         };
 
-        const getRubrikTextEksak = (key, val) => {
+        const getRubrikTextEksak = (key, val, isActive) => {
+          if (!isActive) return '❌ KOMPETENSI INI TIDAK DINILAI DI STESEN INI.';
           const num = Math.round(Number(val));
           if (num === 0) return 'Sila pilih julat skor 1 hingga 5 untuk melihat panduan rubrik BARS rasmi.';
           return DESKRIPSI_RUBRIK_EKSAK[key]?.[num] || 'Standard Penilaian BARS Ditentukan';
@@ -516,7 +543,7 @@
                       </div>
                    )}
 
-                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI (BAIK PULIH HURUF BESAR/KECIL) */}
+                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI */}
                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-3">
                          <label className="text-xs font-extrabold uppercase text-amber-400">PILIH CALON UNTUK DINILAI ({selectedTugas.zon_bertugas})</label>
@@ -536,10 +563,13 @@
                       <select className="w-full p-4 border border-slate-700 rounded-xl text-base font-bold bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none" value={selectedCalonKp} onChange={e => handleSelectCalon(e.target.value)}>
                          <option value="">-- Sila Pilih Nama Calon --</option>
                          {calonBilik.map(c => {
-                            const dinilai = allResults.some(r => safeStr(r.no_kp_calon).trim() === safeStr(c.no_kp).trim());
+                            const dinilaiByMe = allResults.some(r => 
+                               safeStr(r.no_kp_calon).trim() === safeStr(c.no_kp).trim() && 
+                               safeStr(r.nama_panel).trim() === safeStr(currentPanel?.nama_penuh).trim()
+                            );
                             return (
                                <option key={c.no_kp} value={c.no_kp}>
-                                  {dinilai ? '✅ ' : '⏳ '} {c.nama_penuh} ({c.no_kp}) - PPD: {c.ppd || 'N/A'} [{c.sesi}]
+                                  {dinilaiByMe ? '✅ ' : '⏳ '} {c.nama_penuh} ({c.no_kp}) - PPD: {c.ppd || 'N/A'} [{c.sesi}]
                                </option>
                             );
                          })}
@@ -547,192 +577,269 @@
                    </div>
 
                    {selectedCalon && (
-                      <form onSubmit={handleSavePenilaian} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                      <div className="space-y-6">
                          
-                         <div className="lg:col-span-2 space-y-6">
-                            
-                            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow flex justify-between items-center">
-                               <div>
-                                  <h2 className="text-xl font-extrabold text-white uppercase">{selectedCalon.nama_penuh}</h2>
-                                  <p className="text-xs text-slate-400 font-mono mt-0.5">NO. KP: {selectedCalon.no_kp} | PPD: {selectedCalon.ppd} | SME: {selectedCalon.sme_subjek || 'N/A'}</p>
-                               </div>
-                               <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${selectedCalon.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
-                                  STATUS: {selectedCalon.kehadiran || 'BELUM'}
-                               </span>
+                         {/* PILIHAN SUB-MODUL PENILAIAN (DUAL-MODE SELECTION) */}
+                         <div className="bg-slate-900 border border-amber-500/40 p-4 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div>
+                               <span className="text-xs text-amber-400 font-extrabold uppercase tracking-wide">PILIH SUB-MODUL PENILAIAN:</span>
+                               <p className="text-xs text-slate-400">Tentukan sama ada anda menilai keseluruhan 6 kompetensi atau mengikut stesen khas.</p>
                             </div>
-
-                            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-5">
-                               <h3 className="text-sm font-extrabold text-amber-400 uppercase border-b border-slate-800 pb-2">Borang Penilaian Kompetensi & Rubrik Deskriptor BARS (Excel KPM)</h3>
-
-                               {/* 1. BIMBINGAN (25%) */}
-                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                     <div>
-                                        <label className="text-sm font-bold text-slate-200">1. BIMBINGAN PROFESIONAL</label>
-                                        <span className="ml-2 text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 25%</span>
-                                     </div>
-                                     <div className="text-right">
-                                        <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_bimbingan} / 5</span>
-                                        <span className="block text-[10px] text-slate-400 mt-0.5">Sumbangan: {((Number(scores.skor_bimbingan)/5)*25).toFixed(1)}%</span>
-                                     </div>
-                                  </div>
-                                  <input type="range" min="0" max="5" step="1" value={scores.skor_bimbingan} onChange={e => setScores({...scores, skor_bimbingan: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
-                                  <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
-                                     <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_bimbingan}:</p>
-                                     <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_bimbingan', scores.skor_bimbingan)}</p>
-                                  </div>
-                               </div>
-
-                               {/* 2. INSTRUKSIONAL (20%) */}
-                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                     <div>
-                                        <label className="text-sm font-bold text-slate-200">2. INSTRUKSIONAL</label>
-                                        <span className="ml-2 text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 20%</span>
-                                     </div>
-                                     <div className="text-right">
-                                        <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_instruksional} / 5</span>
-                                        <span className="block text-[10px] text-slate-400 mt-0.5">Sumbangan: {((Number(scores.skor_instruksional)/5)*20).toFixed(1)}%</span>
-                                     </div>
-                                  </div>
-                                  <input type="range" min="0" max="5" step="1" value={scores.skor_instruksional} onChange={e => setScores({...scores, skor_instruksional: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
-                                  <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
-                                     <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_instruksional}:</p>
-                                     <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_instruksional', scores.skor_instruksional)}</p>
-                                  </div>
-                               </div>
-
-                               {/* 3. STRATEGIK (20%) */}
-                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                     <div>
-                                        <label className="text-sm font-bold text-slate-200">3. PEMIKIRAN STRATEGIK</label>
-                                        <span className="ml-2 text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 20%</span>
-                                     </div>
-                                     <div className="text-right">
-                                        <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_pemikiran_strategik} / 5</span>
-                                        <span className="block text-[10px] text-slate-400 mt-0.5">Sumbangan: {((Number(scores.skor_pemikiran_strategik)/5)*20).toFixed(1)}%</span>
-                                     </div>
-                                  </div>
-                                  <input type="range" min="0" max="5" step="1" value={scores.skor_pemikiran_strategik} onChange={e => setScores({...scores, skor_pemikiran_strategik: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
-                                  <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
-                                     <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_pemikiran_strategik}:</p>
-                                     <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_pemikiran_strategik', scores.skor_pemikiran_strategik)}</p>
-                                  </div>
-                               </div>
-
-                               {/* 4. ANALISIS DATA (15%) */}
-                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                     <div>
-                                        <label className="text-sm font-bold text-slate-200">4. ANALISIS DATA</label>
-                                        <span className="ml-2 text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 15%</span>
-                                     </div>
-                                     <div className="text-right">
-                                        <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_analisis_data} / 5</span>
-                                        <span className="block text-[10px] text-slate-400 mt-0.5">Sumbangan: {((Number(scores.skor_analisis_data)/5)*15).toFixed(1)}%</span>
-                                     </div>
-                                  </div>
-                                  <input type="range" min="0" max="5" step="1" value={scores.skor_analisis_data} onChange={e => setScores({...scores, skor_analisis_data: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
-                                  <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
-                                     <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_analisis_data}:</p>
-                                     <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_analisis_data', scores.skor_analisis_data)}</p>
-                                  </div>
-                               </div>
-
-                               {/* 5. INTERPERSONAL (10%) */}
-                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                     <div>
-                                        <label className="text-sm font-bold text-slate-200">5. INTERPERSONAL</label>
-                                        <span className="ml-2 text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 10%</span>
-                                     </div>
-                                     <div className="text-right">
-                                        <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_interpersonal} / 5</span>
-                                        <span className="block text-[10px] text-slate-400 mt-0.5">Sumbangan: {((Number(scores.skor_interpersonal)/5)*10).toFixed(1)}%</span>
-                                     </div>
-                                  </div>
-                                  <input type="range" min="0" max="5" step="1" value={scores.skor_interpersonal} onChange={e => setScores({...scores, skor_interpersonal: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
-                                  <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
-                                     <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_interpersonal}:</p>
-                                     <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_interpersonal', scores.skor_interpersonal)}</p>
-                                  </div>
-                               </div>
-
-                               {/* 6. EVIDENS (10%) */}
-                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                     <div>
-                                        <label className="text-sm font-bold text-slate-200">6. EVIDENS PROFESIONAL</label>
-                                        <span className="ml-2 text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 10%</span>
-                                     </div>
-                                     <div className="text-right">
-                                        <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_evidens} / 5</span>
-                                        <span className="block text-[10px] text-slate-400 mt-0.5">Sumbangan: {((Number(scores.skor_evidens)/5)*10).toFixed(1)}%</span>
-                                     </div>
-                                  </div>
-                                  <input type="range" min="0" max="5" step="1" value={scores.skor_evidens} onChange={e => setScores({...scores, skor_evidens: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
-                                  <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
-                                     <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_evidens}:</p>
-                                     <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_evidens', scores.skor_evidens)}</p>
-                                  </div>
-                               </div>
-
-                               {/* ULASAN & BUTANG JANA RUMUSAN */}
-                               <div className="pt-2 space-y-2">
-                                  <div className="flex justify-between items-center">
-                                     <label className="block text-xs font-bold text-slate-400 uppercase">Ulasan & Penjanaan Rumusan Rasmi Panel</label>
-                                     <button type="button" onClick={handleAutoJanaUlasan} className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-lg text-xs transition-all shadow">
-                                        ⚡ Jana Rumusan
-                                     </button>
-                                  </div>
-                                  <textarea rows="7" placeholder="Klik 'Jana Rumusan' untuk menghasilkan draf ulasan rasmi yang kreatif berdasar kekuatan unik calon..." className="w-full p-4 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono leading-relaxed text-slate-100 focus:border-amber-500 focus:outline-none" value={scores.ulasan_panel} onChange={e => setScores({...scores, ulasan_panel: e.target.value})}></textarea>
-                               </div>
-
-                            </div>
-                         </div>
-
-                         <div className="space-y-6">
-                            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg sticky top-6">
-                               <h3 className="text-xs font-extrabold text-amber-400 uppercase border-b border-slate-800 pb-2 mb-4 text-center">Rumusan Markah Terkumpul</h3>
-                               
-                               <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center mb-6">
-                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">JUMLAH MARKAH</span>
-                                  <p className="text-6xl font-black text-amber-400 mt-2">{calcJumlahMarkah()}%</p>
-                                  <div className="mt-3">
-                                     <span className={`px-4 py-1.5 rounded-full text-xs font-extrabold ${calcJumlahMarkah() >= 75 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-red-500/20 text-red-400 border border-red-500/50'}`}>
-                                        {calcJumlahMarkah() >= 75 ? 'LAYAK (75% KE ATAS)' : 'BELUM LAYAK'}
-                                     </span>
-                                  </div>
-                               </div>
-
-                               <RadarChartPenilaian skor={scores} />
-
-                               <button type="submit" className="w-full mt-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl text-base shadow-xl transition-transform active:scale-95">
-                                  💾 SIMPAN PENILAIAN CALON
+                            <div className="flex gap-2 w-full md:w-auto">
+                               <button type="button" onClick={() => { setSubModul(1); setActiveKompetensi({ skor_bimbingan: true, skor_instruksional: true, skor_pemikiran_strategik: true, skor_analisis_data: true, skor_interpersonal: true, skor_evidens: true }); }} className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl font-extrabold text-xs transition-all border ${subModul === 1 ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg scale-105' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
+                                  🔘 Sub-Modul 1: Penilaian Keseluruhan (6 Elemen)
+                               </button>
+                               <button type="button" onClick={() => setSubModul(2)} className={`flex-1 md:flex-none px-4 py-2.5 rounded-xl font-extrabold text-xs transition-all border ${subModul === 2 ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg scale-105' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
+                                  🔘 Sub-Modul 2: Penilaian Berstesen / Pilih Elemen
                                </button>
                             </div>
                          </div>
 
-                      </form>
+                         <form onSubmit={handleSavePenilaian} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            
+                            <div className="lg:col-span-2 space-y-6">
+                               
+                               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow flex justify-between items-center">
+                                  <div>
+                                     <h2 className="text-xl font-extrabold text-white uppercase">{selectedCalon.nama_penuh}</h2>
+                                     <p className="text-xs text-slate-400 font-mono mt-0.5">NO. KP: {selectedCalon.no_kp} | PPD: {selectedCalon.ppd} | SME: {selectedCalon.sme_subjek || 'N/A'}</p>
+                                  </div>
+                                  <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${selectedCalon.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
+                                     STATUS: {selectedCalon.kehadiran || 'BELUM'}
+                                  </span>
+                               </div>
+
+                               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-5">
+                                  <h3 className="text-sm font-extrabold text-amber-400 uppercase border-b border-slate-800 pb-2">Borang Penilaian Kompetensi & Rubrik BARS Rasmi KPM</h3>
+
+                                  {/* 1. BIMBINGAN (25%) */}
+                                  <div className={`p-4 rounded-xl border transition-all ${activeKompetensi.skor_bimbingan ? 'bg-slate-950 border-slate-800' : 'bg-slate-900/40 border-slate-800/40 opacity-40'}`}>
+                                     <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                           {subModul === 2 && (
+                                              <input type="checkbox" checked={activeKompetensi.skor_bimbingan} onChange={e => setActiveKompetensi({...activeKompetensi, skor_bimbingan: e.target.checked})} className="w-4 h-4 accent-amber-500 rounded cursor-pointer" />
+                                           )}
+                                           <label className="text-sm font-bold text-slate-200">1. BIMBINGAN PROFESIONAL</label>
+                                           <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 25%</span>
+                                        </div>
+                                        <div className="text-right">
+                                           <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{activeKompetensi.skor_bimbingan ? scores.skor_bimbingan : 0} / 5</span>
+                                        </div>
+                                     </div>
+                                     {activeKompetensi.skor_bimbingan ? (
+                                        <>
+                                           <input type="range" min="0" max="5" step="1" value={scores.skor_bimbingan} onChange={e => setScores({...scores, skor_bimbingan: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                                           <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
+                                              <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_bimbingan}:</p>
+                                              <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_bimbingan', scores.skor_bimbingan, true)}</p>
+                                           </div>
+                                        </>
+                                     ) : (
+                                        <p className="text-xs text-red-400 italic pt-1">❌ Tidak dinilai di stesen ini.</p>
+                                     )}
+                                  </div>
+
+                                  {/* 2. INSTRUKSIONAL (20%) */}
+                                  <div className={`p-4 rounded-xl border transition-all ${activeKompetensi.skor_instruksional ? 'bg-slate-950 border-slate-800' : 'bg-slate-900/40 border-slate-800/40 opacity-40'}`}>
+                                     <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                           {subModul === 2 && (
+                                              <input type="checkbox" checked={activeKompetensi.skor_instruksional} onChange={e => setActiveKompetensi({...activeKompetensi, skor_instruksional: e.target.checked})} className="w-4 h-4 accent-amber-500 rounded cursor-pointer" />
+                                           )}
+                                           <label className="text-sm font-bold text-slate-200">2. INSTRUKSIONAL</label>
+                                           <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 20%</span>
+                                        </div>
+                                        <div className="text-right">
+                                           <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{activeKompetensi.skor_instruksional ? scores.skor_instruksional : 0} / 5</span>
+                                        </div>
+                                     </div>
+                                     {activeKompetensi.skor_instruksional ? (
+                                        <>
+                                           <input type="range" min="0" max="5" step="1" value={scores.skor_instruksional} onChange={e => setScores({...scores, skor_instruksional: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                                           <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
+                                              <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_instruksional}:</p>
+                                              <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_instruksional', scores.skor_instruksional, true)}</p>
+                                           </div>
+                                        </>
+                                     ) : (
+                                        <p className="text-xs text-red-400 italic pt-1">❌ Tidak dinilai di stesen ini.</p>
+                                     )}
+                                  </div>
+
+                                  {/* 3. STRATEGIK (20%) */}
+                                  <div className={`p-4 rounded-xl border transition-all ${activeKompetensi.skor_pemikiran_strategik ? 'bg-slate-950 border-slate-800' : 'bg-slate-900/40 border-slate-800/40 opacity-40'}`}>
+                                     <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                           {subModul === 2 && (
+                                              <input type="checkbox" checked={activeKompetensi.skor_pemikiran_strategik} onChange={e => setActiveKompetensi({...activeKompetensi, skor_pemikiran_strategik: e.target.checked})} className="w-4 h-4 accent-amber-500 rounded cursor-pointer" />
+                                           )}
+                                           <label className="text-sm font-bold text-slate-200">3. PEMIKIRAN STRATEGIK</label>
+                                           <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 20%</span>
+                                        </div>
+                                        <div className="text-right">
+                                           <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{activeKompetensi.skor_pemikiran_strategik ? scores.skor_pemikiran_strategik : 0} / 5</span>
+                                        </div>
+                                     </div>
+                                     {activeKompetensi.skor_pemikiran_strategik ? (
+                                        <>
+                                           <input type="range" min="0" max="5" step="1" value={scores.skor_pemikiran_strategik} onChange={e => setScores({...scores, skor_pemikiran_strategik: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                                           <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
+                                              <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_pemikiran_strategik}:</p>
+                                              <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_pemikiran_strategik', scores.skor_pemikiran_strategik, true)}</p>
+                                           </div>
+                                        </>
+                                     ) : (
+                                        <p className="text-xs text-red-400 italic pt-1">❌ Tidak dinilai di stesen ini.</p>
+                                     )}
+                                  </div>
+
+                                  {/* 4. ANALISIS DATA (15%) */}
+                                  <div className={`p-4 rounded-xl border transition-all ${activeKompetensi.skor_analisis_data ? 'bg-slate-950 border-slate-800' : 'bg-slate-900/40 border-slate-800/40 opacity-40'}`}>
+                                     <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                           {subModul === 2 && (
+                                              <input type="checkbox" checked={activeKompetensi.skor_analisis_data} onChange={e => setActiveKompetensi({...activeKompetensi, skor_analisis_data: e.target.checked})} className="w-4 h-4 accent-amber-500 rounded cursor-pointer" />
+                                           )}
+                                           <label className="text-sm font-bold text-slate-200">4. ANALISIS DATA</label>
+                                           <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 15%</span>
+                                        </div>
+                                        <div className="text-right">
+                                           <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{activeKompetensi.skor_analisis_data ? scores.skor_analisis_data : 0} / 5</span>
+                                        </div>
+                                     </div>
+                                     {activeKompetensi.skor_analisis_data ? (
+                                        <>
+                                           <input type="range" min="0" max="5" step="1" value={scores.skor_analisis_data} onChange={e => setScores({...scores, skor_analisis_data: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                                           <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
+                                              <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_analisis_data}:</p>
+                                              <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_analisis_data', scores.skor_analisis_data, true)}</p>
+                                           </div>
+                                        </>
+                                     ) : (
+                                        <p className="text-xs text-red-400 italic pt-1">❌ Tidak dinilai di stesen ini.</p>
+                                     )}
+                                  </div>
+
+                                  {/* 5. INTERPERSONAL (10%) */}
+                                  <div className={`p-4 rounded-xl border transition-all ${activeKompetensi.skor_interpersonal ? 'bg-slate-950 border-slate-800' : 'bg-slate-900/40 border-slate-800/40 opacity-40'}`}>
+                                     <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                           {subModul === 2 && (
+                                              <input type="checkbox" checked={activeKompetensi.skor_interpersonal} onChange={e => setActiveKompetensi({...activeKompetensi, skor_interpersonal: e.target.checked})} className="w-4 h-4 accent-amber-500 rounded cursor-pointer" />
+                                           )}
+                                           <label className="text-sm font-bold text-slate-200">5. INTERPERSONAL</label>
+                                           <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 10%</span>
+                                        </div>
+                                        <div className="text-right">
+                                           <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{activeKompetensi.skor_interpersonal ? scores.skor_interpersonal : 0} / 5</span>
+                                        </div>
+                                     </div>
+                                     {activeKompetensi.skor_interpersonal ? (
+                                        <>
+                                           <input type="range" min="0" max="5" step="1" value={scores.skor_interpersonal} onChange={e => setScores({...scores, skor_interpersonal: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                                           <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
+                                              <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_interpersonal}:</p>
+                                              <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_interpersonal', scores.skor_interpersonal, true)}</p>
+                                           </div>
+                                        </>
+                                     ) : (
+                                        <p className="text-xs text-red-400 italic pt-1">❌ Tidak dinilai di stesen ini.</p>
+                                     )}
+                                  </div>
+
+                                  {/* 6. EVIDENS (10%) */}
+                                  <div className={`p-4 rounded-xl border transition-all ${activeKompetensi.skor_evidens ? 'bg-slate-950 border-slate-800' : 'bg-slate-900/40 border-slate-800/40 opacity-40'}`}>
+                                     <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2">
+                                           {subModul === 2 && (
+                                              <input type="checkbox" checked={activeKompetensi.skor_evidens} onChange={e => setActiveKompetensi({...activeKompetensi, skor_evidens: e.target.checked})} className="w-4 h-4 accent-amber-500 rounded cursor-pointer" />
+                                           )}
+                                           <label className="text-sm font-bold text-slate-200">6. EVIDENS PROFESIONAL</label>
+                                           <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">WAJARAN 10%</span>
+                                        </div>
+                                        <div className="text-right">
+                                           <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{activeKompetensi.skor_evidens ? scores.skor_evidens : 0} / 5</span>
+                                        </div>
+                                     </div>
+                                     {activeKompetensi.skor_evidens ? (
+                                        <>
+                                           <input type="range" min="0" max="5" step="1" value={scores.skor_evidens} onChange={e => setScores({...scores, skor_evidens: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                                           <div className="bg-slate-900/90 p-3 rounded-lg border border-slate-800 mt-2">
+                                              <p className="text-xs text-amber-300 font-bold uppercase mb-1">📘 Deskriptor BARS Skor {scores.skor_evidens}:</p>
+                                              <p className="text-xs text-slate-300 italic leading-relaxed">{getRubrikTextEksak('skor_evidens', scores.skor_evidens, true)}</p>
+                                           </div>
+                                        </>
+                                     ) : (
+                                        <p className="text-xs text-red-400 italic pt-1">❌ Tidak dinilai di stesen ini.</p>
+                                     )}
+                                  </div>
+
+                                  {/* ULASAN & BUTANG JANA RUMUSAN */}
+                                  <div className="pt-2 space-y-2">
+                                     <div className="flex justify-between items-center">
+                                        <label className="block text-xs font-bold text-slate-400 uppercase">Ulasan & Penjanaan Rumusan Rasmi Panel</label>
+                                        <button type="button" onClick={handleAutoJanaUlasan} className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-lg text-xs transition-all shadow">
+                                           ⚡ Jana Rumusan
+                                        </button>
+                                     </div>
+                                     <textarea rows="7" placeholder="Klik 'Jana Rumusan' untuk menghasilkan draf ulasan rasmi yang kreatif berdasar kekuatan unik calon..." className="w-full p-4 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono leading-relaxed text-slate-100 focus:border-amber-500 focus:outline-none" value={scores.ulasan_panel} onChange={e => setScores({...scores, ulasan_panel: e.target.value})}></textarea>
+                                  </div>
+
+                               </div>
+                            </div>
+
+                            <div className="space-y-6">
+                               <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg sticky top-6">
+                                  <h3 className="text-xs font-extrabold text-amber-400 uppercase border-b border-slate-800 pb-2 mb-4 text-center">Rumusan Markah Terkumpul</h3>
+                                  
+                                  <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center mb-6">
+                                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">JUMLAH MARKAH</span>
+                                     <p className="text-6xl font-black text-amber-400 mt-2">{calcJumlahMarkah()}%</p>
+                                     <div className="mt-3">
+                                        <span className={`px-4 py-1.5 rounded-full text-xs font-extrabold ${calcJumlahMarkah() >= 75 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-red-500/20 text-red-400 border border-red-500/50'}`}>
+                                           {calcJumlahMarkah() >= 75 ? 'LAYAK (75% KE ATAS)' : 'BELUM LAYAK'}
+                                        </span>
+                                     </div>
+                                  </div>
+
+                                  <RadarChartPenilaian skor={{
+                                     skor_bimbingan: activeKompetensi.skor_bimbingan ? scores.skor_bimbingan : 0,
+                                     skor_instruksional: activeKompetensi.skor_instruksional ? scores.skor_instruksional : 0,
+                                     skor_pemikiran_strategik: activeKompetensi.skor_pemikiran_strategik ? scores.skor_pemikiran_strategik : 0,
+                                     skor_analisis_data: activeKompetensi.skor_analisis_data ? scores.skor_analisis_data : 0,
+                                     skor_interpersonal: activeKompetensi.skor_interpersonal ? scores.skor_interpersonal : 0,
+                                     skor_evidens: activeKompetensi.skor_evidens ? scores.skor_evidens : 0
+                                  }} />
+
+                                  <button type="submit" className="w-full mt-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl text-base shadow-xl transition-transform active:scale-95">
+                                     💾 SIMPAN PENILAIAN CALON
+                                  </button>
+                               </div>
+                            </div>
+
+                         </form>
+                      </div>
                    )}
 
-                   {selectedTugas.peranan === 'Ketua Panel Utama' && (
+                   {/* PEMANTAUAN MULTI-PANEL LIVE UNTUK KETUA PANEL UTAMA & KETUA ZON */}
+                   {(selectedTugas.peranan === 'Ketua Panel Utama' || selectedTugas.peranan === 'Ketua Zon Panel Penemuduga') && (
                       <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12">
                          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                             <div>
-                               <h2 className="text-lg font-bold text-amber-400 uppercase flex items-center gap-2">🌐 Pusat Pemantauan Keseluruhan Zon (Ketua Panel Utama)</h2>
-                               <p className="text-xs text-slate-400 mt-1">Anda mempunyai akses pemantauan markah rasmi di seluruh negara.</p>
+                               <h2 className="text-lg font-bold text-amber-400 uppercase flex items-center gap-2">🌐 Pusat Pemantauan Multi-Panel Live ({selectedTugas.peranan})</h2>
+                               <p className="text-xs text-slate-400 mt-1">Mengumpul penilaian dari 2 atau lebih panel per stesen untuk pengiraan purata muktamad.</p>
                             </div>
-                            <select className="p-3 border border-slate-700 rounded-lg bg-slate-950 text-amber-400 font-bold text-sm" value={filterZonPantau} onChange={e => setFilterZonPantau(e.target.value)}>
-                               <option value="SEMUA">KESEMUA ZON</option>
-                               <option value="UTARA">ZON UTARA</option>
-                               <option value="TIMUR">ZON TIMUR</option>
-                               <option value="TENGAH">ZON TENGAH</option>
-                               <option value="SELATAN">ZON SELATAN</option>
-                               <option value="SABAH">ZON SABAH</option>
-                               <option value="SARAWAK">ZON SARAWAK</option>
-                            </select>
+                            {selectedTugas.peranan === 'Ketua Panel Utama' && (
+                               <select className="p-3 border border-slate-700 rounded-lg bg-slate-950 text-amber-400 font-bold text-sm" value={filterZonPantau} onChange={e => setFilterZonPantau(e.target.value)}>
+                                  <option value="SEMUA">KESEMUA ZON</option>
+                                  <option value="UTARA">ZON UTARA</option>
+                                  <option value="TIMUR">ZON TIMUR</option>
+                                  <option value="TENGAH">ZON TENGAH</option>
+                                  <option value="SELATAN">ZON SELATAN</option>
+                                  <option value="SABAH">ZON SABAH</option>
+                                  <option value="SARAWAK">ZON SARAWAK</option>
+                               </select>
+                            )}
                          </div>
 
                          <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
@@ -743,14 +850,14 @@
                                      <th className="p-3">Nama Calon</th>
                                      <th className="p-3">No. KP</th>
                                      <th className="p-3">Zon</th>
-                                     <th className="p-3">Penilai (Panel)</th>
-                                     <th className="p-3 text-center">Markah (%)</th>
+                                     <th className="p-3">Penilai Berdaftar</th>
+                                     <th className="p-3 text-center">Markah Panel (%)</th>
                                   </tr>
                                </thead>
                                <tbody>
-                                  {allResults.filter(r => filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau).length === 0 ? (
+                                  {allResults.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).length === 0 ? (
                                      <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada rekod penilaian di kawasan pilihan.</td></tr>
-                                  ) : allResults.filter(r => filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau).map((res, idx) => {
+                                  ) : allResults.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).map((res, idx) => {
                                      const cDetail = calonList.find(c => c.no_kp === res.no_kp_calon);
                                      return (
                                         <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/50">
