@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Modul Panel - Sistem SISC+</title>
+    <title>Modul Panel Penemuduga - Sistem SISC+</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- React & ReactDOM -->
@@ -17,14 +17,14 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
-      @media print {
-        .no-print { display: none !important; }
-        body { background: white !important; color: black !important; font-family: 'Arial', sans-serif; }
-      }
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: #0f172a; }
       ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #475569; }
+      input[type=number]::-webkit-inner-spin-button, 
+      input[type=number]::-webkit-outer-spin-button { 
+         -webkit-appearance: none; margin: 0; 
+      }
     </style>
   </head>
   <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
@@ -32,432 +32,557 @@
 
     <script type="text/babel">
       const { useState, useEffect, useRef } = React;
+
       const SUPABASE_URL = 'https://beyxrxnuuwegkvziglmg.supabase.co';
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
-      const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      // KOMPONEN CARTA RADAR PRESTASI (EKSKLUSIF UNTUK KETUA UTAMA)
-      function RadarChartPrestasi({ results, title }) {
+      const safeStr = (val) => (val ? String(val) : '');
+
+      // ==========================================
+      // CARTA RADAR KOMPETENSI
+      // ==========================================
+      function RadarChartPenilaian({ skor }) {
         const canvasRef = useRef(null);
-        const chartInstanceRef = useRef(null);
+        const chartRef = useRef(null);
+
         useEffect(() => {
           if (!canvasRef.current) return;
           const ctx = canvasRef.current.getContext('2d');
-          if (chartInstanceRef.current) chartInstanceRef.current.destroy();
-          let avgScores = [0,0,0,0,0,0];
-          if(results.length > 0) {
-            let sums = [0,0,0,0,0,0];
-            results.forEach(r => {
-              sums[0] += ((r.skor_bimbingan||0)/5)*25; sums[1] += ((r.skor_instruksional||0)/5)*20;
-              sums[2] += ((r.skor_pemikiran_strategik||0)/5)*20; sums[3] += ((r.skor_analisis_data||0)/5)*15;
-              sums[4] += ((r.skor_interpersonal||0)/5)*10; sums[5] += ((r.skor_evidens||0)/5)*10;
-            });
-            avgScores = sums.map(s => s / results.length);
-          }
-          chartInstanceRef.current = new Chart(ctx, {
+          if (chartRef.current) chartRef.current.destroy();
+
+          const dataScores = [
+            ((skor.skor_bimbingan || 0) / 5) * 25,
+            ((skor.skor_instruksional || 0) / 5) * 20,
+            ((skor.skor_pemikiran_strategik || 0) / 5) * 20,
+            ((skor.skor_analisis_data || 0) / 5) * 15,
+            ((skor.skor_interpersonal || 0) / 5) * 10,
+            ((skor.skor_evidens || 0) / 5) * 10
+          ];
+
+          chartRef.current = new Chart(ctx, {
             type: 'radar',
-            data: { 
-              labels: ['BIMBINGAN', 'INSTRUKSIONAL', 'STRATEGIK', 'ANALISIS', 'INTERPERSONAL', 'EVIDENS'], 
-              datasets: [{ label: title, data: avgScores, backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', borderWidth: 2, pointBackgroundColor: '#F59E0B' }] 
+            data: {
+              labels: ['BIMBINGAN', 'INSTRUKSIONAL', 'STRATEGIK', 'ANALISIS', 'INTERPERSONAL', 'EVIDENS'],
+              datasets: [{
+                label: 'Skor Kompetensi',
+                data: dataScores,
+                backgroundColor: 'rgba(212, 175, 55, 0.2)',
+                borderColor: '#D4AF37',
+                borderWidth: 2,
+                pointBackgroundColor: '#F59E0B'
+              }]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { r: { angleLines: { color: '#334155' }, grid: { color: '#1e293b' }, pointLabels: { font: { size: 10, weight: 'bold' }, color: '#94a3b8' }, suggestedMin: 0, suggestedMax: 25 } }, plugins: { legend: { display: false } } }
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                r: {
+                  angleLines: { color: '#334155' },
+                  grid: { color: '#1e293b' },
+                  pointLabels: { font: { size: 10, weight: 'bold' }, color: '#94a3b8' },
+                  suggestedMin: 0,
+                  suggestedMax: 25
+                }
+              },
+              plugins: { legend: { display: false } }
+            }
           });
-          return () => { if (chartInstanceRef.current) chartInstanceRef.current.destroy(); };
-        }, [results, title]);
+          return () => { if (chartRef.current) chartRef.current.destroy(); };
+        }, [skor]);
+
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
+      // ==========================================
+      // APLIKASI UTAMA PANEL
+      // ==========================================
       function PanelApp() {
-        const [activePanel, setActivePanel] = useState(null);
-        const [inputKP, setInputKP] = useState('');
-        const [inputKatalaluan, setInputKatalaluan] = useState('');
-        const [loginMsg, setLoginMsg] = useState({ type: '', text: '' });
+        // Auth State
+        const [isLoggedIn, setIsLoggedIn] = useState(false);
+        const [currentPanel, setCurrentPanel] = useState(null);
+        const [icInput, setIcInput] = useState('');
+        const [passInput, setPassInput] = useState('');
 
+        // Selection State
         const [penugasanList, setPenugasanList] = useState([]);
-        const [activePenugasan, setActivePenugasan] = useState(null);
-        
-        const [activeTab, setActiveTab] = useState('penilaian');
-        const [allCandidates, setAllCandidates] = useState([]);
-        const [allScores, setAllScores] = useState([]);
-        const [selectedKP, setSelectedKP] = useState('');
+        const [selectedTugas, setSelectedTugas] = useState(null);
+        const [calonList, setCalonList] = useState([]);
+        const [selectedCalonKp, setSelectedCalonKp] = useState('');
         const [selectedCalon, setSelectedCalon] = useState(null);
-        
-        const [scores, setScores] = useState({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 });
-        const [ulasan, setUlasan] = useState('');
-        const [loading, setLoading] = useState(false);
+
+        // Form Penilaian
+        const [scores, setScores] = useState({
+          skor_bimbingan: 0,
+          skor_instruksional: 0,
+          skor_pemikiran_strategik: 0,
+          skor_analisis_data: 0,
+          skor_interpersonal: 0,
+          skor_evidens: 0,
+          ulasan_panel: ''
+        });
+
         const [msg, setMsg] = useState({ type: '', text: '' });
+        const [allResults, setAllResults] = useState([]);
+        const [filterZonPantau, setFilterZonPantau] = useState('SEMUA');
 
-        // STATE BAHARU UNTUK TAB RUMUSAN KESELURUHAN (KETUA PANEL UTAMA)
-        const [filterZonRumusan, setFilterZonRumusan] = useState('KESELURUHAN');
-        const [searchRumusan, setSearchRumusan] = useState('');
-        const [pageRumusan, setPageRumusan] = useState(1);
-
-        const RUBRIK = [
-          { id: 'skor_bimbingan', nama: '1. Kompetensi Bimbingan Profesional (25%)', wajaran: 25, deskriptor: { 5: "Mengemudi sesi bimbingan berasaskan keperluan guru secara mendalam. Mencetus perubahan amalan guru.", 4: "Melaksanakan sesi bimbingan secara sistematik dan berkesan.", 3: "Melaksanakan sesi bimbingan mengikut struktur yang ditetapkan.", 2: "Melaksanakan sebahagian langkah bimbingan dengan betul.", 1: "Memberi arahan sebagai pendekatan utama tanpa soalan reflektif." } },
-          { id: 'skor_instruksional', nama: '2. Kompetensi Instruksional (20%)', wajaran: 20, deskriptor: { 5: "Mentafsir kurikulum dengan tepat dan membimbing guru memilih strategi & pentaksiran selari.", 4: "Mentafsir kurikulum dengan tepat dan mencadangkan strategi pedagogi yang sesuai.", 3: "Menjelaskan struktur utama dokumen kurikulum dengan betul.", 2: "Mengenal pasti sebahagian komponen kurikulum, penerangan masih umum.", 1: "Tidak dapat menjelaskan struktur utama dokumen kurikulum secara berkesan." } },
-          { id: 'skor_pemikiran_strategik', nama: '3. Kompetensi Pemikiran Strategik (20%)', wajaran: 20, deskriptor: { 5: "Menganalisis isu daripada perspektif sistem dan membina tindakan jangka panjang & pendek mampan.", 4: "Menganalisis isu secara menyeluruh dan menetapkan tindakan yang realistik.", 3: "Mengenal pasti isu utama dengan tepat dan mencadangkan tindakan bersesuaian.", 2: "Mengenal pasti simptom lebih jelas berbanding punca sebenar.", 1: "Cadangan tindakan tidak menjawab punca masalah sebenar." } },
-          { id: 'skor_analisis_data', nama: '4. Kompetensi Analisis Data (15%)', wajaran: 15, deskriptor: { 5: "Membuat triangulasi pelbagai evidens. Mengenal pasti punca sebenar & menetapkan keutamaan data.", 4: "Menggunakan lebih daripada satu sumber data dan merancang intervensi realistik.", 3: "Menggunakan data yang relevan untuk mengenal pasti isu utama.", 2: "Menggunakan data secara terhad dan keutamaan tindakan tidak jelas.", 1: "Tidak menggunakan data sebagai asas pertimbangan." } },
-          { id: 'skor_interpersonal', nama: '5. Kompetensi Interpersonal (10%)', wajaran: 10, deskriptor: { 5: "Menyampaikan mesej amat jelas, berempati dan mengawal emosi secara konsisten.", 4: "Menyampaikan mesej tersusun, menunjukkan empati dan mengurus maklum balas profesional.", 3: "Menyampaikan mesej yang difahami dan menunjukkan sikap profesional.", 2: "Menyampaikan jawapan yang kurang tersusun dan kesukaran menyesuaikan gaya komunikasi.", 1: "Menyampaikan mesej tidak jelas dan cenderung bersikap defensif." } },
-          { id: 'skor_evidens', nama: '6. Evidens Profesional (10%)', wajaran: 10, deskriptor: { 5: "Evidens amat relevan, disahkan, impak intervensi & perubahan guru terbukti jelas.", 4: "Evidens relevan dengan pengalaman bimbingan yang kukuh dan impak dapat dikenal pasti.", 3: "Evidens berkaitan pengalaman profesional dan penglibatan calon jelas.", 2: "Evidens kurang relevan dengan peranan sebenar pembimbing SISC+.", 1: "Evidens sangat minimum dan kesahihan tidak dapat dipastikan." } }
-        ];
-
+        // LOG MASUK PANEL
         const handleLogin = async (e) => {
           e.preventDefault();
-          setLoginMsg({ type: '', text: '' });
-          const { data: panelData, error: panelError } = await supabase.from('panel_penemuduga').select('*').eq('no_kp', inputKP.trim()).eq('katalaluan', inputKatalaluan.trim()).single();
-          if (panelError || !panelData) {
-            setLoginMsg({ type: 'error', text: 'Maklumat log masuk tidak tepat. Sila semak No. KP dan Kata Laluan.' });
+          setMsg({ type: '', text: '' });
+
+          const { data: panelData, error } = await sb
+            .from('panel_penemuduga')
+            .select('*')
+            .eq('no_kp', icInput.trim())
+            .single();
+
+          if (error || !panelData) {
+            setMsg({ type: 'error', text: 'No. Kad Pengenalan tidak dijumpai dalam pangkalan data.' });
             return;
           }
-          const { data: tugasData } = await supabase.from('penugasan_panel').select('*').eq('no_kp_panel', panelData.no_kp);
-          setActivePanel(panelData);
-          if (tugasData && tugasData.length > 0) setPenugasanList(tugasData); else setPenugasanList([]);
+
+          if (panelData.katalaluan && panelData.katalaluan !== passInput.trim()) {
+            setMsg({ type: 'error', text: 'Kata laluan tidak tepat. Sila cuba lagi.' });
+            return;
+          }
+
+          setCurrentPanel(panelData);
+          setIsLoggedIn(true);
+          fetchPenugasanAndData(panelData.no_kp);
         };
 
-        const handlePilihPenugasan = (tugas) => {
-          setActivePenugasan(tugas);
-          setActiveTab('penilaian');
-          fetchDataSistem();
+        // TARIK DATA DARI SUPABASE
+        const fetchPenugasanAndData = async (no_kp) => {
+          const { data: tugasData } = await sb
+            .from('penugasan_panel')
+            .select('*')
+            .eq('no_kp_panel', no_kp);
+          if (tugasData) setPenugasanList(tugasData);
+
+          const { data: cData } = await sb.from('calon').select('*').order('nama_penuh', { ascending: true });
+          if (cData) setCalonList(cData);
+
+          const { data: rData } = await sb.from('penilaian_skor').select('*');
+          if (rData) setAllResults(rData);
         };
 
-        const fetchDataSistem = async () => {
-          const { data: dataCalon } = await supabase.from('calon').select('*').order('nama_penuh', { ascending: true });
-          if (dataCalon) setAllCandidates(dataCalon);
-          const { data: dataSkor } = await supabase.from('penilaian_skor').select('*').order('jumlah_markah', { ascending: false });
-          if (dataSkor) setAllScores(dataSkor);
+        // PENAPISAN CALON PINTAR UNTUK BILIK TEMU DUGA
+        const calonBilik = selectedTugas ? calonList.filter(c => {
+          const zonSama = safeStr(c.zon_temuduga) === safeStr(selectedTugas.zon_bertugas) || selectedTugas.zon_bertugas === 'SEMUA ZON';
+          const sesiBertugas = safeStr(selectedTugas.sesi_bertugas);
+
+          if (sesiBertugas.includes("SEMUA SESI")) {
+            return zonSama;
+          }
+
+          const namaSesiBersih = sesiBertugas.split(" [")[0].trim();
+          return zonSama && safeStr(c.sesi).includes(namaSesiBersih);
+        }) : [];
+
+        // BILA CALON DIPILIH
+        const handleSelectCalon = (kp) => {
+          setSelectedCalonKp(kp);
+          const c = calonList.find(cal => cal.no_kp === kp);
+          setSelectedCalon(c || null);
+
+          const existingRes = allResults.find(r => safeStr(r.no_kp_calon).trim() === safeStr(kp).trim());
+          if (existingRes) {
+            setScores({
+              skor_bimbingan: existingRes.skor_bimbingan || 0,
+              skor_instruksional: existingRes.skor_instruksional || 0,
+              skor_pemikiran_strategik: existingRes.skor_pemikiran_strategik || 0,
+              skor_analisis_data: existingRes.skor_analisis_data || 0,
+              skor_interpersonal: existingRes.skor_interpersonal || 0,
+              skor_evidens: existingRes.skor_evidens || 0,
+              ulasan_panel: existingRes.ulasan_panel || ''
+            });
+            setMsg({ type: 'success', text: 'Rekod penilaian calon ini telah dimuatkan. Anda boleh mengemas kini markah.' });
+          } else {
+            setScores({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0, ulasan_panel: '' });
+            setMsg({ type: '', text: '' });
+          }
         };
 
-        const calonZonSesi = allCandidates.filter(c => {
-           if(!activePenugasan) return false;
-           const matchZon = activePenugasan.zon_bertugas === 'SEMUA ZON' || c.zon_temuduga === activePenugasan.zon_bertugas;
-           // Gunakan split untuk ambil bahagian SESI sahaja dari format "SESI 1 (12/10/2026)" jika ada
-           const sesiCalon = c.sesi ? c.sesi.split(' (')[0].trim().toUpperCase() : '';
-           const sesiTugas = activePenugasan.sesi_bertugas ? activePenugasan.sesi_bertugas.split(' (')[0].trim().toUpperCase() : '';
-           return matchZon && sesiCalon === sesiTugas;
-        });
-
-        const handleSelectKP = (kp) => {
-          setSelectedKP(kp);
-          const calonFound = calonZonSesi.find(c => String(c.no_kp).trim() === String(kp).trim());
-          setSelectedCalon(calonFound || null);
-          setMsg({type:'', text:''});
-          setScores({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 });
-          setUlasan('');
+        const calcJumlahMarkah = () => {
+          const m1 = (Number(scores.skor_bimbingan) / 5) * 25;
+          const m2 = (Number(scores.skor_instruksional) / 5) * 20;
+          const m3 = (Number(scores.skor_pemikiran_strategik) / 5) * 20;
+          const m4 = (Number(scores.skor_analisis_data) / 5) * 15;
+          const m5 = (Number(scores.skor_interpersonal) / 5) * 10;
+          const m6 = (Number(scores.skor_evidens) / 5) * 10;
+          return Number((m1 + m2 + m3 + m4 + m5 + m6).toFixed(1));
         };
 
-        const calculateTotal = () => {
-          let total = 0;
-          RUBRIK.forEach(r => { total += ((scores[r.id] || 0) / 5) * r.wajaran; });
-          return total.toFixed(2);
-        };
-
-        const generateUlasanPintar = () => {
-          if (Object.values(scores).some(val => val === 0)) return alert('Sila nilai kesemua 6 kompetensi terlebih dahulu.');
-          const namaKompetensi = { skor_bimbingan: 'Bimbingan Profesional', skor_instruksional: 'Kepimpinan Instruksional', skor_pemikiran_strategik: 'Pemikiran Strategik', skor_analisis_data: 'Analisis Data Berkesan', skor_interpersonal: 'Kemahiran Interpersonal', skor_evidens: 'Penyediaan Evidens Profesional' };
-          let kekuatan = []; let kelemahan = [];
-          Object.keys(scores).forEach(key => {
-            if(scores[key] >= 4) kekuatan.push(namaKompetensi[key]);
-            else if(scores[key] <= 3 && scores[key] > 0) kelemahan.push(namaKompetensi[key]);
-          });
-          const total = parseFloat(calculateTotal());
-          let prestasi = total >= 85 ? 'sangat cemerlang dan luar biasa' : total >= 75 ? 'baik dan meyakinkan' : total >= 60 ? 'memuaskan' : 'yang masih memerlukan bimbingan menyeluruh';
-
-          let teks = `Calon mempamerkan tahap penguasaan yang ${prestasi} sepanjang sesi temu duga ini dengan kefahaman konsep peranan SISC+ yang bersesuaian.`;
-          if(kekuatan.length > 0) teks += `\n\nKekuatan utama calon amat terserlah dalam elemen ${kekuatan.join(', ')}. Calon berupaya menerangkan proses pelaksanaan berserta contoh yang kukuh.`;
-          if(kelemahan.length > 0) teks += `\n\nWalau bagaimanapun, sebagai cadangan penambahbaikan, calon disarankan untuk lebih memfokuskan kepada pengukuhan elemen ${kelemahan.join(', ')} bagi memastikan keberkesanan peranan pembimbing di peringkat akar umbi.`;
-          teks += `\n\nSecara keseluruhan, calon ini ${total >= 75 ? 'dinilai BERSEDIA dan LAYAK' : 'memerlukan sedikit pendedahan dan peningkatan sebelum bersedia'} untuk menggalas tanggungjawab sebagai pegawai SISC+ secara optimum.`;
-          setUlasan(teks);
-        };
-
-        const handleSubmitPenilaian = async (e) => {
+        const handleSavePenilaian = async (e) => {
           e.preventDefault();
-          if (!selectedCalon) return alert('Sila pilih calon terlebih dahulu.');
-          if (Object.values(scores).some(val => val === 0)) return alert('Sila isi kesemua 6 skor domain penilaian.');
-          if (!ulasan) return alert('Sila berikan ulasan penemuduga atau klik butang "Jana Ulasan Pintar".');
+          if (!selectedCalon || !selectedTugas || !currentPanel) return alert("Sila pilih calon terlebih dahulu.");
 
-          setLoading(true);
-          const total = calculateTotal();
-          const isPassed = total >= 75 && scores.skor_bimbingan >= 3 && scores.skor_instruksional >= 3 && scores.skor_pemikiran_strategik >= 3 && scores.skor_analisis_data >= 3;
+          const total = calcJumlahMarkah();
+          const isLulus = total >= 75;
 
           const payload = {
-            nama_panel: activePanel.nama_penuh, no_kp_calon: selectedCalon.no_kp, zon: selectedCalon.zon_temuduga, bilik: selectedCalon.bilik_temuduga || '-',
-            ...scores, jumlah_markah: parseFloat(total), status_lulus: isPassed, ulasan_panel: ulasan
+            no_kp_calon: selectedCalon.no_kp,
+            nama_panel: currentPanel.nama_penuh,
+            zon: selectedTugas.zon_bertugas,
+            skor_bimbingan: Number(scores.skor_bimbingan),
+            skor_instruksional: Number(scores.skor_instruksional),
+            skor_pemikiran_strategik: Number(scores.skor_pemikiran_strategik),
+            skor_analisis_data: Number(scores.skor_analisis_data),
+            skor_interpersonal: Number(scores.skor_interpersonal),
+            skor_evidens: Number(scores.skor_evidens),
+            jumlah_markah: total,
+            status_lulus: isLulus,
+            ulasan_panel: scores.ulasan_panel
           };
 
-          const { error } = await supabase.from('penilaian_skor').insert([payload]);
-          if (error) {
-            setMsg({ type: 'error', text: 'Gagal menyimpan penilaian: ' + error.message });
+          const existingRes = allResults.find(r => safeStr(r.no_kp_calon).trim() === safeStr(selectedCalon.no_kp).trim());
+
+          let err = null;
+          if (existingRes) {
+            const { error } = await sb.from('penilaian_skor').update(payload).eq('id', existingRes.id);
+            err = error;
           } else {
-            await supabase.from('calon').update({ kehadiran: 'HADIR' }).eq('no_kp', selectedCalon.no_kp);
-            setMsg({ type: 'success', text: `Penilaian calon ${selectedCalon.nama_penuh} berjaya direkodkan!` });
-            setScores({ skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 });
-            setUlasan(''); setSelectedCalon(null); setSelectedKP('');
-            fetchDataSistem(); 
+            const { error } = await sb.from('penilaian_skor').insert([payload]);
+            err = error;
           }
-          setLoading(false);
+
+          if (err) {
+            setMsg({ type: 'error', text: 'Gagal menyimpan penilaian: ' + err.message });
+          } else {
+            setMsg({ type: 'success', text: `Penilaian untuk ${selectedCalon.nama_penuh} berjaya disimpan! (${total}%)` });
+            fetchPenugasanAndData(currentPanel.no_kp);
+          }
         };
 
-        // KAWALAN PAPARAN (PERANAN)
-        const isKetuaZon = activePenugasan?.peranan === 'Ketua Zon Panel Penemuduga' || activePenugasan?.peranan === 'Ketua Panel Utama';
-        const isKetuaUtama = activePenugasan?.peranan === 'Ketua Panel Utama';
-
-        // LOGIK PENAPISAN & PAGINATION UNTUK TAB KETUA UTAMA (RUMUSAN KESELURUHAN)
-        const ITEMS_PER_PAGE = 10;
-        const filteredRumusan = allScores.filter(skor => {
-            const cDetail = allCandidates.find(c => c.no_kp === skor.no_kp_calon);
-            const namaCalon = cDetail ? cDetail.nama_penuh : skor.no_kp_calon;
-            const matchZon = filterZonRumusan === 'KESELURUHAN' || skor.zon === filterZonRumusan;
-            const matchSearch = namaCalon.toUpperCase().includes(searchRumusan.toUpperCase()) || skor.no_kp_calon.includes(searchRumusan);
-            return matchZon && matchSearch;
-        });
-        const totalPagesRumusan = Math.ceil(filteredRumusan.length / ITEMS_PER_PAGE) || 1;
-        const displayedRumusan = filteredRumusan.slice((pageRumusan - 1) * ITEMS_PER_PAGE, pageRumusan * ITEMS_PER_PAGE);
-
-        useEffect(() => { setPageRumusan(1); }, [searchRumusan, filterZonRumusan]);
-
-        const TabNavButton = ({ id, label }) => (
-          <button onClick={() => { setActiveTab(id); setMsg({type:'',text:''}); }} className={`px-5 py-2.5 rounded-lg text-sm font-extrabold transition-all shadow-md ${activeTab === id ? 'bg-amber-500 text-slate-950 scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'}`}>
-            {label}
-          </button>
-        );
+        const handleLogout = () => {
+          setIsLoggedIn(false);
+          setCurrentPanel(null);
+          setSelectedTugas(null);
+          setSelectedCalon(null);
+          setSelectedCalonKp('');
+          setIcInput('');
+          setPassInput('');
+        };
 
         return (
           <div className="min-h-screen flex flex-col">
             
             {/* HEADER */}
-            <div className="w-full flex flex-col no-print">
-              <div className="bg-white w-full py-4 px-6 md:px-10 flex flex-col md:flex-row justify-between items-center shadow-md z-10 gap-4">
-                <div className="flex items-center gap-4">
-                  <img src="logo-kpm.png" alt="Logo KPM" className="h-12 object-contain" />
-                  <div className="border-l-2 border-slate-300 pl-4 hidden md:block">
-                     <span className="font-extrabold text-xl text-slate-900 tracking-wider block">MODUL PANEL SISC+</span>
-                     {activePenugasan && <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{activePenugasan.peranan}</span>}
-                  </div>
-                </div>
-                <div className="flex gap-3 flex-wrap justify-center">
-                  {activePenugasan && (
-                    <>
-                      <TabNavButton id="penilaian" label="Penilaian Calon" />
-                      {isKetuaZon && <TabNavButton id="pemantauan" label="Pemantauan Zon" />}
-                      {isKetuaUtama && <TabNavButton id="rumusan" label="Rumusan Keseluruhan" />}
-                      <button onClick={() => setActivePenugasan(null)} className="px-4 py-2 rounded-lg text-sm font-bold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 transition-colors ml-2">Lobi Penugasan</button>
-                    </>
-                  )}
-                  {activePanel && !activePenugasan && (
-                    <button onClick={() => { setActivePanel(null); setInputKP(''); setInputKatalaluan(''); }} className="px-4 py-2 rounded-lg text-sm font-bold bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition-colors ml-2">Log Keluar</button>
-                  )}
-                </div>
+            <div className="bg-white w-full py-4 px-6 md:px-10 flex justify-between items-center shadow-md z-10 border-b-4 border-amber-500">
+              <div className="flex items-center gap-4">
+                 <img src="logo-kpm.png" alt="Logo KPM" className="h-12 object-contain" />
+                 <span className="font-extrabold text-xl text-slate-900 tracking-wider hidden md:block">MODUL PANEL PENEMUDUGA SISC+</span>
               </div>
-              <div className="h-1.5 w-full bg-gradient-to-r from-amber-700 via-amber-300 to-amber-700 shadow-[0_2px_10px_rgba(212,175,55,0.4)]"></div>
+              {isLoggedIn && (
+                <div className="flex items-center gap-4">
+                   <span className="text-sm font-bold text-slate-800 uppercase hidden md:inline">{currentPanel?.nama_penuh}</span>
+                   <button onClick={handleLogout} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-sm transition-colors border border-red-200">Log Keluar</button>
+                </div>
+              )}
             </div>
 
-            <div className="p-6 max-w-6xl mx-auto w-full flex-grow mt-4">
+            <div className="p-6 md:p-10 max-w-7xl mx-auto w-full flex-grow">
               
-              {!activePanel ? (
-                <div className="bg-slate-900 border border-slate-800 p-10 rounded-2xl max-w-lg mx-auto my-12 shadow-2xl">
-                  <div className="text-center mb-8"><h2 className="text-3xl font-extrabold text-amber-400">Log Masuk Panel</h2><p className="text-slate-400 text-base mt-2">Sila masukkan kelayakan akses anda.</p></div>
-                  {loginMsg.text && (<div className="p-4 mb-6 rounded text-sm font-bold bg-red-900/80 text-red-200 border border-red-500 text-center">{loginMsg.text}</div>)}
-                  <form onSubmit={handleLogin} className="space-y-6">
-                    <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-4 border border-slate-700 rounded-xl bg-slate-950 text-slate-100 text-lg font-mono font-bold text-center tracking-widest" value={inputKP} onChange={(e) => setInputKP(e.target.value)} />
-                    <input type="password" required placeholder="Kata Laluan" className="w-full p-4 border border-slate-700 rounded-xl bg-slate-950 text-slate-100 text-lg font-mono font-bold text-center tracking-widest" value={inputKatalaluan} onChange={(e) => setInputKatalaluan(e.target.value)} />
-                    <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-4 rounded-xl text-lg shadow-lg">Sahkan & Masuk</button>
-                  </form>
+              {/* SKRIN 1: BORANG LOG MASUK */}
+              {!isLoggedIn && (
+                <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl mt-12">
+                   <div className="text-center mb-6">
+                      <span className="text-5xl">📋</span>
+                      <h2 className="text-2xl font-extrabold text-amber-400 mt-2">Log Masuk Panel</h2>
+                      <p className="text-slate-400 text-xs mt-1">Masukkan No. KP dan Kata Laluan rasmi anda.</p>
+                   </div>
+
+                   {msg.text && (
+                      <div className={`p-3 mb-4 rounded text-xs font-bold text-center ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
+                         {msg.text}
+                      </div>
+                   )}
+
+                   <form onSubmit={handleLogin} className="space-y-4">
+                      <div>
+                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">No. Kad Pengenalan</label>
+                         <input type="text" required placeholder="Contoh: 800101015555" className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-amber-500 focus:outline-none font-mono" value={icInput} onChange={e => setIcInput(e.target.value)} />
+                      </div>
+                      <div>
+                         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Kata Laluan</label>
+                         <input type="password" required placeholder="••••••••" className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-amber-500 focus:outline-none" value={passInput} onChange={e => setPassInput(e.target.value)} />
+                      </div>
+                      <button type="submit" className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold rounded-lg text-sm shadow-lg transition-transform active:scale-95 mt-2">
+                         LOG MASUK SEKARANG
+                      </button>
+                   </form>
                 </div>
-              ) : !activePenugasan ? (
-                <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                  <div className="text-center mb-10"><p className="text-amber-400 font-extrabold uppercase tracking-wider mb-2">Selamat Datang,</p><h2 className="text-3xl font-extrabold text-white">{activePanel.nama_penuh}</h2><p className="text-slate-400 mt-2">Sila pilih Surat Penugasan anda untuk memulakan sesi.</p></div>
-                  {penugasanList.length === 0 ? (
-                     <div className="bg-red-900/30 border border-red-500/50 p-8 rounded-2xl text-center max-w-2xl mx-auto"><span className="text-4xl block mb-4">⚠️</span><h3 className="text-xl font-bold text-red-400 mb-2">Tiada Penugasan Aktif</h3><p className="text-slate-300">Anda belum diberikan sebarang penugasan zon atau sesi oleh Admin. Sila hubungi Urus Setia untuk tindakan lanjut.</p></div>
-                  ) : (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {penugasanList.map(tugas => (
-                           <div key={tugas.id} onClick={() => handlePilihPenugasan(tugas)} className="group bg-slate-900 border border-slate-700 hover:border-amber-400 p-8 rounded-2xl shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer relative overflow-hidden flex flex-col items-center text-center">
-                              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                              <span className="text-4xl mb-4 group-hover:scale-110 transition-transform">{tugas.peranan === 'Ketua Panel Utama' ? '👑' : tugas.peranan === 'Ketua Zon Panel Penemuduga' ? '⭐' : '📝'}</span>
-                              <h3 className="text-2xl font-extrabold text-amber-400 mb-1">{tugas.zon_bertugas}</h3>
-                              <p className="text-white font-bold text-lg mb-4">{tugas.sesi_bertugas}</p>
-                              <div className="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider mb-6 w-full border border-slate-700">{tugas.peranan}</div>
-                              <button className="mt-auto bg-slate-800 text-amber-400 font-extrabold px-6 py-3 rounded-lg w-full group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors shadow-lg text-sm">Masuk Bilik</button>
-                           </div>
-                        ))}
-                     </div>
-                  )}
-                </div>
-              ) : (
-              <div>
-                  {msg.text && (<div className={`p-5 mb-8 rounded-xl text-base font-bold text-center shadow-lg ${msg.type === 'error' ? 'bg-red-900/90 text-red-200 border border-red-500' : 'bg-emerald-900/90 text-emerald-200 border border-emerald-500'}`}>{msg.text}</div>)}
-
-                  {/* TAB A: PENILAIAN CALON */}
-                  {activeTab === 'penilaian' && (
-                     <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-lg flex flex-col md:flex-row gap-6 items-center">
-                           <div className="flex-1 w-full">
-                              <label className="block text-sm font-bold uppercase text-amber-400 mb-3">Sila Pilih Calon ({activePenugasan.zon_bertugas} - {activePenugasan.sesi_bertugas})</label>
-                              <select className="w-full p-4 border border-slate-700 rounded-xl text-lg font-mono bg-slate-950 text-slate-100 font-semibold" value={selectedKP} onChange={(e) => handleSelectKP(e.target.value)}>
-                                 <option value="">-- Senarai Calon Berdaftar --</option>
-                                 {calonZonSesi.map(c => <option key={c.no_kp} value={c.no_kp}>{c.no_kp} - {c.nama_penuh}</option>)}
-                              </select>
-                           </div>
-                        </div>
-
-                        {selectedCalon && (
-                        <form onSubmit={handleSubmitPenilaian} className="space-y-8">
-                           <div className="bg-slate-900 border-l-4 border-l-amber-500 p-6 rounded-2xl text-base text-slate-200 shadow-md">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <p><strong>Nama Calon:</strong> <span className="font-bold text-white text-lg ml-2">{selectedCalon.nama_penuh}</span></p>
-                                 <p><strong>No. Kad Pengenalan:</strong> <span className="font-mono text-amber-400 font-bold ml-2 text-lg">{selectedCalon.no_kp}</span></p>
-                                 <p><strong>PPD & Opsyen:</strong> {selectedCalon.ppd || '-'} <span className="bg-slate-800 text-slate-300 px-3 py-1 rounded text-xs ml-2 font-bold">{selectedCalon.sme_subjek}</span></p>
-                              </div>
-                           </div>
-
-                           {RUBRIK.map((r) => (
-                              <div key={r.id} className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-md hover:border-amber-500/30 transition-colors">
-                              <h4 className="font-extrabold text-xl mb-6 text-amber-400">{r.nama}</h4>
-                              <div className="flex gap-4">
-                                 {[1, 2, 3, 4, 5].map((s) => (
-                                    <button key={s} type="button" onClick={() => setScores({ ...scores, [r.id]: s })} className={`flex-1 py-5 rounded-xl text-lg font-extrabold border-2 transition-all ${scores[r.id] === s ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)] scale-105' : 'bg-slate-950 text-slate-300 border-slate-700 hover:bg-slate-800'}`}>
-                                    SKOR {s}
-                                    </button>
-                                 ))}
-                              </div>
-                              {scores[r.id] > 0 && (<div className="mt-6 p-6 bg-slate-950 border-l-4 border-amber-500 rounded-r-xl text-lg text-slate-200"><span className="text-amber-500 font-extrabold uppercase text-sm block mb-2">Deskriptor Tahap {scores[r.id]}:</span>{r.deskriptor[scores[r.id]]}</div>)}
-                              </div>
-                           ))}
-
-                           <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-md">
-                              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-                              <label className="block text-sm font-bold uppercase text-amber-400">Ulasan Keseluruhan Penemuduga</label>
-                              <button type="button" onClick={generateUlasanPintar} className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-lg text-sm font-extrabold shadow-lg transition-all flex items-center gap-2 border border-indigo-400/30">
-                                 <span className="text-lg">🤖</span> Jana Ulasan Pintar
-                              </button>
-                              </div>
-                              <textarea rows="6" className="w-full p-5 border border-slate-700 rounded-xl text-lg bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none leading-relaxed" value={ulasan} onChange={(e) => setUlasan(e.target.value)} placeholder="Taipkan ulasan ringkas mengenai calon, atau klik butang 'Jana Ulasan Pintar' di atas..."></textarea>
-                           </div>
-
-                           <div className="bg-slate-900 border border-amber-500/40 text-white p-8 rounded-2xl flex justify-between items-center shadow-2xl sticky bottom-6 z-10 backdrop-blur-md bg-opacity-95">
-                              <div><p className="text-sm text-slate-400 uppercase font-bold tracking-wider">Jumlah Markah</p><div className="text-5xl font-extrabold text-amber-400 mt-1">{calculateTotal()}%</div></div>
-                              <button type="submit" disabled={loading} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold px-10 py-5 rounded-xl text-xl shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all disabled:opacity-50">
-                              {loading ? 'Menyimpan...' : 'Simpan & Hantar Penilaian'}
-                              </button>
-                           </div>
-                        </form>
-                        )}
-                     </div>
-                  )}
-
-                  {/* TAB B: PEMANTAUAN ZON (AKSES KETUA ZON & UTAMA) */}
-                  {activeTab === 'pemantauan' && isKetuaZon && (
-                     <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                        <div className="bg-slate-900 border border-emerald-500/30 p-8 rounded-2xl shadow-lg">
-                           <div className="flex justify-between items-end border-b border-slate-800 pb-4 mb-6">
-                              <div><h2 className="text-2xl font-extrabold text-emerald-400">Pemantauan Eksekutif Zon</h2><p className="text-slate-400 mt-1">Menyenaraikan status pemarkahan calon bagi {activePenugasan.zon_bertugas} ({activePenugasan.sesi_bertugas})</p></div>
-                              <div className="text-right hidden md:block"><p className="text-xs font-bold uppercase text-slate-500 mb-1">Jumlah Calon Zon</p><p className="text-3xl font-extrabold text-white">{calonZonSesi.length}</p></div>
-                           </div>
-                           <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
-                              <table className="w-full text-left text-sm border-collapse">
-                                 <thead className="sticky top-0 bg-slate-950 shadow z-10"><tr className="text-emerald-400 uppercase text-xs border-b border-slate-800"><th className="p-4">Nama Calon</th><th className="p-4 text-center">Status</th><th className="p-4 text-center">Markah</th><th className="p-4">Dinilai Oleh</th></tr></thead>
-                                 <tbody>
-                                    {calonZonSesi.length === 0 ? <tr><td colSpan="4" className="text-center p-8 text-slate-500 italic">Tiada calon berdaftar untuk zon dan sesi ini.</td></tr> : 
-                                    calonZonSesi.map(c => {
-                                       const skor = allScores.find(s => s.no_kp_calon === c.no_kp);
-                                       return (
-                                          <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                             <td className="p-4"><p className="font-bold text-slate-200 text-base">{c.nama_penuh}</p><p className="font-mono text-xs text-slate-500 mt-1">{c.no_kp}</p></td>
-                                             <td className="p-4 text-center">{skor ? <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded text-xs font-bold">SELESAI</span> : <span className="bg-slate-800 text-slate-400 px-3 py-1 rounded text-xs font-bold">BELUM</span>}</td>
-                                             <td className="p-4 text-center">{skor ? <span className={`text-xl font-extrabold ${skor.status_lulus ? 'text-amber-400' : 'text-rose-400'}`}>{skor.jumlah_markah}%</span> : '-'}</td>
-                                             <td className="p-4 text-xs font-bold text-slate-300">{skor ? skor.nama_panel : '-'}</td>
-                                          </tr>
-                                       );
-                                    })}
-                                 </tbody>
-                              </table>
-                           </div>
-                        </div>
-                     </div>
-                  )}
-
-                  {/* TAB C: ANALITIK PRESTASI KESELURUHAN (BAHARU - EKSKLUSIF KETUA UTAMA) */}
-                  {activeTab === 'rumusan' && isKetuaUtama && (
-                     <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                        
-                        {/* Bar Kawalan Tapisan */}
-                        <div className="bg-slate-900 border border-amber-500/30 p-6 rounded-2xl shadow-lg flex flex-col md:flex-row justify-between items-center gap-4">
-                           <div>
-                              <h2 className="text-xl font-extrabold text-amber-400 flex items-center gap-2"><span className="text-2xl">📊</span> Analitik Prestasi Keseluruhan</h2>
-                              <p className="text-slate-400 text-sm mt-1">Pemantauan taburan markah dan purata kompetensi mengikut zon.</p>
-                           </div>
-                           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                              <input type="text" placeholder="🔍 Cari Nama Calon..." className="w-full md:w-64 p-3 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchRumusan} onChange={(e) => setSearchRumusan(e.target.value)} />
-                              <select className="w-full md:w-48 p-3 border border-slate-700 rounded-lg bg-slate-950 text-amber-400 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonRumusan} onChange={(e) => setFilterZonRumusan(e.target.value)}>
-                                 <option value="KESELURUHAN">Paparan Keseluruhan</option>
-                                 <option value="UTARA">Zon Utara Sahaja</option>
-                                 <option value="TIMUR">Zon Timur Sahaja</option>
-                                 <option value="TENGAH">Zon Tengah Sahaja</option>
-                                 <option value="SELATAN">Zon Selatan Sahaja</option>
-                                 <option value="SABAH">Zon Sabah Sahaja</option>
-                                 <option value="SARAWAK">Zon Sarawak Sahaja</option>
-                              </select>
-                           </div>
-                        </div>
-
-                        {/* Carta Radar Dinamik */}
-                        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center">
-                           <h3 className="w-full text-center text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">
-                              Purata Kompetensi: {filterZonRumusan === 'KESELURUHAN' ? 'Semua Zon' : `Zon ${filterZonRumusan}`}
-                           </h3>
-                           <RadarChartPrestasi results={filteredRumusan} title={`Purata ${filterZonRumusan}`} />
-                        </div>
-
-                        {/* Jadual Senarai Pencapaian Calon */}
-                        <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-lg">
-                           <div className="flex justify-between items-end border-b border-slate-800 pb-4 mb-6">
-                              <h3 className="text-lg font-bold text-slate-200 uppercase tracking-wide">Senarai Pencapaian Calon</h3>
-                              <p className="text-xs font-bold uppercase text-slate-500">Jumlah Rekod: {filteredRumusan.length}</p>
-                           </div>
-
-                           <div className="overflow-x-auto min-h-[300px]">
-                              <table className="w-full text-left text-sm border-collapse">
-                                 <thead className="bg-slate-950 shadow z-10"><tr className="text-amber-400 uppercase text-xs border-b border-slate-800"><th className="p-4 text-center">Kedudukan</th><th className="p-4">Nama Calon</th><th className="p-4">Zon / PPD</th><th className="p-4 text-center">Markah</th><th className="p-4 text-center">Status</th></tr></thead>
-                                 <tbody>
-                                    {displayedRumusan.length === 0 ? <tr><td colSpan="5" className="text-center p-8 text-slate-500 italic">Tiada rekod calon yang menepati carian zon ini.</td></tr> : 
-                                    displayedRumusan.map((skor, idx) => {
-                                       const cDetail = allCandidates.find(c => c.no_kp === skor.no_kp_calon);
-                                       // Kedudukan sebenar mengira offset halaman
-                                       const rank = ((pageRumusan - 1) * ITEMS_PER_PAGE) + idx + 1;
-                                       return (
-                                          <tr key={skor.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                             <td className="p-4 text-center text-lg font-extrabold text-slate-500">{rank}</td>
-                                             <td className="p-4"><p className="font-bold text-slate-200 text-base">{cDetail ? cDetail.nama_penuh : 'Data Calon Hilang'}</p><p className="font-mono text-xs text-slate-500 mt-1">{skor.no_kp_calon}</p></td>
-                                             <td className="p-4"><p className="font-bold text-amber-300">{skor.zon}</p><p className="text-xs text-slate-400 mt-0.5">{cDetail ? cDetail.ppd : '-'}</p></td>
-                                             <td className="p-4 text-center text-xl font-extrabold text-white">{skor.jumlah_markah}%</td>
-                                             <td className="p-4 text-center">{skor.status_lulus ? <span className="bg-emerald-900/40 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded text-xs font-bold tracking-widest">LAYAK</span> : <span className="bg-rose-900/40 text-rose-400 border border-rose-500/30 px-3 py-1 rounded text-xs font-bold tracking-widest">GAGAL</span>}</td>
-                                          </tr>
-                                       );
-                                    })}
-                                 </tbody>
-                              </table>
-                           </div>
-                           
-                           {/* Kawalan Pagination */}
-                           {totalPagesRumusan > 1 && (
-                              <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800">
-                                 <p className="text-xs text-slate-500 font-bold">Halaman {pageRumusan} / {totalPagesRumusan}</p>
-                                 <div className="flex gap-2">
-                                    <button onClick={() => setPageRumusan(prev => Math.max(prev - 1, 1))} disabled={pageRumusan === 1} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Sebelumnya</button>
-                                    <button onClick={() => setPageRumusan(prev => Math.min(prev + 1, totalPagesRumusan))} disabled={pageRumusan === totalPagesRumusan} className="px-3 py-1 bg-slate-800 text-slate-300 rounded hover:bg-slate-700 disabled:opacity-30 font-bold text-sm">Seterusnya</button>
-                                 </div>
-                              </div>
-                           )}
-                        </div>
-                     </div>
-                  )}
-
-              </div>
               )}
+
+              {/* SKRIN 2: LOBI AGIHAN SURAT PENUGASAN (REKA BENTUK MODEN & KEMAS) */}
+              {isLoggedIn && !selectedTugas && (
+                <div className="space-y-6">
+                   <div className="text-center max-w-2xl mx-auto">
+                      <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-wide">SELAMAT DATANG, {currentPanel?.nama_penuh}</h1>
+                      <p className="text-slate-400 text-sm mt-1">Sila pilih Surat Penugasan anda di bawah untuk memulakan sesi penilaian calon.</p>
+                   </div>
+
+                   {penugasanList.length === 0 ? (
+                      <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-2xl max-w-xl mx-auto mt-8 shadow-2xl">
+                         <span className="text-5xl text-slate-600">📂</span>
+                         <h3 className="text-lg font-bold text-slate-300 mt-3">Tiada Rekod Penugasan Aktif</h3>
+                         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Akaun anda belum ditugaskan ke mana-mana zon atau sesi. Sila hubungi Urus Setia/Admin untuk tindakan agihan.</p>
+                      </div>
+                   ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-8">
+                         {penugasanList.map(tugas => (
+                            <div key={tugas.id} className="bg-slate-900 border-2 border-slate-800 hover:border-amber-500/80 rounded-2xl shadow-2xl flex flex-col justify-between overflow-hidden transition-all duration-300 hover:-translate-y-1">
+                               
+                               {/* HEAD KAD */}
+                               <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 border-b border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <span className="px-3 py-1 bg-amber-500/20 text-amber-300 font-extrabold text-xs rounded-full border border-amber-500/40 uppercase tracking-wider">
+                                        📍 ZON {tugas.zon_bertugas}
+                                     </span>
+                                     <span className="text-[11px] text-slate-500 font-mono">ID #{tugas.id}</span>
+                                  </div>
+                                  <h3 className="text-lg font-extrabold text-white mt-2 leading-snug">{tugas.sesi_bertugas}</h3>
+                               </div>
+
+                               {/* BADAN KAD */}
+                               <div className="p-5 flex-grow flex flex-col justify-center items-center text-center">
+                                  <div className="w-full py-2.5 px-4 bg-slate-950/80 border border-slate-800 rounded-xl mb-2">
+                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">PERANAN RASMI</p>
+                                     <p className="text-xs font-black text-emerald-400 uppercase mt-0.5">{tugas.peranan}</p>
+                                  </div>
+                               </div>
+
+                               {/* FOOTER & BUTANG MASUK */}
+                               <div className="p-5 pt-0">
+                                  <button onClick={() => setSelectedTugas(tugas)} className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-sm shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2">
+                                     <span>MASUK BILIK TEMU DUGA</span>
+                                     <span>➔</span>
+                                  </button>
+                               </div>
+
+                            </div>
+                         ))}
+                      </div>
+                   )}
+                </div>
+              )}
+
+              {/* SKRIN 3: BILIK PENILAIAN CALON */}
+              {isLoggedIn && selectedTugas && (
+                <div className="space-y-8">
+                   
+                   {/* BAR MAKLUMAT TUGASAN & BUTANG TUKAR */}
+                   <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4 shadow">
+                      <div className="flex items-center gap-3">
+                         <button onClick={() => { setSelectedTugas(null); setSelectedCalon(null); setSelectedCalonKp(''); }} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors">
+                            <span>⬅️</span> <span>Tukar Tugas</span>
+                         </button>
+                         <div>
+                            <span className="text-xs text-slate-400 uppercase font-bold">Penugasan Aktif:</span>
+                            <h2 className="text-sm font-extrabold text-amber-400 uppercase">{selectedTugas.zon_bertugas} — {selectedTugas.sesi_bertugas} ({selectedTugas.peranan})</h2>
+                         </div>
+                      </div>
+                      <div className="text-xs text-slate-400 font-bold bg-slate-950 px-4 py-2 rounded-lg border border-slate-800">
+                         Jumlah Calon Dalam Bilik: <span className="text-emerald-400 text-sm font-extrabold ml-1">{calonBilik.length} Orang</span>
+                      </div>
+                   </div>
+
+                   {/* NOTIFIKASI */}
+                   {msg.text && (
+                      <div className={`p-4 rounded-xl text-sm font-bold text-center shadow-md animate-pulse ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
+                         {msg.text}
+                      </div>
+                   )}
+
+                   {/* PILIHAN CALON */}
+                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
+                      <label className="block text-xs font-extrabold uppercase text-amber-400 mb-2">PILIH CALON UNTUK DINILAI ({selectedTugas.zon_bertugas} - {selectedTugas.sesi_bertugas})</label>
+                      <select className="w-full p-4 border border-slate-700 rounded-xl text-base font-bold bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none" value={selectedCalonKp} onChange={e => handleSelectCalon(e.target.value)}>
+                         <option value="">-- Sila Pilih Nama Calon --</option>
+                         {calonBilik.map(c => {
+                            const dinilai = allResults.some(r => safeStr(r.no_kp_calon).trim() === safeStr(c.no_kp).trim());
+                            return (
+                               <option key={c.no_kp} value={c.no_kp}>
+                                  {dinilai ? '✅ ' : '⏳ '} {c.nama_penuh} ({c.no_kp}) - PPD: {c.ppd || 'N/A'} [{c.sesi}]
+                               </option>
+                            );
+                         })}
+                      </select>
+                   </div>
+
+                   {/* FORM PENILAIAN SKOR */}
+                   {selectedCalon && (
+                      <form onSubmit={handleSavePenilaian} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                         
+                         {/* KOLUM LEFT & MIDDLE: BORANG MARKAH */}
+                         <div className="lg:col-span-2 space-y-6">
+                            
+                            {/* MAKLUMAT CALON */}
+                            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow flex justify-between items-center">
+                               <div>
+                                  <h2 className="text-xl font-extrabold text-white uppercase">{selectedCalon.nama_penuh}</h2>
+                                  <p className="text-xs text-slate-400 font-mono mt-0.5">NO. KP: {selectedCalon.no_kp} | PPD: {selectedCalon.ppd} | SME: {selectedCalon.sme_subjek || 'N/A'}</p>
+                               </div>
+                               <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${selectedCalon.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
+                                  STATUS: {selectedCalon.kehadiran || 'BELUM'}
+                               </span>
+                            </div>
+
+                            {/* SLIDER / INPUT SKOR KOMPETENSI (6 ELEMEN) */}
+                            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-5">
+                               <h3 className="text-sm font-extrabold text-amber-400 uppercase border-b border-slate-800 pb-2">Borang Penilaian Kompetensi (Skor 0 - 5)</h3>
+
+                               {/* 1. BIMBINGAN (25%) */}
+                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <label className="text-sm font-bold text-slate-200">1. BIMBINGAN & PEMENTORAN (25%)</label>
+                                     <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_bimbingan} / 5</span>
+                                  </div>
+                                  <input type="range" min="0" max="5" step="0.5" value={scores.skor_bimbingan} onChange={e => setScores({...scores, skor_bimbingan: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                               </div>
+
+                               {/* 2. INSTRUKSIONAL (20%) */}
+                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <label className="text-sm font-bold text-slate-200">2. KEPIMPINAN INSTRUKSIONAL (20%)</label>
+                                     <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_instruksional} / 5</span>
+                                  </div>
+                                  <input type="range" min="0" max="5" step="0.5" value={scores.skor_instruksional} onChange={e => setScores({...scores, skor_instruksional: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                               </div>
+
+                               {/* 3. STRATEGIK (20%) */}
+                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <label className="text-sm font-bold text-slate-200">3. PEMIKIRAN STRATEGIK (20%)</label>
+                                     <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_pemikiran_strategik} / 5</span>
+                                  </div>
+                                  <input type="range" min="0" max="5" step="0.5" value={scores.skor_pemikiran_strategik} onChange={e => setScores({...scores, skor_pemikiran_strategik: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                               </div>
+
+                               {/* 4. ANALISIS DATA (15%) */}
+                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <label className="text-sm font-bold text-slate-200">4. ANALISIS DATA & PENILAIAN (15%)</label>
+                                     <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_analisis_data} / 5</span>
+                                  </div>
+                                  <input type="range" min="0" max="5" step="0.5" value={scores.skor_analisis_data} onChange={e => setScores({...scores, skor_analisis_data: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                               </div>
+
+                               {/* 5. INTERPERSONAL (10%) */}
+                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <label className="text-sm font-bold text-slate-200">5. KEMAHIRAN INTERPERSONAL (10%)</label>
+                                     <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_interpersonal} / 5</span>
+                                  </div>
+                                  <input type="range" min="0" max="5" step="0.5" value={scores.skor_interpersonal} onChange={e => setScores({...scores, skor_interpersonal: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                               </div>
+
+                               {/* 6. EVIDENS (10%) */}
+                               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <label className="text-sm font-bold text-slate-200">6. EVIDENS & PORTFOLIO (10%)</label>
+                                     <span className="text-base font-extrabold text-amber-400 bg-slate-900 px-3 py-1 rounded border border-slate-700">{scores.skor_evidens} / 5</span>
+                                  </div>
+                                  <input type="range" min="0" max="5" step="0.5" value={scores.skor_evidens} onChange={e => setScores({...scores, skor_evidens: e.target.value})} className="w-full accent-amber-500 h-2 bg-slate-800 rounded-lg cursor-pointer" />
+                               </div>
+
+                               {/* ULASAN PANEL */}
+                               <div className="pt-2">
+                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Ulasan Keseluruhan Panel Penemuduga</label>
+                                  <textarea rows="3" placeholder="Sila berikan ulasan ringkas mengenai potensi dan prestasi calon..." className="w-full p-4 bg-slate-950 border border-slate-700 rounded-xl text-sm text-slate-100 focus:border-amber-500 focus:outline-none" value={scores.ulasan_panel} onChange={e => setScores({...scores, ulasan_panel: e.target.value})}></textarea>
+                               </div>
+
+                            </div>
+                         </div>
+
+                         {/* KOLUM RIGHT: CARTA RADAR & RUMUSAN SKOR */}
+                         <div className="space-y-6">
+                            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg sticky top-6">
+                               <h3 className="text-xs font-extrabold text-amber-400 uppercase border-b border-slate-800 pb-2 mb-4 text-center">Rumusan Markah Terkumpul</h3>
+                               
+                               <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 text-center mb-6">
+                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">JUMLAH MARKAH</span>
+                                  <p className="text-6xl font-black text-amber-400 mt-2">{calcJumlahMarkah()}%</p>
+                                  <div className="mt-3">
+                                     <span className={`px-4 py-1.5 rounded-full text-xs font-extrabold ${calcJumlahMarkah() >= 75 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'bg-red-500/20 text-red-400 border border-red-500/50'}`}>
+                                        {calcJumlahMarkah() >= 75 ? 'LAYAK (>=75%)' : 'BELUM LAYAK'}
+                                     </span>
+                                  </div>
+                               </div>
+
+                               <RadarChartPenilaian skor={scores} />
+
+                               <button type="submit" className="w-full mt-6 py-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black rounded-xl text-base shadow-xl transition-transform active:scale-95">
+                                  💾 SIMPAN PENILAIAN CALON
+                               </button>
+                            </div>
+                         </div>
+
+                      </form>
+                   )}
+
+                   {/* BAHAGIAN KHAS: PEMANTAUAN UNTUK KETUA PANEL UTAMA */}
+                   {selectedTugas.peranan === 'Ketua Panel Utama' && (
+                      <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12">
+                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
+                            <div>
+                               <h2 className="text-lg font-bold text-amber-400 uppercase flex items-center gap-2">🌐 Pusat Pemantauan Keseluruhan Zon (Ketua Panel Utama)</h2>
+                               <p className="text-xs text-slate-400 mt-1">Anda mempunyai akses pemantauan markah rasmi di seluruh negara.</p>
+                            </div>
+                            <select className="p-3 border border-slate-700 rounded-lg bg-slate-950 text-amber-400 font-bold text-sm" value={filterZonPantau} onChange={e => setFilterZonPantau(e.target.value)}>
+                               <option value="SEMUA">KESEMUA ZON</option>
+                               <option value="UTARA">ZON UTARA</option>
+                               <option value="TIMUR">ZON TIMUR</option>
+                               <option value="TENGAH">ZON TENGAH</option>
+                               <option value="SELATAN">ZON SELATAN</option>
+                               <option value="SABAH">ZON SABAH</option>
+                               <option value="SARAWAK">ZON SARAWAK</option>
+                            </select>
+                         </div>
+
+                         <div className="overflow-x-auto max-h-[350px] overflow-y-auto">
+                            <table className="w-full text-left text-sm border-collapse">
+                               <thead className="bg-slate-950 sticky top-0 shadow">
+                                  <tr className="text-amber-400 uppercase text-xs border-b border-slate-800">
+                                     <th className="p-3">#</th>
+                                     <th className="p-3">Nama Calon</th>
+                                     <th className="p-3">No. KP</th>
+                                     <th className="p-3">Zon</th>
+                                     <th className="p-3">Penilai (Panel)</th>
+                                     <th className="p-3 text-center">Markah (%)</th>
+                                  </tr>
+                               </thead>
+                               <tbody>
+                                  {allResults.filter(r => filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau).length === 0 ? (
+                                     <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada rekod penilaian di kawasan pilihan.</td></tr>
+                                  ) : allResults.filter(r => filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau).map((res, idx) => {
+                                     const cDetail = calonList.find(c => c.no_kp === res.no_kp_calon);
+                                     return (
+                                        <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/50">
+                                           <td className="p-3 font-bold text-slate-500">{idx + 1}</td>
+                                           <td className="p-3 font-bold">{cDetail ? safeStr(cDetail.nama_penuh) : safeStr(res.no_kp_calon)}</td>
+                                           <td className="p-3 font-mono text-slate-400 text-xs">{safeStr(res.no_kp_calon)}</td>
+                                           <td className="p-3 font-bold text-amber-300">{safeStr(res.zon)}</td>
+                                           <td className="p-3 text-slate-300 text-xs">{safeStr(res.nama_panel)}</td>
+                                           <td className="p-3 text-center font-extrabold text-emerald-400">{res.jumlah_markah}%</td>
+                                        </tr>
+                                     );
+                                  })}
+                               </tbody>
+                            </table>
+                         </div>
+                      </div>
+                   )}
+
+                </div>
+              )}
+
             </div>
           </div>
         );
       }
+
       ReactDOM.createRoot(document.getElementById('root')).render(<PanelApp />);
     </script>
   </body>
