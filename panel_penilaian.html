@@ -164,10 +164,8 @@
         const [selectedCalon, setSelectedCalon] = useState(null);
         const [filterSesiTapis, setFilterSesiTapis] = useState('SEMUA');
 
-        // SUB-MODUL SELECTION STATE (1: Penilaian Keseluruhan, 2: Penilaian Berstesen)
         const [subModul, setSubModul] = useState(1);
 
-        // PAPAN SUIS (TOGGLE) ACTIVE KOMPETENSI BAGI SUB-MODUL 2
         const [activeKompetensi, setActiveKompetensi] = useState({
           skor_bimbingan: true,
           skor_instruksional: true,
@@ -230,6 +228,7 @@
           if (rData) setAllResults(rData);
         };
 
+        // TAPIS CALON DALAM BILIK
         const calonBilik = selectedTugas ? calonList.filter(c => {
           const zonCalon = safeStr(c.zon_temuduga).toUpperCase().trim();
           const zonTugas = safeStr(selectedTugas.zon_bertugas).toUpperCase().trim();
@@ -251,13 +250,15 @@
           return sesiCalonStr.includes(sesiFilterStr);
         }) : [];
 
+        // HANYA TAPIS REKOD PENILAIAN YANG MPUNYAI CALON SAH / MASIH WUJUD
+        const validResults = allResults.filter(r => calonList.some(c => safeStr(c.no_kp).trim() === safeStr(r.no_kp_calon).trim()));
+
         const handleSelectCalon = (kp) => {
           setSelectedCalonKp(kp);
           const c = calonList.find(cal => cal.no_kp === kp);
           setSelectedCalon(c || null);
 
-          // Cari rekod penilaian panel semasa untuk calon ini
-          const existingRes = allResults.find(r => 
+          const existingRes = validResults.find(r => 
              safeStr(r.no_kp_calon).trim() === safeStr(kp).trim() && 
              safeStr(r.nama_panel).trim() === safeStr(currentPanel?.nama_penuh).trim()
           );
@@ -273,7 +274,6 @@
               ulasan_panel: existingRes.ulasan_panel || ''
             });
 
-            // Set Suis Active berdasarkan penilaian terdahulu
             setActiveKompetensi({
               skor_bimbingan: (existingRes.skor_bimbingan || 0) > 0,
               skor_instruksional: (existingRes.skor_instruksional || 0) > 0,
@@ -379,7 +379,7 @@
             ulasan_panel: scores.ulasan_panel
           };
 
-          const existingRes = allResults.find(r => 
+          const existingRes = validResults.find(r => 
              safeStr(r.no_kp_calon).trim() === safeStr(selectedCalon.no_kp).trim() &&
              safeStr(r.nama_panel).trim() === safeStr(currentPanel.nama_penuh).trim()
           );
@@ -563,7 +563,7 @@
                       <select className="w-full p-4 border border-slate-700 rounded-xl text-base font-bold bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none" value={selectedCalonKp} onChange={e => handleSelectCalon(e.target.value)}>
                          <option value="">-- Sila Pilih Nama Calon --</option>
                          {calonBilik.map(c => {
-                            const dinilaiByMe = allResults.some(r => 
+                            const dinilaiByMe = validResults.some(r => 
                                safeStr(r.no_kp_calon).trim() === safeStr(c.no_kp).trim() && 
                                safeStr(r.nama_panel).trim() === safeStr(currentPanel?.nama_penuh).trim()
                             );
@@ -579,7 +579,7 @@
                    {selectedCalon && (
                       <div className="space-y-6">
                          
-                         {/* PILIHAN SUB-MODUL PENILAIAN (DUAL-MODE SELECTION) */}
+                         {/* PILIHAN SUB-MODUL PENILAIAN */}
                          <div className="bg-slate-900 border border-amber-500/40 p-4 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-center gap-4">
                             <div>
                                <span className="text-xs text-amber-400 font-extrabold uppercase tracking-wide">PILIH SUB-MODUL PENILAIAN:</span>
@@ -821,7 +821,7 @@
                       </div>
                    )}
 
-                   {/* PEMANTAUAN MULTI-PANEL LIVE UNTUK KETUA PANEL UTAMA & KETUA ZON */}
+                   {/* PEMANTAUAN MULTI-PANEL LIVE DENGAN PENAPISAN HANYA CALON WUJUD */}
                    {(selectedTugas.peranan === 'Ketua Panel Utama' || selectedTugas.peranan === 'Ketua Zon Panel Penemuduga') && (
                       <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12">
                          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
@@ -855,14 +855,14 @@
                                   </tr>
                                </thead>
                                <tbody>
-                                  {allResults.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).length === 0 ? (
-                                     <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada rekod penilaian di kawasan pilihan.</td></tr>
-                                  ) : allResults.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).map((res, idx) => {
-                                     const cDetail = calonList.find(c => c.no_kp === res.no_kp_calon);
+                                  {validResults.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).length === 0 ? (
+                                     <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada rekod penilaian bagi calon aktif.</td></tr>
+                                  ) : validResults.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).map((res, idx) => {
+                                     const cDetail = calonList.find(c => safeStr(c.no_kp).trim() === safeStr(res.no_kp_calon).trim());
                                      return (
                                         <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/50">
                                            <td className="p-3 font-bold text-slate-500">{idx + 1}</td>
-                                           <td className="p-3 font-bold">{cDetail ? safeStr(cDetail.nama_penuh) : safeStr(res.no_kp_calon)}</td>
+                                           <td className="p-3 font-bold text-slate-200">{cDetail ? safeStr(cDetail.nama_penuh) : safeStr(res.no_kp_calon)}</td>
                                            <td className="p-3 font-mono text-slate-400 text-xs">{safeStr(res.no_kp_calon)}</td>
                                            <td className="p-3 font-bold text-amber-300">{safeStr(res.zon)}</td>
                                            <td className="p-3 text-slate-300 text-xs">{safeStr(res.nama_panel)}</td>
