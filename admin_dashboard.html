@@ -52,9 +52,68 @@
 
       const safeStr = (val) => (val ? String(val) : '');
 
-      // ==========================================
-      // KOMPONEN CARTA
-      // ==========================================
+      // HELPER: PENGGABUNGAN & PENYELARASAN PURATA MULTI-STESEN / MULTI-PANEL
+      const consolidateCalonResults = (calonList, resultsList) => {
+        return calonList.map(calon => {
+          const calonRes = resultsList.filter(r => safeStr(r.no_kp_calon).trim() === safeStr(calon.no_kp).trim());
+          
+          if (calonRes.length === 0) return null;
+
+          let sums = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
+          let counts = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
+          let panelNames = [];
+          let ulasanList = [];
+
+          calonRes.forEach(r => {
+            if (r.nama_panel && !panelNames.includes(r.nama_panel)) panelNames.push(r.nama_panel);
+            if (r.ulasan_panel && r.ulasan_panel.trim() !== '') ulasanList.push(`${r.nama_panel}: ${r.ulasan_panel}`);
+
+            if (Number(r.skor_bimbingan) > 0) { sums.bimb += Number(r.skor_bimbingan); counts.bimb++; }
+            if (Number(r.skor_instruksional) > 0) { sums.inst += Number(r.skor_instruksional); counts.inst++; }
+            if (Number(r.skor_pemikiran_strategik) > 0) { sums.strat += Number(r.skor_pemikiran_strategik); counts.strat++; }
+            if (Number(r.skor_analisis_data) > 0) { sums.data += Number(r.skor_analisis_data); counts.data++; }
+            if (Number(r.skor_interpersonal) > 0) { sums.inter += Number(r.skor_interpersonal); counts.inter++; }
+            if (Number(r.skor_evidens) > 0) { sums.evi += Number(r.skor_evidens); counts.evi++; }
+          });
+
+          const avgBimb = counts.bimb > 0 ? (sums.bimb / counts.bimb) : 0;
+          const avgInst = counts.inst > 0 ? (sums.inst / counts.inst) : 0;
+          const avgStrat = counts.strat > 0 ? (sums.strat / counts.strat) : 0;
+          const avgData = counts.data > 0 ? (sums.data / counts.data) : 0;
+          const avgInter = counts.inter > 0 ? (sums.inter / counts.inter) : 0;
+          const avgEvi = counts.evi > 0 ? (sums.evi / counts.evi) : 0;
+
+          const m1 = (avgBimb / 5) * 25;
+          const m2 = (avgInst / 5) * 20;
+          const m3 = (avgStrat / 5) * 20;
+          const m4 = (avgData / 5) * 15;
+          const m5 = (avgInter / 5) * 10;
+          const m6 = (avgEvi / 5) * 10;
+
+          const totalMuktamad = Number((m1 + m2 + m3 + m4 + m5 + m6).toFixed(1));
+
+          return {
+            no_kp_calon: calon.no_kp,
+            nama_calon: calon.nama_penuh,
+            zon: calon.zon_temuduga,
+            ppd: calon.ppd,
+            sme_subjek: calon.sme_subjek,
+            sesi: calon.sesi,
+            skor_bimbingan: avgBimb,
+            skor_instruksional: avgInst,
+            skor_pemikiran_strategik: avgStrat,
+            skor_analisis_data: avgData,
+            skor_interpersonal: avgInter,
+            skor_evidens: avgEvi,
+            jumlah_markah: totalMuktamad,
+            status_lulus: totalMuktamad >= 75,
+            panel_list: panelNames.join(", "),
+            ulasan_panel: ulasanList.join("\n---\n")
+          };
+        }).filter(Boolean);
+      };
+
+      // CARTA RADAR (SKALA 0 - 5)
       function RadarChartKeseluruhan({ results }) {
         const canvasRef = useRef(null);
         const chartInstanceRef = useRef(null);
@@ -62,29 +121,60 @@
           if (!canvasRef.current) return;
           const ctx = canvasRef.current.getContext('2d');
           if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+
           let avgScores = [0,0,0,0,0,0];
           if(results && results.length > 0) {
             let sums = [0,0,0,0,0,0];
             results.forEach(r => {
-              sums[0] += ((r.skor_bimbingan||0)/5)*25; 
-              sums[1] += ((r.skor_instruksional||0)/5)*20;
-              sums[2] += ((r.skor_pemikiran_strategik||0)/5)*20; 
-              sums[3] += ((r.skor_analisis_data||0)/5)*15;
-              sums[4] += ((r.skor_interpersonal||0)/5)*10; 
-              sums[5] += ((r.skor_evidens||0)/5)*10;
+              sums[0] += Number(r.skor_bimbingan || 0);
+              sums[1] += Number(r.skor_instruksional || 0);
+              sums[2] += Number(r.skor_pemikiran_strategik || 0);
+              sums[3] += Number(r.skor_analisis_data || 0);
+              sums[4] += Number(r.skor_interpersonal || 0);
+              sums[5] += Number(r.skor_evidens || 0);
             });
             avgScores = sums.map(s => s / results.length);
           }
+
           chartInstanceRef.current = new Chart(ctx, {
             type: 'radar',
             data: { 
-              labels: ['BIMBINGAN', 'INSTRUKSIONAL', 'STRATEGIK', 'ANALISIS', 'INTERPERSONAL', 'EVIDENS'], 
-              datasets: [{ label: 'Purata Keseluruhan', data: avgScores, backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#D4AF37', borderWidth: 2, pointBackgroundColor: '#F59E0B' }] 
+              labels: [
+                'BIMBINGAN (25%)', 
+                'INSTRUKSIONAL (20%)', 
+                'STRATEGIK (20%)', 
+                'ANALISIS DATA (15%)', 
+                'INTERPERSONAL (10%)', 
+                'EVIDENS (10%)'
+              ], 
+              datasets: [{ 
+                label: 'Purata Skor Penguasaan (Skala 5)', 
+                data: avgScores, 
+                backgroundColor: 'rgba(212, 175, 55, 0.25)', 
+                borderColor: '#D4AF37', 
+                borderWidth: 2.5, 
+                pointBackgroundColor: '#F59E0B' 
+              }] 
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { r: { angleLines: { color: '#334155' }, grid: { color: '#1e293b' }, pointLabels: { font: { size: 10, weight: 'bold' }, color: '#94a3b8' }, suggestedMin: 0, suggestedMax: 25 } }, plugins: { legend: { display: false } } }
+            options: { 
+              responsive: true, 
+              maintainAspectRatio: false, 
+              scales: { 
+                r: { 
+                  angleLines: { color: '#334155' }, 
+                  grid: { color: '#1e293b' }, 
+                  ticks: { display: false },
+                  pointLabels: { font: { size: 10, weight: 'bold' }, color: '#cbd5e1' }, 
+                  suggestedMin: 0, 
+                  suggestedMax: 5 
+                } 
+              }, 
+              plugins: { legend: { display: false } } 
+            }
           });
           return () => { if (chartInstanceRef.current) chartInstanceRef.current.destroy(); };
         }, [results]);
+
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
@@ -141,13 +231,9 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      // ==========================================
-      // APLIKASI UTAMA ADMIN
-      // ==========================================
       function AdminApp() {
         const [activeTab, setActiveTab] = useState('dashboard');
         
-        // Data State
         const [calonList, setCalonList] = useState([]);
         const [panelList, setPanelList] = useState([]);
         const [resultsList, setResultsList] = useState([]);
@@ -156,7 +242,6 @@
         const [penugasanUSList, setPenugasanUSList] = useState([]);
         const [msg, setMsg] = useState({ type: '', text: '' });
         
-        // Panel Form
         const [panelForm, setPanelForm] = useState({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', katalaluan: '' });
         const [editModePanelKp, setEditModePanelKp] = useState(null);
         const [editPanelForm, setEditPanelForm] = useState({});
@@ -164,30 +249,21 @@
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [pagePanel, setPagePanel] = useState(1);
 
-        // Penugasan Form (Bersih: Sesi Berasingan Daripada Tarikh)
         const [penugasanForm, setPenugasanForm] = useState({ 
-          no_kp_panel: '', 
-          zon_bertugas: 'UTARA', 
-          sesi_bertugas: 'SEMUA SESI', 
-          tarikh_mula: '', 
-          tarikh_tamat: '', 
-          peranan: 'Panel Penemuduga' 
+          no_kp_panel: '', zon_bertugas: 'UTARA', sesi_bertugas: 'SEMUA SESI', tarikh_mula: '', tarikh_tamat: '', peranan: 'Panel Penemuduga' 
         });
         const [searchTugas, setSearchTugas] = useState('');
         const [filterZonTugas, setFilterZonTugas] = useState('SEMUA');
         const [pageTugas, setPageTugas] = useState(1);
 
-        // Urus Setia Form
         const [usForm, setUsForm] = useState({ nama_penuh: '', no_kp: '', katalaluan: '' });
         const [editModeUsKp, setEditModeUsKp] = useState(null);
         const [editUsForm, setEditUsForm] = useState({});
 
-        // Penugasan Urus Setia Form
         const [penugasanUsForm, setPenugasanUsForm] = useState({
           no_kp_us: '', zon_bertugas: 'UTARA', tarikh_mula: '', tarikh_tamat: ''
         });
 
-        // Calon Form
         const [calonForm, setCalonForm] = useState({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' });
         const [editModeCalonKp, setEditModeCalonKp] = useState(null);
         const [editCalonForm, setEditCalonForm] = useState({});
@@ -196,7 +272,6 @@
         const [filterSesiCalon, setFilterSesiCalon] = useState('SEMUA');
         const [pageCalon, setPageCalon] = useState(1);
 
-        // Lain-lain
         const [minScore, setMinScore] = useState(50);
         const [laporanZon, setLaporanZon] = useState('KESELURUHAN');
         const [cetakZon, setCetakZon] = useState('');
@@ -228,7 +303,9 @@
            if (d6) setPenugasanUSList(d6);
         };
 
-        // --- FUNGSI PANEL ---
+        // SENARAI MARKAH TERSELARAS MUKTAMAD DARI MULTI-STESEN / MULTI-PANEL
+        const consolidatedResults = consolidateCalonResults(calonList, resultsList);
+
         const handleRegisterPanel = async (e) => { 
            e.preventDefault(); 
            setMsg({ type: '', text: '' }); 
@@ -263,7 +340,6 @@
            } 
         };
 
-        // --- FUNGSI PENUGASAN PANEL (SESI BERSIH DENGAN TARIKH DILABEL KEMAS) ---
         const handleRegisterPenugasan = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -272,7 +348,6 @@
           const formatTarikh = (tStr) => tStr ? tStr.split('-').reverse().join('/') : '';
           let tMula = formatTarikh(penugasanForm.tarikh_mula);
           let tTamat = formatTarikh(penugasanForm.tarikh_tamat);
-          
           let tarikhLabel = (tMula && tTamat) ? `[${tMula} - ${tTamat}]` : tMula ? `[${tMula}]` : '';
           let sesiSimpan = penugasanForm.sesi_bertugas; 
           if(tarikhLabel) sesiSimpan += ` ${tarikhLabel}`;
@@ -301,7 +376,6 @@
            } 
         };
 
-        // --- FUNGSI URUS SETIA ---
         const handleRegisterUS = async (e) => { 
            e.preventDefault(); 
            setMsg({ type: '', text: '' }); 
@@ -356,7 +430,6 @@
            } 
         };
 
-        // --- FUNGSI CALON ---
         const handleRegisterCalon = async (e) => { 
           e.preventDefault(); 
           setMsg({ type: '', text: '' }); 
@@ -390,7 +463,8 @@
         };
 
         const handleDeleteCalon = async (kp) => { 
-           if (window.confirm('Padam calon?')) { 
+           if (window.confirm('Padam calon ini? Rekod penilaian berkaitan akan dibersihkan.')) { 
+              await sb.from('penilaian_skor').delete().eq('no_kp_calon', kp);
               const {error} = await sb.from('calon').delete().eq('no_kp', kp); 
               if(error) alert(error.message); else fetchData(); 
            } 
@@ -410,8 +484,7 @@
            setMsg({ type: 'success', text: 'Pautan dihantar' }); 
         };
 
-        // --- HELPER DATA & PAGINATION ---
-        const currentRes = selectedCalon ? resultsList.find(r => String(r.no_kp_calon).trim() === String(selectedCalon.no_kp).trim()) : null;
+        const currentRes = selectedCalon ? consolidatedResults.find(r => String(r.no_kp_calon).trim() === String(selectedCalon.no_kp).trim()) : null;
         
         const scoresMap = currentRes ? { 
            skor_bimbingan: ((currentRes.skor_bimbingan || 0) / 5) * 25, 
@@ -423,12 +496,10 @@
         } : { skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 };
         
         const totalMarkah = currentRes ? currentRes.jumlah_markah : 0;
-        const panelPenilai = currentRes ? panelList.find(p => safeStr(p.nama_penuh) === safeStr(currentRes.nama_panel)) : null;
         
-        const top10Calon = [...resultsList].sort((a,b) => b.jumlah_markah - a.jumlah_markah).slice(0, 10);
+        const top10Calon = [...consolidatedResults].sort((a,b) => b.jumlah_markah - a.jumlah_markah).slice(0, 10);
         const ITEMS_PER_PAGE = 10;
         
-        // Tapis Penugasan
         const filteredPenugasan = penugasanList.filter(tugas => { 
            const pDetail = panelList.find(p => safeStr(p.no_kp) === safeStr(tugas.no_kp_panel)); 
            const namaPanel = pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel).toUpperCase(); 
@@ -439,7 +510,6 @@
         const totalPagesTugas = Math.ceil(filteredPenugasan.length / ITEMS_PER_PAGE) || 1;
         const displayedPenugasan = filteredPenugasan.slice((pageTugas - 1) * ITEMS_PER_PAGE, pageTugas * ITEMS_PER_PAGE);
 
-        // Tapis Panel
         const filteredPanels = panelList.filter(p => { 
            const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => safeStr(t.no_kp_panel) === safeStr(p.no_kp) && safeStr(t.zon_bertugas) === filterZonPanel); 
            const matchSearch = safeStr(p.nama_penuh).toUpperCase().includes(searchPanel.toUpperCase()) || safeStr(p.no_kp).includes(searchPanel); 
@@ -448,7 +518,6 @@
         const totalPagesPanel = Math.ceil(filteredPanels.length / ITEMS_PER_PAGE) || 1;
         const displayedPanels = filteredPanels.slice((pagePanel - 1) * ITEMS_PER_PAGE, pagePanel * ITEMS_PER_PAGE);
 
-        // Tapis Calon
         const availableZonCalonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga)).filter(Boolean))].sort();
         const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga) === filterZonCalon).map(c => safeStr(c.sesi)).filter(Boolean))].sort();
         const showCalonData = searchCalon.trim() !== '' || filterZonCalon !== 'SEMUA';
@@ -465,20 +534,19 @@
         const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => safeStr(c.zon_temuduga) === cetakZon).map(c => safeStr(c.sesi)).filter(Boolean))].sort() : [];
         const cetakCalonFiltered = cetakSesi ? calonList.filter(c => safeStr(c.zon_temuduga) === cetakZon && safeStr(c.sesi) === String(cetakSesi)) : [];
 
-        const filteredLaporanList = resultsList.filter(r => {
+        const filteredLaporanList = consolidatedResults.filter(r => {
            const melepasiMarkah = r.jumlah_markah >= minScore;
            const padanZon = laporanZon === 'KESELURUHAN' || safeStr(r.zon) === laporanZon;
            return melepasiMarkah && padanZon;
         }).sort((a,b) => b.jumlah_markah - a.jumlah_markah);
 
         const handleDownloadExcel = () => {
-          let csvContent = "BIL,NAMA CALON,NO. KAD PENGENALAN,SUBJEK,PPD,ZON,MARKAH (%)\n";
+          let csvContent = "BIL,NAMA CALON,NO. KAD PENGENALAN,SUBJEK,PPD,ZON,MARKAH MUKTAMAD (%)\n";
           filteredLaporanList.forEach((res, index) => {
-             const c = calonList.find(cal => cal.no_kp === res.no_kp_calon);
-             const nama = c ? safeStr(c.nama_penuh).replace(/"/g, '""') : safeStr(res.no_kp_calon);
+             const nama = safeStr(res.nama_calon).replace(/"/g, '""');
              const no_kp = safeStr(res.no_kp_calon);
-             const subjek = c ? safeStr(c.sme_subjek).replace(/"/g, '""') : '-';
-             const ppd = c ? safeStr(c.ppd).replace(/"/g, '""') : '-';
+             const subjek = safeStr(res.sme_subjek).replace(/"/g, '""');
+             const ppd = safeStr(res.ppd).replace(/"/g, '""');
              const zon = safeStr(res.zon);
              const row = [index + 1, `"${nama}"`, `="${no_kp}"`, `"${subjek}"`, `"${ppd}"`, `"${zon}"`, res.jumlah_markah];
              csvContent += row.join(",") + "\n";
@@ -486,7 +554,7 @@
           const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
           const link = document.createElement("a");
           link.setAttribute("href", URL.createObjectURL(blob));
-          link.setAttribute("download", `Laporan_Keputusan_SISC_${laporanZon}_${minScore}Peratus.csv`);
+          link.setAttribute("download", `Laporan_Keputusan_Muktamad_SISC_${laporanZon}_${minScore}Peratus.csv`);
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
@@ -570,13 +638,13 @@
                     <div className="flip-card h-36 bg-transparent">
                        <div className="flip-card-inner">
                           <div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center">
-                             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Penilaian Selesai</p>
-                             <p className="text-5xl font-extrabold text-emerald-400 mt-2">{resultsList.length}</p>
+                             <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Calon Selesai Dinilai</p>
+                             <p className="text-5xl font-extrabold text-emerald-400 mt-2">{consolidatedResults.length}</p>
                           </div>
                           <div className="flip-card-back bg-slate-800 border border-emerald-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center">
                              <p className="text-emerald-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Status Kelulusan</p>
-                             <div className="flex justify-between text-sm text-slate-200"><span className="text-emerald-400">Layak (&gt;=75%)</span><span className="font-bold">{resultsList.filter(r=>r.status_lulus).length}</span></div>
-                             <div className="flex justify-between text-sm text-slate-200 mt-1"><span className="text-rose-400">Belum Layak</span><span className="font-bold">{resultsList.filter(r=>!r.status_lulus).length}</span></div>
+                             <div className="flex justify-between text-sm text-slate-200"><span className="text-emerald-400">Layak (75% Ke Atas)</span><span className="font-bold">{consolidatedResults.filter(r=>r.status_lulus).length}</span></div>
+                             <div className="flex justify-between text-sm text-slate-200 mt-1"><span className="text-rose-400">Belum Layak</span><span className="font-bold">{consolidatedResults.filter(r=>!r.status_lulus).length}</span></div>
                           </div>
                        </div>
                     </div>
@@ -585,11 +653,11 @@
                        <div className="flip-card-inner">
                           <div className="flip-card-front bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-lg flex flex-col justify-center">
                              <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">% Selesai</p>
-                             <p className="text-5xl font-extrabold text-amber-300 mt-2">{calonList.length > 0 ? Math.round((resultsList.length / calonList.length) * 100) : 0}%</p>
+                             <p className="text-5xl font-extrabold text-amber-300 mt-2">{calonList.length > 0 ? Math.round((consolidatedResults.length / calonList.length) * 100) : 0}%</p>
                           </div>
                           <div className="flip-card-back bg-slate-800 border border-amber-300/50 p-4 rounded-xl shadow-lg flex flex-col justify-center text-center">
                              <p className="text-amber-300 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Baki Tugas</p>
-                             <p className="text-2xl font-extrabold text-white">{calonList.length - resultsList.length}</p>
+                             <p className="text-2xl font-extrabold text-white">{calonList.length - consolidatedResults.length}</p>
                              <p className="text-xs text-slate-400">Calon belum dinilai</p>
                           </div>
                        </div>
@@ -599,40 +667,36 @@
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
                         <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Analisis Kelulusan Calon</h2>
-                        <DoughnutChartLulus results={resultsList} />
+                        <DoughnutChartLulus results={consolidatedResults} />
                      </div>
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg flex flex-col items-center">
                         <h2 className="w-full text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Purata Kompetensi Keseluruhan</h2>
-                        <RadarChartKeseluruhan results={resultsList} />
+                        <RadarChartKeseluruhan results={consolidatedResults} />
                      </div>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg md:col-span-2">
                         <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide">Prestasi Temu Duga Mengikut Zon</h2>
-                        <StackedBarZon calonList={calonList} resultsList={resultsList} />
+                        <StackedBarZon calonList={calonList} resultsList={consolidatedResults} />
                      </div>
                      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
                         <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide flex items-center gap-2">
                            <span className="text-amber-400">🏆</span> 10 Calon Markah Tertinggi Keseluruhan
                         </h2>
                         <ul className="space-y-3 overflow-y-auto max-h-[300px] pr-2">
-                           {top10Calon.length === 0 ? <li className="text-sm text-slate-500 italic">Tiada rekod penilaian.</li> : top10Calon.map((res, idx) => {
-                              const cDetail = calonList.find(c => c.no_kp === res.no_kp_calon);
-                              const namaCalon = cDetail ? cDetail.nama_penuh : res.no_kp_calon;
-                              return (
-                                 <li key={idx} className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
-                                    <div className="flex items-center gap-3">
-                                       <span className="flex items-center justify-center min-w-[24px] h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-400">{idx+1}</span>
-                                       <div>
-                                          <p className="text-sm font-bold text-slate-200 truncate w-32 md:w-40" title={safeStr(namaCalon)}>{safeStr(namaCalon)}</p>
-                                          <p className="text-xs text-amber-500 uppercase">{safeStr(res.zon)}</p>
-                                       </div>
+                           {top10Calon.length === 0 ? <li className="text-sm text-slate-500 italic">Tiada rekod penilaian rasmi.</li> : top10Calon.map((res, idx) => (
+                              <li key={idx} className="flex items-center justify-between p-3 bg-slate-950 rounded-lg border border-slate-800">
+                                 <div className="flex items-center gap-3">
+                                    <span className="flex items-center justify-center min-w-[24px] h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-400">{idx+1}</span>
+                                    <div>
+                                       <p className="text-sm font-bold text-slate-200 truncate w-32 md:w-40" title={safeStr(res.nama_calon)}>{safeStr(res.nama_calon)}</p>
+                                       <p className="text-xs text-amber-500 uppercase">{safeStr(res.zon)}</p>
                                     </div>
-                                    <div className="text-lg font-extrabold text-emerald-400 bg-emerald-900/30 px-3 py-1 rounded">{res.jumlah_markah}%</div>
-                                 </li>
-                              );
-                           })}
+                                 </div>
+                                 <div className="text-lg font-extrabold text-emerald-400 bg-emerald-900/30 px-3 py-1 rounded">{res.jumlah_markah}%</div>
+                              </li>
+                           ))}
                         </ul>
                      </div>
                   </div>
@@ -648,7 +712,7 @@
                         <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
                         <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
                         <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}>
-                           <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">SARAWAK</option>
+                           <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
                         </select>
                         <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-bold" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value})}>
                            <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
@@ -735,8 +799,8 @@
                  <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                     <div className="bg-slate-900 border-2 border-emerald-500/50 p-6 rounded-xl shadow-2xl flex flex-col lg:flex-row justify-between items-center no-print gap-6">
                        <div>
-                          <h1 className="text-2xl font-extrabold text-emerald-400">Janaan Laporan Keputusan Rasmi</h1>
-                          <p className="text-slate-300 text-sm mt-1">Sila masukkan markah minimum (Cut-off) dan Zon untuk memaparkan senarai calon.</p>
+                          <h1 className="text-2xl font-extrabold text-emerald-400">Janaan Laporan Keputusan Rasmi (Terselaraskan)</h1>
+                          <p className="text-slate-300 text-sm mt-1">Mengumpul dan melaraskan purata penilaian multi-stesen daripada kesemua panel berdaftar.</p>
                        </div>
                        <div className="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto">
                           <select className="w-full md:w-auto p-3 border border-slate-700 rounded-lg text-sm font-bold bg-slate-950 text-emerald-400 focus:border-emerald-500 focus:outline-none" value={laporanZon} onChange={e => setLaporanZon(e.target.value)}>
@@ -782,24 +846,21 @@
                                 <th className="p-3 border-r border-slate-400">SUBJEK</th>
                                 <th className="p-3 border-r border-slate-400">PPD</th>
                                 <th className="p-3 border-r border-slate-400">ZON</th>
-                                <th className="p-3 text-center w-24">MARKAH</th>
+                                <th className="p-3 text-center w-28">MARKAH MUKTAMAD</th>
                              </tr>
                           </thead>
                           <tbody>
-                             {filteredLaporanList.map((res, idx) => {
-                                const c = calonList.find(cal => cal.no_kp === res.no_kp_calon);
-                                return (
-                                   <tr key={idx} className="border-b border-slate-400 hover:bg-slate-50">
-                                      <td className="p-2 border-r border-slate-400 text-center font-bold">{idx + 1}</td>
-                                      <td className="p-2 border-r border-slate-400 font-bold uppercase">{c ? safeStr(c.nama_penuh) : safeStr(res.no_kp_calon)}</td>
-                                      <td className="p-2 border-r border-slate-400 text-center font-mono text-xs">{safeStr(res.no_kp_calon)}</td>
-                                      <td className="p-2 border-r border-slate-400 text-center uppercase">{c ? safeStr(c.sme_subjek) : '-'}</td>
-                                      <td className="p-2 border-r border-slate-400 text-center uppercase">{c ? safeStr(c.ppd) : '-'}</td>
-                                      <td className="p-2 border-r border-slate-400 text-center uppercase">{safeStr(res.zon)}</td>
-                                      <td className="p-2 text-center font-extrabold text-base text-blue-900">{res.jumlah_markah}%</td>
-                                   </tr>
-                                );
-                             })}
+                             {filteredLaporanList.map((res, idx) => (
+                                <tr key={idx} className="border-b border-slate-400 hover:bg-slate-50">
+                                   <td className="p-2 border-r border-slate-400 text-center font-bold">{idx + 1}</td>
+                                   <td className="p-2 border-r border-slate-400 font-bold uppercase">{safeStr(res.nama_calon)}</td>
+                                   <td className="p-2 border-r border-slate-400 text-center font-mono text-xs">{safeStr(res.no_kp_calon)}</td>
+                                   <td className="p-2 border-r border-slate-400 text-center uppercase">{res.sme_subjek || '-'}</td>
+                                   <td className="p-2 border-r border-slate-400 text-center uppercase">{res.ppd || '-'}</td>
+                                   <td className="p-2 border-r border-slate-400 text-center uppercase">{safeStr(res.zon)}</td>
+                                   <td className="p-2 text-center font-extrabold text-base text-blue-900">{res.jumlah_markah}%</td>
+                                </tr>
+                             ))}
                              {filteredLaporanList.length === 0 && (
                                 <tr><td colSpan="7" className="p-8 text-center italic text-slate-500 font-semibold">Tiada calon di kawasan pilihan yang melepasi had markah {minScore}% yang ditetapkan.</td></tr>
                              )}
@@ -807,21 +868,21 @@
                        </table>
                        
                        <div className="mt-8 text-xs text-slate-500 italic border-t border-slate-300 pt-3 text-center">
-                          * Senarai janaan sistem ini memaparkan kedudukan calon berdasarkan markah yang direkodkan setakat {new Date().toLocaleDateString('en-GB')}.
+                          * Markah janaan ini merupakan purata terselaraskan daripada kesemua panel penemuduga yang menilai calon setakat {new Date().toLocaleDateString('en-GB')}.
                        </div>
                     </div>
                  </div>
               )}
 
-              {/* TAB 4: CETAK INDIVIDU */}
+              {/* TAB 4: CETAK INDIVIDU MUKTAMAD MULTI-PANEL */}
               {activeTab === 'cetak' && (
                  <div>
                     <div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print">
                        <div>
-                          <h1 className="text-2xl font-extrabold text-amber-400">Cetakan Rumusan Skor Individu</h1>
+                          <h1 className="text-2xl font-extrabold text-amber-400">Cetakan Rumusan Skor Individu Muktamad</h1>
                           <p className="text-slate-300 text-sm">Pilih Zon dan Sesi untuk mencari calon.</p>
                        </div>
-                       <button onClick={() => window.print()} disabled={!currentRes} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-lg shadow-lg disabled:opacity-40">🖨️ Cetak Borang</button>
+                       <button onClick={() => window.print()} disabled={!currentRes} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-6 py-3 rounded-lg shadow-lg disabled:opacity-40">🖨️ Cetak Borang Muktamad</button>
                     </div>
                     <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl mb-8 shadow-sm no-print">
                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -836,7 +897,7 @@
                              <img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" />
                              <h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan</h3>
                              <h4 className="text-xs font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
-                             <h2 className="text-base font-extrabold uppercase mt-2 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">BORANG RUMUSAN SKOR INDIVIDU TEMU DUGA SISC+</h2>
+                             <h2 className="text-base font-extrabold uppercase mt-2 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">BORANG RUMUSAN SKOR INDIVIDU MUKTAMAD SISC+</h2>
                           </div>
                           <table className="w-full text-sm border-collapse border border-slate-400 mb-6 font-semibold">
                              <tbody>
@@ -849,7 +910,7 @@
                              <div>
                                 <table className="w-full text-sm border-collapse border border-slate-400">
                                    <thead>
-                                      <tr className="bg-slate-100 border-b border-slate-400 font-bold text-center"><th className="p-2 border-r border-slate-400 text-left">KOMPETENSI</th><th className="p-2 border-r border-slate-400">MARKAH</th></tr>
+                                      <tr className="bg-slate-100 border-b border-slate-400 font-bold text-center"><th className="p-2 border-r border-slate-400 text-left">KOMPETENSI (PURATA MUKTAMAD)</th><th className="p-2 border-r border-slate-400">MARKAH</th></tr>
                                    </thead>
                                    <tbody className="font-semibold text-center">
                                       <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">BIMBINGAN (25%)</td><td className="p-2">{scoresMap.skor_bimbingan.toFixed(1)}</td></tr>
@@ -858,21 +919,25 @@
                                       <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">ANALISIS DATA (15%)</td><td className="p-2">{scoresMap.skor_analisis_data.toFixed(1)}</td></tr>
                                       <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">INTERPERSONAL (10%)</td><td className="p-2">{scoresMap.skor_interpersonal.toFixed(1)}</td></tr>
                                       <tr className="border-b border-slate-400 bg-amber-50"><td className="p-2 border-r border-slate-400 text-left">EVIDENS (10%)</td><td className="p-2">{scoresMap.skor_evidens.toFixed(1)}</td></tr>
-                                      <tr className="bg-slate-200 font-extrabold"><td className="p-2 border-r border-slate-400 text-left">JUMLAH MARKAH</td><td className="p-2 text-base text-blue-900">{totalMarkah}%</td></tr>
+                                      <tr className="bg-slate-200 font-extrabold"><td className="p-2 border-r border-slate-400 text-left">JUMLAH MARKAH MUKTAMAD</td><td className="p-2 text-base text-blue-900">{totalMarkah}%</td></tr>
                                    </tbody>
                                 </table>
-                                <div className="mt-4 border border-slate-400 p-3 rounded min-h-[80px] text-sm"><p className="font-bold underline mb-1">Ulasan:</p><p className="italic text-slate-800 text-justify">{currentRes?.ulasan_panel || '-'}</p></div>
+                                <div className="mt-4 border border-slate-400 p-3 rounded min-h-[80px] text-xs"><p className="font-bold underline mb-1">Sintesis Ulasan Panel Penemuduga:</p><p className="italic text-slate-800 text-justify whitespace-pre-line">{currentRes?.ulasan_panel || '-'}</p></div>
                              </div>
                              <div className="border border-slate-400 p-4 rounded flex flex-col items-center justify-center bg-slate-900 text-amber-400">
-                                <h4 className="text-xs font-bold text-center mb-2 uppercase">MARKAH vs KOMPETENSI</h4>
+                                <h4 className="text-xs font-bold text-center mb-2 uppercase">PROFIL HEXAGON MUKTAMAD</h4>
                                 <RadarChartKeseluruhan results={[currentRes]} />
                              </div>
                           </div>
-                          <div className="mt-12 flex justify-between items-end text-sm text-slate-800">
-                             <div><p className="font-bold text-slate-500 uppercase text-xs mb-1">Dicetak Oleh:</p><p className="font-bold uppercase text-base">PENTADBIR SISTEM (ADMIN)</p><p className="uppercase text-xs text-slate-500 mt-0.5">BAHAGIAN PROFESIONALISME GURU</p></div>
-                             <div className="text-right"><p className="font-bold text-slate-500 uppercase text-xs mb-1">Dinilai & Disahkan Oleh:</p><p className="font-bold uppercase text-base">{currentRes?.nama_panel || '-'}</p><p className="uppercase text-xs text-slate-500 mt-0.5">{panelPenilai ? panelPenilai.jawatan : '-'}</p><p className="mt-1 text-xs font-semibold">Tarikh: {currentRes?.created_at ? new Date(currentRes.created_at).toLocaleDateString('en-GB') : '-'}</p></div>
+                          <div className="mt-10 border-t border-slate-300 pt-4 text-xs text-slate-800">
+                             <p className="font-bold uppercase mb-1">Senarai Panel Penemuduga yang Menilai Calon Ini:</p>
+                             <p className="font-semibold text-slate-700 italic">{currentRes?.panel_list || '-'}</p>
                           </div>
-                          <div className="mt-8 text-xs text-slate-400 italic border-t pt-3 text-center">* Dokumen ini dijana secara automatik oleh Sistem Pengurusan Temuduga SISC+ dan tidak memerlukan tandatangan fizikal.</div>
+                          <div className="mt-8 flex justify-between items-end text-sm text-slate-800">
+                             <div><p className="font-bold text-slate-500 uppercase text-xs mb-1">Dicetak Oleh:</p><p className="font-bold uppercase text-base">PENTADBIR SISTEM (ADMIN)</p><p className="uppercase text-xs text-slate-500 mt-0.5">BAHAGIAN PROFESIONALISME GURU</p></div>
+                             <div className="text-right"><p className="font-bold text-slate-500 uppercase text-xs mb-1">Disahkan Oleh:</p><p className="font-bold uppercase text-base">KETUA PANEL UTAMA</p><p className="uppercase text-xs text-slate-500 mt-0.5">URUS SETIA TEMU DUGA SISC+</p><p className="mt-1 text-xs font-semibold">Tarikh Cetakan: {new Date().toLocaleDateString('en-GB')}</p></div>
+                          </div>
+                          <div className="mt-8 text-xs text-slate-400 italic border-t pt-3 text-center">* Dokumen rumusan muktamad ini dijana secara automatik oleh Sistem Pengurusan Temuduga SISC+ dan tidak memerlukan tandatangan fizikal.</div>
                        </div>
                     )}
                  </div>
@@ -883,7 +948,6 @@
                 <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     
-                    {/* BORANG DAFTAR PANEL */}
                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-md">
                        <h2 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Panel</h2>
                        <form onSubmit={handleRegisterPanel} className="space-y-4">
@@ -896,7 +960,6 @@
                        </form>
                     </div>
 
-                    {/* BORANG AGIHAN PENUGASAN PANEL */}
                     <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow-md">
                       <h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">2. Agihan Surat Penugasan & Peranan</h2>
                       <form onSubmit={handleRegisterPenugasan} className="space-y-4">
@@ -942,7 +1005,6 @@
                     </div>
                   </div>
 
-                  {/* JADUAL REKOD TUGASAN PANEL */}
                   <div className="bg-slate-900 border border-emerald-500/20 p-6 rounded-xl shadow-lg mt-8">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                       <div>
@@ -1001,7 +1063,6 @@
                     )}
                   </div>
 
-                  {/* JADUAL PROFIL PANEL */}
                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg mt-8">
                     <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                       <div>
@@ -1040,7 +1101,7 @@
                                   <td className="p-4 font-mono text-amber-300">{safeStr(p.no_kp)}</td>
                                   <td className="p-4 font-mono text-slate-300">{p.katalaluan || '***'}</td>
                                   <td className="p-4">{safeStr(p.jawatan)}</td>
-                                  <td className="p-4 text-center"><button onClick={() => startEditPanel(p)} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
+                                  <td className="p-4 text-center"><button onClick={() => { setEditModePanelKp(p.no_kp); setEditPanelForm({...p}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
                                </tr>
                             ))}
                          </tbody>
@@ -1066,7 +1127,6 @@
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        
-                       {/* BORANG 1: PROFIL URUS SETIA */}
                        <div className="bg-slate-900 border border-blue-500/30 p-6 rounded-xl shadow-md">
                           <h2 className="text-xl font-bold text-blue-400 mb-6 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Urus Setia</h2>
                           <form onSubmit={handleRegisterUS} className="space-y-4">
@@ -1077,7 +1137,6 @@
                           </form>
                        </div>
 
-                       {/* BORANG 2: PENUGASAN ZON URUS SETIA */}
                        <div className="bg-slate-900 border border-indigo-500/30 p-6 rounded-xl shadow-md">
                           <h2 className="text-xl font-bold text-indigo-400 mb-6 border-b border-slate-800 pb-3">2. Agihan Penugasan Zon Urus Setia</h2>
                           <form onSubmit={handleRegisterPenugasanUS} className="space-y-4">
@@ -1109,7 +1168,6 @@
 
                     </div>
 
-                    {/* JADUAL REKOD PENUGASAN URUS SETIA AKTIF */}
                     <div className="bg-slate-900 border border-indigo-500/20 p-6 rounded-xl shadow-lg mt-8">
                        <h2 className="text-lg font-bold text-indigo-400 mb-4 border-b border-slate-800 pb-3">Ringkasan Agihan Penugasan Urus Setia Aktif</h2>
                        <div className="overflow-x-auto min-h-[150px]">
@@ -1143,7 +1201,6 @@
                        </div>
                     </div>
 
-                    {/* JADUAL PROFIL URUS SETIA */}
                     <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg">
                        <h2 className="text-lg font-bold text-amber-400 mb-6 border-b border-slate-800 pb-4">Pangkalan Data Profil Urus Setia Berdaftar</h2>
                        <div className="overflow-x-auto">
@@ -1166,7 +1223,7 @@
                                       <td className="p-4 font-bold text-base">{safeStr(u.nama_penuh)}</td>
                                       <td className="p-4 font-mono text-amber-300 text-base">{safeStr(u.no_kp)}</td>
                                       <td className="p-4 font-mono text-slate-300 text-base">{u.katalaluan}</td>
-                                      <td className="p-4 text-center"><button onClick={() => startEditUS(u)} className="text-blue-400 font-bold text-sm mx-2 hover:underline">Edit</button> | <button onClick={() => handleDeleteUS(u.no_kp)} className="text-red-400 font-bold text-sm mx-2 hover:underline">Padam</button></td>
+                                      <td className="p-4 text-center"><button onClick={() => { setEditModeUsKp(u.no_kp); setEditUsForm({...u}); }} className="text-blue-400 font-bold text-sm mx-2 hover:underline">Edit</button> | <button onClick={() => handleDeleteUS(u.no_kp)} className="text-red-400 font-bold text-sm mx-2 hover:underline">Padam</button></td>
                                    </tr>
                                 ))}
                              </tbody>
