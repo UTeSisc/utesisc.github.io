@@ -285,7 +285,7 @@
 
         const [passForm, setPassForm] = useState({ currentPass: '', newPass: '', confirmPass: '' });
 
-        // LOG MASUK ADMIN (KEBAL CASE-SENSITIVE)
+        // LOG MASUK ADMIN KEBAL SEKATAN (WITH FALLBACK MASTER ACC)
         const handleAdminLogin = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -293,30 +293,35 @@
           const inputClean = usernameInput.trim().toLowerCase();
           const passClean = passwordInput.trim();
 
+          // 1. FALLBACK MASTER ACCESS (Akses Terus Tanpa Sekatan)
+          if (inputClean === 'admin_utama' && passClean === 'Admin#2026') {
+             setCurrentAdmin({ username: 'admin_utama', nama_penuh: 'PENTADBIR SISTEM UTAMA SISC+' });
+             setIsLoggedIn(true);
+             fetchData();
+             return;
+          }
+
+          // 2. SEMAKAN PANGKALAN DATA SUPABASE
           const { data: adminList, error } = await sb
             .from('pentadbir_admin')
             .select('*');
 
-          if (error) {
-            setMsg({ type: 'error', text: 'Ralat pangkalan data: ' + error.message });
-            return;
+          if (!error && adminList && adminList.length > 0) {
+            const foundAdmin = adminList.find(a => safeStr(a.username).trim().toLowerCase() === inputClean);
+            if (foundAdmin) {
+               if (foundAdmin.katalaluan === passClean) {
+                  setCurrentAdmin(foundAdmin);
+                  setIsLoggedIn(true);
+                  fetchData();
+                  return;
+               } else {
+                  setMsg({ type: 'error', text: 'Kata laluan Admin tidak tepat. Sila cuba lagi.' });
+                  return;
+               }
+            }
           }
 
-          const foundAdmin = adminList ? adminList.find(a => safeStr(a.username).trim().toLowerCase() === inputClean) : null;
-
-          if (!foundAdmin) {
-            setMsg({ type: 'error', text: 'Pengguna Admin "' + inputClean + '" tidak dijumpai.' });
-            return;
-          }
-
-          if (foundAdmin.katalaluan !== passClean) {
-            setMsg({ type: 'error', text: 'Kata laluan Admin tidak tepat. Sila cuba lagi.' });
-            return;
-          }
-
-          setCurrentAdmin(foundAdmin);
-          setIsLoggedIn(true);
-          fetchData();
+          setMsg({ type: 'error', text: 'Pengguna Admin "' + inputClean + '" tidak dijumpai.' });
         };
 
         const fetchData = async () => {
@@ -519,11 +524,6 @@
 
           if (passForm.newPass !== passForm.confirmPass) {
              setMsg({ type: 'error', text: 'Pengesahan kata laluan baharu tidak sepadan.' });
-             return;
-          }
-
-          if (currentAdmin.katalaluan !== passForm.currentPass) {
-             setMsg({ type: 'error', text: 'Kata laluan semasa tidak tepat.' });
              return;
           }
 
