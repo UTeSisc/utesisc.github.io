@@ -232,7 +232,6 @@
       }
 
       function AdminApp() {
-        // STATE AUTH LOG MASUK ADMIN
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [currentAdmin, setCurrentAdmin] = useState(null);
         const [usernameInput, setUsernameInput] = useState('');
@@ -284,44 +283,41 @@
         const [cetakSesi, setCetakSesi] = useState('');
         const [selectedCalon, setSelectedCalon] = useState(null);
 
-        // State Tukar Password Admin
         const [passForm, setPassForm] = useState({ currentPass: '', newPass: '', confirmPass: '' });
 
-       // LOG MASUK ADMIN (KEBAL CASE-SENSITIVE)
-const handleAdminLogin = async (e) => {
-  e.preventDefault();
-  setMsg({ type: '', text: '' });
+        // LOG MASUK ADMIN (KEBAL CASE-SENSITIVE)
+        const handleAdminLogin = async (e) => {
+          e.preventDefault();
+          setMsg({ type: '', text: '' });
 
-  const inputClean = usernameInput.trim().toLowerCase();
-  const passClean = passwordInput.trim();
+          const inputClean = usernameInput.trim().toLowerCase();
+          const passClean = passwordInput.trim();
 
-  // Semakan terus ke Supabase
-  const { data: adminList, error } = await sb
-    .from('pentadbir_admin')
-    .select('*');
+          const { data: adminList, error } = await sb
+            .from('pentadbir_admin')
+            .select('*');
 
-  if (error) {
-    setMsg({ type: 'error', text: 'Ralat pangkalan data: ' + error.message });
-    return;
-  }
+          if (error) {
+            setMsg({ type: 'error', text: 'Ralat pangkalan data: ' + error.message });
+            return;
+          }
 
-  // Cari admin tanpa hiraukan huruf besar/kecil
-  const foundAdmin = adminList ? adminList.find(a => safeStr(a.username).trim().toLowerCase() === inputClean) : null;
+          const foundAdmin = adminList ? adminList.find(a => safeStr(a.username).trim().toLowerCase() === inputClean) : null;
 
-  if (!foundAdmin) {
-    setMsg({ type: 'error', text: 'Pengguna Admin "' + inputClean + '" tidak dijumpai.' });
-    return;
-  }
+          if (!foundAdmin) {
+            setMsg({ type: 'error', text: 'Pengguna Admin "' + inputClean + '" tidak dijumpai.' });
+            return;
+          }
 
-  if (foundAdmin.katalaluan !== passClean) {
-    setMsg({ type: 'error', text: 'Kata laluan Admin tidak tepat. Sila cuba lagi.' });
-    return;
-  }
+          if (foundAdmin.katalaluan !== passClean) {
+            setMsg({ type: 'error', text: 'Kata laluan Admin tidak tepat. Sila cuba lagi.' });
+            return;
+          }
 
-  setCurrentAdmin(foundAdmin);
-  setIsLoggedIn(true);
-  fetchData();
-};
+          setCurrentAdmin(foundAdmin);
+          setIsLoggedIn(true);
+          fetchData();
+        };
 
         const fetchData = async () => {
            const { data: d1 } = await sb.from('calon').select('*').order('created_at', { ascending: false });
@@ -517,7 +513,6 @@ const handleAdminLogin = async (e) => {
            fetchData(); 
         };
 
-        // FUNGSI TUKAR KATA LALUAN ADMIN
         const handleChangeAdminPassword = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
