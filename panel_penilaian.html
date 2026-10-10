@@ -458,7 +458,8 @@
           }
         };
 
-        const handleLogoutToHome = () => {
+        // FUNGSI LOG KELUAR (KEMBALI KE SKRIN LOGIN AKAN DILAKUKAN, BUKAN LOGOUT PORTAL)
+        const handleLogoutAccount = () => {
           setIsLoggedIn(false);
           setCurrentPanel(null);
           setSelectedTugas(null);
@@ -466,6 +467,10 @@
           setSelectedCalonKp('');
           setIcInput('');
           setPassInput('');
+        };
+
+        // FUNGSI KEMBALI KE MENU UTAMA (PORTAL INDEX)
+        const handleGoToMenuUtama = () => {
           window.location.href = 'index.html';
         };
 
@@ -486,12 +491,18 @@
                  <span className="font-extrabold text-xl text-slate-900 tracking-wider hidden md:block">MODUL PANEL PENEMUDUGA SISC+</span>
               </div>
               <div className="flex items-center gap-4">
-                 {isLoggedIn && (
-                    <span className="text-sm font-bold text-slate-800 uppercase hidden md:inline">{currentPanel?.nama_penuh}</span>
+                 {isLoggedIn ? (
+                    <>
+                       <span className="text-sm font-bold text-slate-800 uppercase hidden md:inline">{currentPanel?.nama_penuh}</span>
+                       <button onClick={handleLogoutAccount} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-sm transition-colors border border-red-200">
+                          Log Keluar
+                       </button>
+                    </>
+                 ) : (
+                    <button onClick={handleGoToMenuUtama} className="px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg text-sm transition-colors border border-amber-300">
+                       Menu Utama
+                    </button>
                  )}
-                 <button onClick={handleLogoutToHome} className="px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg text-sm transition-colors border border-amber-300">
-                    Menu Utama
-                 </button>
               </div>
             </div>
 
