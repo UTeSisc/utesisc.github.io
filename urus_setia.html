@@ -31,7 +31,13 @@
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      const safeStr = (val) => (val ? String(val) : '');
+      const safeStr = (val) => (val ? String(val).trim() : '');
+
+      // HELPER: EKSTRAK NAMA SESI UTAMA (BUANG TARIKH DALAM KURUNGAN JIKA ADA)
+      const cleanSesiName = (sStr) => {
+         if (!sStr) return '';
+         return safeStr(sStr).split('(')[0].trim().toUpperCase();
+      };
 
       function UrusSetiaApp() {
         const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -91,7 +97,6 @@
           }
         };
 
-        // LOG KELUAR AKAN KEMBALI KE SKRIN LOG MASUK URUS SETIA
         const handleLogoutAccount = () => {
           setIsLoggedIn(false);
           setCurrentUS(null);
@@ -99,17 +104,22 @@
           setPassInput('');
         };
 
-        // NAVIGASI KEMBALI KE MENU UTAMA (INDEX)
         const handleGoToMenuUtama = () => {
           window.location.href = 'index.html';
         };
 
-        const availableZonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga)).filter(Boolean))].sort();
-        const availableSesiList = [...new Set(calonList.filter(c => filterZon === 'SEMUA' || safeStr(c.zon_temuduga) === filterZon).map(c => safeStr(c.sesi)).filter(Boolean))].sort();
+        const availableZonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga).toUpperCase()))].filter(Boolean).sort();
+        
+        // PENGGABUNGAN SESI PINTAR (MEMANFAATKAN cleanSesiName AGAR TIADA SESI BERTINDIH)
+        const availableSesiList = [...new Set(
+           calonList
+             .filter(c => filterZon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZon)
+             .map(c => cleanSesiName(c.sesi))
+        )].filter(Boolean).sort();
 
         const filteredCalons = calonList.filter(c => {
-          const matchZon = filterZon === 'SEMUA' || safeStr(c.zon_temuduga) === filterZon;
-          const matchSesi = filterSesi === 'SEMUA' || safeStr(c.sesi) === filterSesi;
+          const matchZon = filterZon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZon;
+          const matchSesi = filterSesi === 'SEMUA' || cleanSesiName(c.sesi) === cleanSesiName(filterSesi);
           const matchSearch = safeStr(c.nama_penuh).toUpperCase().includes(searchCalon.toUpperCase()) || safeStr(c.no_kp).includes(searchCalon);
           return matchZon && matchSesi && matchSearch;
         });
@@ -126,7 +136,7 @@
               <div className="flex items-center gap-4">
                  {isLoggedIn ? (
                     <>
-                       <span className="text-sm font-bold text-slate-800 uppercase hidden md:inline">{currentUS?.nama_penuh}</span>
+                       <span className="text-sm font-bold text-slate-800 uppercase hidden md:inline">{safeStr(currentUS?.nama_penuh).toUpperCase()}</span>
                        <button onClick={handleLogoutAccount} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-sm transition-colors border border-red-200">
                           Log Keluar
                        </button>
@@ -228,15 +238,15 @@
                             ) : filteredCalons.map((c, idx) => (
                                <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
                                   <td className="p-3 font-bold text-slate-500">{idx + 1}</td>
-                                  <td className="p-3 font-bold text-slate-100 uppercase">{safeStr(c.nama_penuh)}</td>
+                                  <td className="p-3 font-bold text-slate-100 uppercase">{safeStr(c.nama_penuh).toUpperCase()}</td>
                                   <td className="p-3 font-mono text-slate-300 text-xs">{safeStr(c.no_kp)}</td>
-                                  <td className="p-3 font-bold text-amber-300">
-                                     {safeStr(c.zon_temuduga)}
-                                     <span className="text-slate-400 font-normal block text-xs mt-0.5">{safeStr(c.sesi)}</span>
+                                  <td className="p-3 font-bold text-amber-300 uppercase">
+                                     {safeStr(c.zon_temuduga).toUpperCase()}
+                                     <span className="text-slate-400 font-normal block text-xs mt-0.5">{safeStr(c.sesi).toUpperCase()}</span>
                                   </td>
-                                  <td className="p-3 text-xs text-slate-300">
-                                     {safeStr(c.ppd) || '-'}
-                                     <span className="text-slate-400 block text-[11px]">({safeStr(c.sme_subjek) || '-'})</span>
+                                  <td className="p-3 text-xs text-slate-300 uppercase">
+                                     {safeStr(c.ppd).toUpperCase() || '-'}
+                                     <span className="text-slate-400 block text-[11px]">({safeStr(c.sme_subjek).toUpperCase() || '-'})</span>
                                   </td>
                                   <td className="p-3 text-center">
                                      <button onClick={() => handleKehadiranToggle(c.no_kp, c.kehadiran)} className={`px-4 py-2 rounded-xl text-xs font-extrabold w-28 transition-all border shadow ${c.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/30' : c.kehadiran === 'TIDAK HADIR' ? 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'}`}>
