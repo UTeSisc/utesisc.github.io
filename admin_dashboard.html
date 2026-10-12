@@ -50,11 +50,11 @@
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      const safeStr = (val) => (val ? String(val) : '');
+      const safeStr = (val) => (val ? String(val).trim() : '');
 
       const consolidateCalonResults = (calonList, resultsList) => {
         return calonList.map(calon => {
-          const calonRes = resultsList.filter(r => safeStr(r.no_kp_calon).trim() === safeStr(calon.no_kp).trim());
+          const calonRes = resultsList.filter(r => safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
           
           if (calonRes.length === 0) return null;
 
@@ -93,11 +93,11 @@
 
           return {
             no_kp_calon: calon.no_kp,
-            nama_calon: calon.nama_penuh,
-            zon: calon.zon_temuduga,
-            ppd: calon.ppd,
-            sme_subjek: calon.sme_subjek,
-            sesi: calon.sesi,
+            nama_calon: safeStr(calon.nama_penuh).toUpperCase(),
+            zon: safeStr(calon.zon_temuduga).toUpperCase(),
+            ppd: safeStr(calon.ppd).toUpperCase(),
+            sme_subjek: safeStr(calon.sme_subjek).toUpperCase(),
+            sesi: safeStr(calon.sesi).toUpperCase(),
             skor_bimbingan: avgBimb,
             skor_instruksional: avgInst,
             skor_pemikiran_strategik: avgStrat,
@@ -210,13 +210,13 @@
           if (!canvasRef.current) return;
           const ctx = canvasRef.current.getContext('2d');
           if (chartRef.current) chartRef.current.destroy();
-          const zons = [...new Set(calonList.map(c => safeStr(c.zon_temuduga)))].filter(Boolean).sort();
+          const zons = [...new Set(calonList.map(c => safeStr(c.zon_temuduga).toUpperCase()))].filter(Boolean).sort();
           const selesaiData = zons.map(z => { 
-             const calonZon = calonList.filter(c => safeStr(c.zon_temuduga) === z); 
-             return calonZon.filter(c => resultsList.some(r => r.no_kp_calon === c.no_kp)).length; 
+             const calonZon = calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === z); 
+             return calonZon.filter(c => resultsList.some(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp))).length; 
           });
           const belumData = zons.map((z, idx) => { 
-             const totalZon = calonList.filter(c => safeStr(c.zon_temuduga) === z).length; 
+             const totalZon = calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === z).length; 
              return totalZon - selesaiData[idx]; 
           });
           chartRef.current = new Chart(ctx, {
@@ -302,7 +302,7 @@
             .select('*');
 
           if (!error && adminList && adminList.length > 0) {
-            const foundAdmin = adminList.find(a => safeStr(a.username).trim().toLowerCase() === inputClean);
+            const foundAdmin = adminList.find(a => safeStr(a.username).toLowerCase() === inputClean);
             if (foundAdmin) {
                if (foundAdmin.katalaluan === passClean) {
                   setCurrentAdmin(foundAdmin);
@@ -320,7 +320,7 @@
         };
 
         const fetchData = async () => {
-           const { data: d1 } = await sb.from('calon').select('*').order('created_at', { ascending: false });
+           const { data: d1 } = await sb.from('calon').select('*').order('nama_penuh', { ascending: true });
            if (d1) setCalonList(d1);
            
            const { data: d2 } = await sb.from('panel_penemuduga').select('*').order('created_at', { ascending: false });
@@ -470,30 +470,37 @@
           setMsg({ type: '', text: '' }); 
           let formatTarikh = "";
           if (calonForm.tarikh) formatTarikh = calonForm.tarikh.split('-').reverse().join('/');
-          const sesiGabungan = formatTarikh ? `${calonForm.sesi} (${formatTarikh})` : calonForm.sesi;
+          const sesiGabungan = formatTarikh ? `${calonForm.sesi.toUpperCase()} (${formatTarikh})` : calonForm.sesi.toUpperCase();
           
           const payload = { 
              nama_penuh: safeStr(calonForm.nama_penuh).toUpperCase(), 
              no_kp: safeStr(calonForm.no_kp), 
-             zon_temuduga: calonForm.zon_temuduga, 
+             zon_temuduga: calonForm.zon_temuduga.toUpperCase(), 
              sesi: sesiGabungan, 
              ppd: safeStr(calonForm.ppd).toUpperCase(), 
              sme_subjek: safeStr(calonForm.sme_subjek).toUpperCase(), 
-             bilik_temuduga: safeStr(calonForm.bilik_temuduga), 
-             kehadiran: calonForm.kehadiran 
+             bilik_temuduga: safeStr(calonForm.bilik_temuduga).toUpperCase(), 
+             kehadiran: calonForm.kehadiran.toUpperCase() 
           };
           
           const { error } = await sb.from('calon').insert([payload]); 
           if(error) setMsg({ type: 'error', text: error.message });
           else { 
-             setMsg({ type: 'success', text: 'Calon baru direkodkan!' }); 
+             setMsg({ type: 'success', text: 'Calon baru direkodkan dengan nama & sesi dalam format standard!' }); 
              setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' }); 
              fetchData(); 
           } 
         };
 
         const handleUpdateCalon = async (kp) => { 
-           const {error} = await sb.from('calon').update(editCalonForm).eq('no_kp', kp); 
+           const payloadFormat = {
+              ...editCalonForm,
+              nama_penuh: safeStr(editCalonForm.nama_penuh).toUpperCase(),
+              ppd: safeStr(editCalonForm.ppd).toUpperCase(),
+              sme_subjek: safeStr(editCalonForm.sme_subjek).toUpperCase(),
+              sesi: safeStr(editCalonForm.sesi).toUpperCase()
+           };
+           const {error} = await sb.from('calon').update(payloadFormat).eq('no_kp', kp); 
            if(error) alert(error.message); else { setEditModeCalonKp(null); fetchData(); } 
         };
 
@@ -547,7 +554,7 @@
           window.location.href = 'index.html';
         };
 
-        const currentRes = selectedCalon ? consolidatedResults.find(r => String(r.no_kp_calon).trim() === String(selectedCalon.no_kp).trim()) : null;
+        const currentRes = selectedCalon ? consolidatedResults.find(r => safeStr(r.no_kp_calon) === safeStr(selectedCalon.no_kp)) : null;
         
         const scoresMap = currentRes ? { 
            skor_bimbingan: ((currentRes.skor_bimbingan || 0) / 5) * 25, 
@@ -566,7 +573,7 @@
         const filteredPenugasan = penugasanList.filter(tugas => { 
            const pDetail = panelList.find(p => safeStr(p.no_kp) === safeStr(tugas.no_kp_panel)); 
            const namaPanel = pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel).toUpperCase(); 
-           const matchZon = filterZonTugas === 'SEMUA' || safeStr(tugas.zon_bertugas) === filterZonTugas; 
+           const matchZon = filterZonTugas === 'SEMUA' || safeStr(tugas.zon_bertugas).toUpperCase() === filterZonTugas; 
            const matchSearch = namaPanel.includes(searchTugas.toUpperCase()) || safeStr(tugas.no_kp_panel).includes(searchTugas); 
            return matchZon && matchSearch; 
         });
@@ -574,32 +581,35 @@
         const displayedPenugasan = filteredPenugasan.slice((pageTugas - 1) * ITEMS_PER_PAGE, pageTugas * ITEMS_PER_PAGE);
 
         const filteredPanels = panelList.filter(p => { 
-           const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => safeStr(t.no_kp_panel) === safeStr(p.no_kp) && safeStr(t.zon_bertugas) === filterZonPanel); 
+           const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => safeStr(t.no_kp_panel) === safeStr(p.no_kp) && safeStr(t.zon_bertugas).toUpperCase() === filterZonPanel); 
            const matchSearch = safeStr(p.nama_penuh).toUpperCase().includes(searchPanel.toUpperCase()) || safeStr(p.no_kp).includes(searchPanel); 
            return matchZon && matchSearch; 
         });
         const totalPagesPanel = Math.ceil(filteredPanels.length / ITEMS_PER_PAGE) || 1;
         const displayedPanels = filteredPanels.slice((pagePanel - 1) * ITEMS_PER_PAGE, pagePanel * ITEMS_PER_PAGE);
 
-        const availableZonCalonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga)).filter(Boolean))].sort();
-        const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga) === filterZonCalon).map(c => safeStr(c.sesi)).filter(Boolean))].sort();
+        const availableZonCalonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga).toUpperCase()))].filter(Boolean).sort();
+        
+        // NORMALISASI SESI AGAR TIADA PEMISAHAN ANTARA 'Sesi 5' DAN 'SESI 5 (13/10/2026)'
+        const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon).map(c => safeStr(c.sesi).toUpperCase()))].filter(Boolean).sort();
+        
         const showCalonData = searchCalon.trim() !== '' || filterZonCalon !== 'SEMUA';
         
         const filteredCalons = calonList.filter(c => { 
-           const matchZon = filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga) === filterZonCalon; 
-           const matchSesi = filterSesiCalon === 'SEMUA' || safeStr(c.sesi) === filterSesiCalon; 
+           const matchZon = filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon; 
+           const matchSesi = filterSesiCalon === 'SEMUA' || safeStr(c.sesi).toUpperCase() === filterSesiCalon.toUpperCase(); 
            const matchSearch = safeStr(c.nama_penuh).toUpperCase().includes(searchCalon.toUpperCase()) || safeStr(c.no_kp).includes(searchCalon); 
            return matchZon && matchSesi && matchSearch; 
         });
         const totalPagesCalon = Math.ceil(filteredCalons.length / ITEMS_PER_PAGE) || 1;
         const displayedCalons = filteredCalons.slice((pageCalon - 1) * ITEMS_PER_PAGE, pageCalon * ITEMS_PER_PAGE);
 
-        const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => safeStr(c.zon_temuduga) === cetakZon).map(c => safeStr(c.sesi)).filter(Boolean))].sort() : [];
-        const cetakCalonFiltered = cetakSesi ? calonList.filter(c => safeStr(c.zon_temuduga) === cetakZon && safeStr(c.sesi) === String(cetakSesi)) : [];
+        const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon).map(c => safeStr(c.sesi).toUpperCase()))].filter(Boolean).sort() : [];
+        const cetakCalonFiltered = cetakSesi ? calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon && safeStr(c.sesi).toUpperCase() === String(cetakSesi).toUpperCase()) : [];
 
         const filteredLaporanList = consolidatedResults.filter(r => {
            const melepasiMarkah = r.jumlah_markah >= minScore;
-           const padanZon = laporanZon === 'KESELURUHAN' || safeStr(r.zon) === laporanZon;
+           const padanZon = laporanZon === 'KESELURUHAN' || safeStr(r.zon).toUpperCase() === laporanZon;
            return melepasiMarkah && padanZon;
         }).sort((a,b) => b.jumlah_markah - a.jumlah_markah);
 
@@ -730,7 +740,7 @@
                                 <div className="flip-card-back bg-slate-800 border border-amber-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center">
                                    <p className="text-amber-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Bilangan Calon (Zon)</p>
                                    <div className="overflow-y-auto max-h-[80px] pr-1">
-                                      {availableZonCalonList.map(z => (<div key={z} className="flex justify-between text-sm text-slate-200 mb-1"><span>{z}</span><span className="font-bold">{calonList.filter(c=>safeStr(c.zon_temuduga)===z).length}</span></div>))}
+                                      {availableZonCalonList.map(z => (<div key={z} className="flex justify-between text-sm text-slate-200 mb-1"><span>{z}</span><span className="font-bold">{calonList.filter(c=>safeStr(c.zon_temuduga).toUpperCase()===z).length}</span></div>))}
                                    </div>
                                 </div>
                              </div>
@@ -823,8 +833,8 @@
                         <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
                            <h2 className="text-xl font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-2">+ Tambah Calon Baharu Secara Manual</h2>
                            <form onSubmit={handleRegisterCalon} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                              <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
-                              <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
+                              <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2 uppercase font-bold" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
+                              <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-mono" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
                               <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}>
                                  <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
                               </select>
@@ -832,8 +842,8 @@
                                  <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
                               </select>
                               <input type="date" required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.tarikh} onChange={e => setCalonForm({...calonForm, tarikh: e.target.value})} />
-                              <input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} />
-                              <input type="text" placeholder="SME Subjek (Cth: BM, SC)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} />
+                              <input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} />
+                              <input type="text" placeholder="SME Subjek (Cth: BM, SC)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase" value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} />
                               <button type="submit" className="md:col-span-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold rounded p-3 text-sm shadow">DAFTAR CALON</button>
                            </form>
                         </div>
@@ -874,19 +884,19 @@
                                         <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada padanan calon ditemui.</td></tr>
                                      ) : displayedCalons.map(c => editModeCalonKp === c.no_kp ? (
                                         <tr key={c.no_kp} className="bg-slate-800">
-                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value})} /></td>
+                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600 uppercase font-bold" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td>
-                                           <td className="p-2 flex gap-1"><select className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value})}><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option></select><input type="text" className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value})} /></td>
-                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" value={editCalonForm.ppd} onChange={e => setEditCalonForm({...editCalonForm, ppd: e.target.value})} /></td>
+                                           <td className="p-2 flex gap-1"><select className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value})}><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option></select><input type="text" className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white uppercase" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value.toUpperCase()})} /></td>
+                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600 uppercase" value={editCalonForm.ppd} onChange={e => setEditCalonForm({...editCalonForm, ppd: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2 text-center text-xs text-slate-400">Mod Edit</td>
                                            <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateCalon(c.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeCalonKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
                                         </tr>
                                      ) : (
                                         <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                           <td className="p-3 font-bold">{safeStr(c.nama_penuh)}</td>
+                                           <td className="p-3 font-bold uppercase">{safeStr(c.nama_penuh)}</td>
                                            <td className="p-3 font-mono text-slate-300">{safeStr(c.no_kp)}</td>
-                                           <td className="p-3 text-amber-300 font-bold">{safeStr(c.zon_temuduga)} <span className="text-slate-400 font-normal block text-xs mt-0.5">{safeStr(c.sesi)}</span></td>
-                                           <td className="p-3">{safeStr(c.ppd)}</td>
+                                           <td className="p-3 text-amber-300 font-bold uppercase">{safeStr(c.zon_temuduga)} <span className="text-slate-400 font-normal block text-xs mt-0.5">{safeStr(c.sesi)}</span></td>
+                                           <td className="p-3 uppercase">{safeStr(c.ppd)}</td>
                                            <td className="p-3 text-center"><button onClick={() => handleKehadiranToggle(c.no_kp, c.kehadiran)} className={`px-3 py-1 rounded text-xs font-bold w-24 transition-colors border ${c.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : c.kehadiran === 'TIDAK HADIR' ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>{c.kehadiran || 'BELUM'}</button></td>
                                            <td className="p-3 text-center"><button onClick={() => { setEditModeCalonKp(c.no_kp); setEditCalonForm({...c}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeleteCalon(c.no_kp)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
                                         </tr>
@@ -1000,9 +1010,9 @@
                           </div>
                           <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl mb-8 shadow-sm no-print">
                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">1. Pilih Zon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100" value={cetakZon} onChange={(e) => {setCetakZon(e.target.value); setCetakSesi(''); setSelectedCalon(null);}}><option value="">-- Pilih Zon --</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}</select></div>
-                                <div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">2. Pilih Sesi</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={cetakSesi} disabled={!cetakZon} onChange={(e) => {setCetakSesi(e.target.value); setSelectedCalon(null);}}><option value="">-- Pilih Sesi --</option>{cetakSesiList.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-                                <div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">3. Pilih Nama Calon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 disabled:opacity-50" value={selectedCalon?.no_kp || ''} disabled={!cetakSesi} onChange={(e) => setSelectedCalon(calonList.find(c => c.no_kp === e.target.value) || null)}><option value="">-- Pilih Calon --</option>{cetakCalonFiltered.map(c => <option key={c.no_kp} value={c.no_kp}>{c.nama_penuh}</option>)}</select></div>
+                                <div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">1. Pilih Zon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 uppercase" value={cetakZon} onChange={(e) => {setCetakZon(e.target.value); setCetakSesi(''); setSelectedCalon(null);}}><option value="">-- Pilih Zon --</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}</select></div>
+                                <div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">2. Pilih Sesi</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 uppercase disabled:opacity-50" value={cetakSesi} disabled={!cetakZon} onChange={(e) => {setCetakSesi(e.target.value); setSelectedCalon(null);}}><option value="">-- Pilih Sesi --</option>{cetakSesiList.map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                                <div><label className="block text-sm font-bold uppercase text-amber-400 mb-2">3. Pilih Nama Calon</label><select className="w-full p-4 border border-slate-700 rounded-lg text-base bg-slate-950 text-slate-100 uppercase disabled:opacity-50" value={selectedCalon?.no_kp || ''} disabled={!cetakSesi} onChange={(e) => setSelectedCalon(calonList.find(c => safeStr(c.no_kp) === e.target.value) || null)}><option value="">-- Pilih Calon --</option>{cetakCalonFiltered.map(c => <option key={c.no_kp} value={c.no_kp}>{safeStr(c.nama_penuh).toUpperCase()}</option>)}</select></div>
                              </div>
                           </div>
                           {selectedCalon && currentRes && (
@@ -1015,9 +1025,9 @@
                                 </div>
                                 <table className="w-full text-sm border-collapse border border-slate-400 mb-6 font-semibold">
                                    <tbody>
-                                      <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td><td className="p-2.5 uppercase font-bold">{selectedCalon.nama_penuh}</td></tr>
+                                      <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td><td className="p-2.5 uppercase font-bold">{safeStr(selectedCalon.nama_penuh).toUpperCase()}</td></tr>
                                       <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">NO KAD PENGENALAN</td><td className="p-2.5 font-mono font-bold">{selectedCalon.no_kp}</td></tr>
-                                      <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD & SUBJEK</td><td className="p-2.5 uppercase">{selectedCalon.ppd || '-'} ({selectedCalon.sme_subjek || '-'})</td></tr>
+                                      <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD & SUBJEK</td><td className="p-2.5 uppercase">{safeStr(selectedCalon.ppd).toUpperCase() || '-'} ({safeStr(selectedCalon.sme_subjek).toUpperCase() || '-'})</td></tr>
                                    </tbody>
                                 </table>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -1057,7 +1067,7 @@
                        </div>
                     )}
 
-                    {/* TAB 5: URUS PANEL (DILENGKAPI SESI 4 & 5) */}
+                    {/* TAB 5: URUS PANEL */}
                     {activeTab === 'panel' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1065,11 +1075,11 @@
                           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-md">
                              <h2 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Panel</h2>
                              <form onSubmit={handleRegisterPanel} className="space-y-4">
-                                <input type="text" required placeholder="Nama Penuh Panel" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
-                                <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
+                                <input type="text" required placeholder="Nama Penuh Panel" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm uppercase" value={panelForm.nama_penuh} onChange={(e) => setPanelForm({...panelForm, nama_penuh: e.target.value.toUpperCase()})} />
+                                <input type="text" required placeholder="No. Kad Pengenalan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-mono" value={panelForm.no_kp} onChange={(e) => setPanelForm({...panelForm, no_kp: e.target.value})} />
                                 <input type="text" required placeholder="Kata Laluan Log Masuk" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.katalaluan} onChange={(e) => setPanelForm({...panelForm, katalaluan: e.target.value})} />
-                                <input type="text" required placeholder="Jawatan Rasmi" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
-                                <input type="text" required placeholder="Tempat Bertugas / Jabatan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
+                                <input type="text" required placeholder="Jawatan Rasmi" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm uppercase" value={panelForm.jawatan} onChange={(e) => setPanelForm({...panelForm, jawatan: e.target.value.toUpperCase()})} />
+                                <input type="text" required placeholder="Tempat Bertugas / Jabatan" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm uppercase" value={panelForm.tempat_bertugas} onChange={(e) => setPanelForm({...panelForm, tempat_bertugas: e.target.value.toUpperCase()})} />
                                 <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Daftar Akaun Panel</button>
                              </form>
                           </div>
@@ -1078,9 +1088,9 @@
                             <h2 className="text-lg font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-3">2. Agihan Surat Penugasan & Peranan</h2>
                             <form onSubmit={handleRegisterPenugasan} className="space-y-4">
                               <label className="block text-xs text-slate-400 font-bold uppercase">Pilih Nama Panel Berdaftar</label>
-                              <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanForm.no_kp_panel} onChange={(e) => setPenugasanForm({...penugasanForm, no_kp_panel: e.target.value})}>
+                              <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold uppercase" value={penugasanForm.no_kp_panel} onChange={(e) => setPenugasanForm({...penugasanForm, no_kp_panel: e.target.value})}>
                                 <option value="">-- Sila Pilih Profil Panel --</option>
-                                {panelList.map(p => <option key={p.no_kp} value={p.no_kp}>{p.nama_penuh} ({p.no_kp})</option>)}
+                                {panelList.map(p => <option key={p.no_kp} value={p.no_kp}>{safeStr(p.nama_penuh).toUpperCase()} ({p.no_kp})</option>)}
                               </select>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -1152,10 +1162,10 @@
                                      const pDetail = panelList.find(p => p.no_kp === tugas.no_kp_panel); 
                                      return (
                                         <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                           <td className="p-3 font-bold">{pDetail ? safeStr(pDetail.nama_penuh) : safeStr(tugas.no_kp_panel)}</td>
+                                           <td className="p-3 font-bold uppercase">{pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel)}</td>
                                            <td className="p-3 font-mono text-slate-300 text-xs">
-                                              <span className="font-bold text-sm text-emerald-300">{safeStr(tugas.zon_bertugas)}</span><br/>
-                                              {safeStr(tugas.sesi_bertugas)}
+                                              <span className="font-bold text-sm text-emerald-300">{safeStr(tugas.zon_bertugas).toUpperCase()}</span><br/>
+                                              {safeStr(tugas.sesi_bertugas).toUpperCase()}
                                            </td>
                                            <td className="p-3 text-white font-semibold">{safeStr(tugas.peranan)}</td>
                                            <td className="p-3 text-center">
@@ -1205,18 +1215,18 @@
                                      <tr><td colSpan="5" className="text-center p-8 text-slate-500 italic">Tiada rekod panel dijumpai.</td></tr>
                                   ) : displayedPanels.map((p) => editModePanelKp === p.no_kp ? (
                                      <tr key={p.no_kp} className="bg-slate-800">
-                                        <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
+                                        <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white uppercase font-bold" value={editPanelForm.nama_penuh} onChange={e => setEditPanelForm({...editPanelForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
                                         <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-slate-400" disabled value={editPanelForm.no_kp} /></td>
                                         <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.katalaluan || ''} onChange={e => setEditPanelForm({...editPanelForm, katalaluan: e.target.value})} /></td>
-                                        <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value.toUpperCase()})} /></td>
+                                        <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white uppercase" value={editPanelForm.jawatan} onChange={e => setEditPanelForm({...editPanelForm, jawatan: e.target.value.toUpperCase()})} /></td>
                                         <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdatePanel(p.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModePanelKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
                                      </tr>
                                   ) : (
                                      <tr key={p.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                        <td className="p-4 font-bold">{safeStr(p.nama_penuh)}</td>
+                                        <td className="p-4 font-bold uppercase">{safeStr(p.nama_penuh)}</td>
                                         <td className="p-4 font-mono text-amber-300">{safeStr(p.no_kp)}</td>
                                         <td className="p-4 font-mono text-slate-300">{p.katalaluan || '***'}</td>
-                                        <td className="p-4">{safeStr(p.jawatan)}</td>
+                                        <td className="p-4 uppercase">{safeStr(p.jawatan)}</td>
                                         <td className="p-4 text-center"><button onClick={() => { setEditModePanelKp(p.no_kp); setEditPanelForm({...p}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeletePanel(p.no_kp, p.nama_penuh)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
                                      </tr>
                                   ))}
@@ -1246,7 +1256,7 @@
                              <div className="bg-slate-900 border border-blue-500/30 p-6 rounded-xl shadow-md">
                                 <h2 className="text-xl font-bold text-blue-400 mb-6 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Urus Setia</h2>
                                 <form onSubmit={handleRegisterUS} className="space-y-4">
-                                   <input type="text" required placeholder="Nama Penuh Urus Setia" className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={usForm.nama_penuh} onChange={e => setUsForm({...usForm, nama_penuh: e.target.value.toUpperCase()})} />
+                                   <input type="text" required placeholder="Nama Penuh Urus Setia" className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase font-bold" value={usForm.nama_penuh} onChange={e => setUsForm({...usForm, nama_penuh: e.target.value.toUpperCase()})} />
                                    <input type="text" required placeholder="No. Kad Pengenalan / ID" className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-sm font-mono text-slate-100" value={usForm.no_kp} onChange={e => setUsForm({...usForm, no_kp: e.target.value})} />
                                    <input type="text" required placeholder="Kata Laluan" className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-sm font-mono text-slate-100" value={usForm.katalaluan} onChange={e => setUsForm({...usForm, katalaluan: e.target.value})} />
                                    <button type="submit" className="w-full mt-2 bg-blue-500 hover:bg-blue-600 text-white font-extrabold rounded-lg py-3 text-sm shadow-lg">Daftar Profil Urus Setia</button>
@@ -1257,9 +1267,9 @@
                                 <h2 className="text-xl font-bold text-indigo-400 mb-6 border-b border-slate-800 pb-3">2. Agihan Penugasan Zon Urus Setia</h2>
                                 <form onSubmit={handleRegisterPenugasanUS} className="space-y-4">
                                    <label className="block text-xs text-slate-400 font-bold uppercase">Pilih Urus Setia Berdaftar</label>
-                                   <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold" value={penugasanUsForm.no_kp_us} onChange={(e) => setPenugasanUsForm({...penugasanUsForm, no_kp_us: e.target.value})}>
+                                   <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold uppercase" value={penugasanUsForm.no_kp_us} onChange={(e) => setPenugasanUsForm({...penugasanUsForm, no_kp_us: e.target.value})}>
                                       <option value="">-- Sila Pilih Urus Setia --</option>
-                                      {urusSetiaList.map(u => <option key={u.no_kp} value={u.no_kp}>{u.nama_penuh} ({u.no_kp})</option>)}
+                                      {urusSetiaList.map(u => <option key={u.no_kp} value={u.no_kp}>{safeStr(u.nama_penuh).toUpperCase()} ({u.no_kp})</option>)}
                                    </select>
                                    
                                    <label className="block text-xs text-slate-400 font-bold uppercase">Zon Bertugas</label>
@@ -1303,8 +1313,8 @@
                                          const uDetail = urusSetiaList.find(u => u.no_kp === tugas.no_kp_us);
                                          return (
                                             <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                               <td className="p-3 font-bold">{uDetail ? safeStr(uDetail.nama_penuh) : safeStr(tugas.no_kp_us)}</td>
-                                               <td className="p-3 font-bold text-amber-300">{safeStr(tugas.zon_bertugas)}</td>
+                                               <td className="p-3 font-bold uppercase">{uDetail ? safeStr(uDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_us)}</td>
+                                               <td className="p-3 font-bold text-amber-300 uppercase">{safeStr(tugas.zon_bertugas).toUpperCase()}</td>
                                                <td className="p-3 font-mono text-slate-300 text-xs">{safeStr(tugas.tempoh_bertugas)}</td>
                                                <td className="p-3 text-center">
                                                   <button onClick={() => handleDeletePenugasanUS(tugas.id)} className="text-red-400 font-bold text-xs hover:underline">Batal Tugas</button>
@@ -1329,14 +1339,14 @@
                                    <tbody>
                                       {urusSetiaList.map((u) => editModeUsKp === u.no_kp ? (
                                          <tr key={u.no_kp} className="bg-slate-800">
-                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-white" value={editUsForm.nama_penuh} onChange={e => setEditUsForm({...editUsForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
+                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-white uppercase font-bold" value={editUsForm.nama_penuh} onChange={e => setEditUsForm({...editUsForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
                                             <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-slate-400" disabled value={editUsForm.no_kp} /></td>
                                             <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-sm text-white" value={editUsForm.katalaluan} onChange={e => setEditUsForm({...editUsForm, katalaluan: e.target.value})} /></td>
                                             <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateUS(u.no_kp)} className="bg-emerald-500 text-slate-900 px-3 py-1.5 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeUsKp(null)} className="bg-slate-600 text-white px-3 py-1.5 rounded font-bold text-xs">Batal</button></td>
                                          </tr>
                                       ) : (
                                          <tr key={u.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                            <td className="p-4 font-bold text-base">{safeStr(u.nama_penuh)}</td>
+                                            <td className="p-4 font-bold text-base uppercase">{safeStr(u.nama_penuh)}</td>
                                             <td className="p-4 font-mono text-amber-300 text-base">{safeStr(u.no_kp)}</td>
                                             <td className="p-4 font-mono text-slate-300 text-base">{u.katalaluan}</td>
                                             <td className="p-4 text-center"><button onClick={() => { setEditModeUsKp(u.no_kp); setEditUsForm({...u}); }} className="text-blue-400 font-bold text-sm mx-2 hover:underline">Edit</button> | <button onClick={() => handleDeleteUS(u.no_kp)} className="text-red-400 font-bold text-sm mx-2 hover:underline">Padam</button></td>
