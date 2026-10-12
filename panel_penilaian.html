@@ -45,7 +45,6 @@
 
       const safeStr = (val) => (val ? String(val).trim() : '');
 
-      // HELPER: EKSTRAK NAMA SESI UTAMA (BUANG TARIKH DALAM KURUNGAN JIKA ADA)
       const cleanSesiName = (sStr) => {
          if (!sStr) return '';
          return safeStr(sStr).split('(')[0].trim().toUpperCase();
@@ -197,10 +196,9 @@
         const [msg, setMsg] = useState({ type: '', text: '' });
         const [allResults, setAllResults] = useState([]);
         
-        // TETAPAN PEMANTAUAN KETUA ZON & KETUA PANEL UTAMA
         const [filterZonPantau, setFilterZonPantau] = useState('SEMUA');
         const [minScorePantau, setMinScorePantau] = useState(50);
-        const [viewModePantau, setViewModePantau] = useState('monitor'); // 'monitor' ATAU 'report'
+        const [viewModePantau, setViewModePantau] = useState('monitor'); // 'monitor' | 'report' | 'summary'
 
         const handleLogin = async (e) => {
           e.preventDefault();
@@ -262,13 +260,15 @@
 
         const validResults = allResults.filter(r => calonList.some(c => safeStr(c.no_kp) === safeStr(r.no_kp_calon)));
 
+        // KONSOLIDASI DENGAN PEMBETULAN PENILAI UNIK (MENYELESAIKAN ISU DR. ZARINA TERPAPAR 6 KALI)
         const consolidatedLiveList = calonList.map(calon => {
            const calonResList = validResults.filter(r => safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
            if (calonResList.length === 0) return null;
 
            let sums = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
            let counts = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
-           let panelInfoArr = [];
+           
+           let panelMap = {}; // KUNCI UNIK UNTUK GELOMPOK NAMA PANEL
            let ulasanArr = [];
 
            calonResList.forEach(r => {
@@ -280,14 +280,24 @@
               if (Number(r.skor_interpersonal) > 0) { sums.inter += Number(r.skor_interpersonal); counts.inter++; compList.push("Interpersonal"); }
               if (Number(r.skor_evidens) > 0) { sums.evi += Number(r.skor_evidens); counts.evi++; compList.push("Evidens"); }
 
-              panelInfoArr.push({
-                 nama: safeStr(r.nama_panel).toUpperCase(),
-                 elemen: compList.length > 0 ? compList.join(", ") : "Semua Elemen"
-              });
+              const pName = safeStr(r.nama_panel).toUpperCase();
+              if (pName) {
+                 if (!panelMap[pName]) panelMap[pName] = new Set();
+                 compList.forEach(cItem => panelMap[pName].add(cItem));
+              }
 
               if (r.ulasan_panel && r.ulasan_panel.trim() !== "") {
-                 ulasanArr.push(`${safeStr(r.nama_panel).toUpperCase()}: ${r.ulasan_panel}`);
+                 const textUlasan = `${pName}: ${r.ulasan_panel.trim()}`;
+                 if (!ulasanArr.includes(textUlasan)) ulasanArr.push(textUlasan);
               }
+           });
+
+           let panelInfoArr = Object.keys(panelMap).map(pName => {
+              const compArr = Array.from(panelMap[pName]);
+              return {
+                 nama: pName,
+                 elemen: compArr.length > 0 ? compArr.join(", ") : "Semua Elemen"
+              };
            });
 
            const avgBimb = counts.bimb > 0 ? (sums.bimb / counts.bimb) : 0;
@@ -482,7 +492,6 @@
           window.location.href = 'index.html';
         };
 
-        // KEPUTUSAN TERBISA DILUARIKAN DENGAN TAPISAN PERATUSAN MINIMUM KETUA ZON / KETUA PANEL
         const zonAktifPantau = selectedTugas?.peranan === 'Ketua Zon Panel Penemuduga' 
            ? safeStr(selectedTugas.zon_bertugas).toUpperCase() 
            : filterZonPantau;
@@ -509,6 +518,71 @@
           link.setAttribute("href", URL.createObjectURL(blob));
           link.setAttribute("download", `Laporan_Keputusan_SISC_${zonAktifPantau}_${minScorePantau}Peratus.csv`);
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        };
+
+        // RUMUSAN & ANALISIS PINTAR KETUA ZON
+        const generateZonSummaryText = () => {
+           const listZon = consolidatedLiveList.filter(r => zonAktifPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === zonAktifPantau);
+           const totalCalonZon = calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).length;
+           const totalEvaluated = listZon.length;
+           const totalLulus75 = listZon.filter(r => r.totalMarkah >= 75).length;
+           const totalSederhana50 = listZon.filter(r => r.totalMarkah >= 50 && r.totalMarkah < 75).length;
+           const totalGagal50 = listZon.filter(r => r.totalMarkah < 50).length;
+
+           let t = `RUMUSAN & ANALISIS PRESTASI TEMU DUGA SISC+ (${zonAktifPantau !== 'SEMUA' ? 'ZON ' + zonAktifPantau : 'KESELURUHAN ZON'})\n`;
+           t += `Tarikh Janaan: ${new Date().toLocaleDateString('en-GB')}\n`;
+           t += `===========================================================\n\n`;
+           t += `1. RINGKASAN PENYERTAAN & KELULUSAN ZON:\n`;
+           t += `   • Jumlah Calon Terdaftar : ${totalCalonZon} Orang\n`;
+           t += `   • Calon Selesai Dinilai   : ${totalEvaluated} Orang (${totalCalonZon > 0 ? Math.round((totalEvaluated/totalCalonZon)*100) : 0}%)\n`;
+           t += `   • Layak (>= 75%)          : ${totalLulus75} Orang (${totalEvaluated > 0 ? Math.round((totalLulus75/totalEvaluated)*100) : 0}%)\n`;
+           t += `   • Sederhana (50% - 74%)   : ${totalSederhana50} Orang\n`;
+           t += `   • Belum Melepasi (< 50%)   : ${totalGagal50} Orang\n\n`;
+
+           // BREAKDOWN SME
+           const smeMap = {};
+           calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+              const smeName = safeStr(c.sme_subjek).toUpperCase() || 'TIADA SME';
+              if (!smeMap[smeName]) smeMap[smeName] = { total: 0, m50: 0, m75: 0 };
+              smeMap[smeName].total++;
+              
+              const res = listZon.find(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp));
+              if (res) {
+                 if (res.totalMarkah >= 50) smeMap[smeName].m50++;
+                 if (res.totalMarkah >= 75) smeMap[smeName].m75++;
+              }
+           });
+
+           t += `2. ANALISIS KELULUSAN MENGIKUT SME SUBJEK:\n`;
+           Object.keys(smeMap).forEach(sme => {
+              const data = smeMap[sme];
+              t += `   • ${sme} : Total ${data.total} | Melepasi >=50%: ${data.m50} | Layak >=75%: ${data.m75}\n`;
+           });
+
+           // BREAKDOWN PPD
+           const ppdMap = {};
+           calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+              const ppdName = safeStr(c.ppd).toUpperCase() || 'TIADA PPD';
+              if (!ppdMap[ppdName]) ppdMap[ppdName] = { total: 0, m50: 0, m75: 0 };
+              ppdMap[ppdName].total++;
+              
+              const res = listZon.find(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp));
+              if (res) {
+                 if (res.totalMarkah >= 50) ppdMap[ppdName].m50++;
+                 if (res.totalMarkah >= 75) ppdMap[ppdName].m75++;
+              }
+           });
+
+           t += `\n3. ANALISIS KELULUSAN MENGIKUT PPD:\n`;
+           Object.keys(ppdMap).forEach(ppd => {
+              const data = ppdMap[ppd];
+              t += `   • ${ppd} : Total ${data.total} | Melepasi >=50%: ${data.m50} | Layak >=75%: ${data.m75}\n`;
+           });
+
+           t += `\n4. IMPLIKASI & SYOR KETUA ZON:\n`;
+           t += `   Calon yang melepasi had 75% diperakukan bersedia untuk penempatan sebagai Pegawai SISC+. Calon dalam julat 50%-74% disyorkan berada dalam senarai simpanan zon.`;
+
+           return t;
         };
 
         const getRubrikTextEksak = (key, val, isActive) => {
@@ -933,7 +1007,7 @@
                    {(selectedTugas.peranan === 'Ketua Panel Utama' || selectedTugas.peranan === 'Ketua Zon Panel Penemuduga') && (
                       <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12">
                          
-                         {/* TOGGLE MOD PAPARAN (MONITOR LIVE VS LAPORAN KEPUTUSAN RASMI) */}
+                         {/* TOGGLE MOD PAPARAN (MONITOR LIVE VS LAPORAN KEPUTUSAN VS RUMUSAN PINTAR) */}
                          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4 no-print">
                             <div>
                                <h2 className="text-lg font-bold text-amber-400 uppercase flex items-center gap-2">
@@ -946,12 +1020,15 @@
                                </p>
                             </div>
                             
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                <button onClick={() => setViewModePantau('monitor')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${viewModePantau === 'monitor' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
                                   📊 Pemantauan Live
                                </button>
                                <button onClick={() => setViewModePantau('report')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${viewModePantau === 'report' ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
-                                  📑 Laporan Keputusan Rasmi
+                                  📑 Laporan Keputusan
+                               </button>
+                               <button onClick={() => setViewModePantau('summary')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${viewModePantau === 'summary' ? 'bg-purple-500 text-white border-purple-400 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
+                                  ⚡ Rumusan Pintar Zon
                                </button>
                             </div>
                          </div>
@@ -1021,7 +1098,7 @@
                                                  </td>
                                                  <td className="p-4 text-center font-black text-emerald-400 text-base">{res.totalMarkah}%</td>
                                                  <td className="p-4 text-center">
-                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${res.isLulus ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
+                                                    <span className={`px-3 py-1.5 rounded-full text-[10px] font-black border whitespace-nowrap inline-block ${res.isLulus ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
                                                        {res.isLulus ? 'LAYAK' : 'BELUM LAYAK'}
                                                     </span>
                                                  </td>
@@ -1115,6 +1192,24 @@
                                   <div className="mt-8 text-xs text-slate-500 italic border-t border-slate-300 pt-3 text-center">
                                      * Markah janaan ini merupakan purata terkumpul daripada kesemua panel penemuduga yang menilai calon setakat {new Date().toLocaleDateString('en-GB')}.
                                   </div>
+                               </div>
+                            </div>
+                         )}
+
+                         {/* MOD 3: RUMUSAN & ANALISIS PINTAR KETUA ZON / KETUA PANEL UTAMA */}
+                         {viewModePantau === 'summary' && (
+                            <div className="space-y-6">
+                               <div className="bg-slate-950 p-6 rounded-2xl border border-purple-500/40 shadow-xl space-y-4">
+                                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                                     <h3 className="text-base font-extrabold text-purple-400 flex items-center gap-2">
+                                        ⚡ Janaan Laporan Analisis Eksekutif Pintar ({zonAktifPantau})
+                                     </h3>
+                                     <button onClick={() => { navigator.clipboard.writeText(generateZonSummaryText()); alert('Rumusan laporan analisis berjaya disalin!'); }} className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-4 py-2 rounded-lg text-xs shadow transition-transform active:scale-95">
+                                        📋 Salin Teks Rumusan
+                                     </button>
+                                  </div>
+
+                                  <textarea rows="14" readOnly className="w-full p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono leading-relaxed text-slate-200 focus:outline-none" value={generateZonSummaryText()}></textarea>
                                </div>
                             </div>
                          )}
