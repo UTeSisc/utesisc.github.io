@@ -45,21 +45,6 @@
 
       const safeStr = (val) => (val ? String(val).trim() : '');
 
-      // HELPER FORMAT JADUAL TEKS RAPI (FIXED PADDING ALIGNMENT)
-      const padRight = (str, len) => {
-         const s = String(str);
-         if (s.length >= len) return s.substring(0, len);
-         return s + ' '.repeat(len - s.length);
-      };
-
-      const padCenter = (str, len) => {
-         const s = String(str);
-         if (s.length >= len) return s.substring(0, len);
-         const left = Math.floor((len - s.length) / 2);
-         const right = len - s.length - left;
-         return ' '.repeat(left) + s + ' '.repeat(right);
-      };
-
       const cleanSesiName = (sStr) => {
          if (!sStr) return '';
          return safeStr(sStr).split('(')[0].trim().toUpperCase();
@@ -207,7 +192,8 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      function PrintVisualCharts({ ppdData, jantinaData }) {
+      // CARTA VISUAL A4 TERBAIKI: BAR MENGIKUT ZON SAHAJA (BERSIH & TIDAK SESAK)
+      function PrintVisualCharts({ zonData, jantinaData }) {
         const doughnutRef = useRef(null);
         const barRef = useRef(null);
 
@@ -238,27 +224,26 @@
 
             if (barRef.current) {
               const ctx2 = barRef.current.getContext('2d');
-              const ppdNames = Object.keys(ppdData);
-              const ppdTotals = ppdNames.map(k => ppdData[k].total);
+              const zonNames = Object.keys(zonData);
+              const zonTotals = zonNames.map(k => zonData[k]);
 
               barChart = new Chart(ctx2, {
                 type: 'bar',
                 data: {
-                  labels: ppdNames.length > 0 ? ppdNames : ['Tiada Data'],
+                  labels: zonNames.length > 0 ? zonNames : ['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'],
                   datasets: [{
                     label: 'Jumlah Calon Dinilai',
-                    data: ppdTotals.length > 0 ? ppdTotals : [0],
+                    data: zonTotals.length > 0 ? zonTotals : [0,0,0,0,0,0],
                     backgroundColor: '#0D9488',
                     borderRadius: 4
                   }]
                 },
                 options: {
-                  indexAxis: 'y',
                   responsive: true,
                   maintainAspectRatio: false,
                   scales: {
-                    x: { ticks: { precision: 0, font: { size: 9 } } },
-                    y: { ticks: { font: { size: 9, weight: 'bold' } } }
+                    x: { ticks: { font: { size: 9, weight: 'bold' } } },
+                    y: { ticks: { precision: 0, font: { size: 9 } } }
                   },
                   plugins: { legend: { display: false } }
                 }
@@ -271,7 +256,7 @@
             if (doughnutChart) doughnutChart.destroy();
             if (barChart) barChart.destroy();
           };
-        }, [ppdData, jantinaData]);
+        }, [zonData, jantinaData]);
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6 border p-4 rounded-xl bg-slate-50 border-slate-200">
@@ -280,7 +265,7 @@
                 <div className="w-full h-44"><canvas ref={doughnutRef}></canvas></div>
              </div>
              <div className="h-56 flex flex-col items-center">
-                <p className="text-xs font-bold text-slate-700 uppercase mb-2">Taburan Calon Mengikut PPD (Bar Melintang)</p>
+                <p className="text-xs font-bold text-slate-700 uppercase mb-2">Taburan Calon Mengikut Zon</p>
                 <div className="w-full h-44"><canvas ref={barRef}></canvas></div>
              </div>
           </div>
@@ -660,7 +645,7 @@
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
-        // SENARAI LENGKAP PANEL ZON (LENGKAP NAMA, JAWATAN, TEMPAT BERTUGAS, PERANAN)
+        // SENARAI LENGKAP PANEL ZON
         const getPanelZonListComplete = () => {
            let mapComplete = {};
 
@@ -702,7 +687,7 @@
            });
         };
 
-        // ENJIN JANAAN RUMUSAN ZON & SINTESIS KEBANGSAAN (DENGAN JADUAL ALIGNMENT TEPAT)
+        // DRAF RUMUSAN TEXT RINGKAS DBP
         const generateZonSummaryText = () => {
            const isKebangsaan = (zonAktifPantau === 'SEMUA');
            const listZon = consolidatedLiveList.filter(r => isKebangsaan || safeStr(r.zon).toUpperCase() === zonAktifPantau);
@@ -711,32 +696,6 @@
 
            let countLelaki = 0, countPerempuan = 0;
            listZon.forEach(r => { if (r.jantina === 'PEREMPUAN') countPerempuan++; else countLelaki++; });
-
-           let sumBimb = 0, sumInst = 0, sumStrat = 0, sumData = 0, sumInter = 0, sumEvi = 0;
-           if (totalEvaluated > 0) {
-              listZon.forEach(r => {
-                 sumBimb += (r.avgBimb / 5) * 100;
-                 sumInst += (r.avgInst / 5) * 100;
-                 sumStrat += (r.avgStrat / 5) * 100;
-                 sumData += (r.avgData / 5) * 100;
-                 sumInter += (r.avgInter / 5) * 100;
-                 sumEvi += (r.avgEvi / 5) * 100;
-              });
-           }
-
-           const avgBimbPct = totalEvaluated > 0 ? (sumBimb / totalEvaluated).toFixed(1) : '0.0';
-           const avgInstPct = totalEvaluated > 0 ? (sumInst / totalEvaluated).toFixed(1) : '0.0';
-           const avgStratPct = totalEvaluated > 0 ? (sumStrat / totalEvaluated).toFixed(1) : '0.0';
-           const avgDataPct = totalEvaluated > 0 ? (sumData / totalEvaluated).toFixed(1) : '0.0';
-           const avgInterPct = totalEvaluated > 0 ? (sumInter / totalEvaluated).toFixed(1) : '0.0';
-           const avgEviPct = totalEvaluated > 0 ? (sumEvi / totalEvaluated).toFixed(1) : '0.0';
-
-           const m90 = listZon.filter(r => r.totalMarkah >= 90).length;
-           const m80 = listZon.filter(r => r.totalMarkah >= 80 && r.totalMarkah < 90).length;
-           const m70 = listZon.filter(r => r.totalMarkah >= 70 && r.totalMarkah < 80).length;
-           const m60 = listZon.filter(r => r.totalMarkah >= 60 && r.totalMarkah < 70).length;
-           const m50 = listZon.filter(r => r.totalMarkah >= 50 && r.totalMarkah < 60).length;
-           const m49 = listZon.filter(r => r.totalMarkah < 50).length;
 
            let t = `BAHAGIAN PROFESIONALISME GURU\nKEMENTERIAN PENDIDIKAN MALAYSIA\n`;
            t += `========================================================================================\n`;
@@ -754,114 +713,11 @@
            t += `   Setakat tarikh laporan ini dijana, seramai ${totalEvaluated} calon (${totalCalonZon > 0 ? Math.round((totalEvaluated/totalCalonZon)*100) : 0}%) telah selesai menduduki sesi\n`;
            t += `   temu duga penilaian berstruktur berasaskan Rubrik BARS KPM.\n\n`;
            t += `   Pecahan Demografi Calon Dinilai:\n`;
-           t += `   -------------------------------------------------------------------------------------\n`;
            t += `   • Lelaki     : ${countLelaki} (${totalEvaluated > 0 ? ((countLelaki/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   • Perempuan  : ${countPerempuan} (${totalEvaluated > 0 ? ((countPerempuan/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   -------------------------------------------------------------------------------------\n\n`;
+           t += `   • Perempuan  : ${countPerempuan} (${totalEvaluated > 0 ? ((countPerempuan/totalEvaluated)*100).toFixed(1) : 0}%)\n\n`;
 
-           // JIKA KEBANGSAAN -> TAMPILKAN JADUAL PERBANDINGAN ZON
            if (isKebangsaan) {
-              t += `2.0 MATRIKS PERBANDINGAN TAHAP PENCAPAAN MENGIKUT ZON (PERINGKAT KEBANGSAAN)\n`;
-              t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
-              t += `   | ZON               | JUMLAH CALON  | >=90% | >=80% | >=70% | >=60% | >=50% | <=49% |\n`;
-              t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
-              
-              const allZons = ['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'];
-              allZons.forEach(zName => {
-                 const zList = consolidatedLiveList.filter(r => safeStr(r.zon).toUpperCase() === zName);
-                 const zTot = zList.length;
-                 const zm90 = zList.filter(r => r.totalMarkah >= 90).length;
-                 const zm80 = zList.filter(r => r.totalMarkah >= 80 && r.totalMarkah < 90).length;
-                 const zm70 = zList.filter(r => r.totalMarkah >= 70 && r.totalMarkah < 80).length;
-                 const zm60 = zList.filter(r => r.totalMarkah >= 60 && r.totalMarkah < 70).length;
-                 const zm50 = zList.filter(r => r.totalMarkah >= 50 && r.totalMarkah < 60).length;
-                 const zm49 = zList.filter(r => r.totalMarkah < 50).length;
-
-                 t += `   | ${padRight('ZON ' + zName, 17)} | ${padCenter(zTot, 13)} | ${padCenter(zm90, 5)} | ${padCenter(zm80, 5)} | ${padCenter(zm70, 5)} | ${padCenter(zm60, 5)} | ${padCenter(zm50, 5)} | ${padCenter(zm49, 5)} |\n`;
-              });
-              t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n\n`;
-           }
-
-           t += `${isKebangsaan ? '3.0' : '2.0'} ANALISIS PURATA PENGUASAAN KOMPETENSI ${isKebangsaan ? 'KEBANGSAAN' : 'ZON'} (SKALA WAJARAN 100%)\n`;
-           t += `   Pencapaian purata bagi setiap elemen kompetensi BARS adalah seperti yang berikut:\n`;
-           t += `   -------------------------------------------------------------------------------------\n`;
-           t += `   1. Bimbingan Profesional (Wajaran 25%)  : ${avgBimbPct}%\n`;
-           t += `   2. Instruksional (Wajaran 20%)          : ${avgInstPct}%\n`;
-           t += `   3. Pemikiran Strategik (Wajaran 20%)    : ${avgStratPct}%\n`;
-           t += `   4. Analisis Data (Wajaran 15%)          : ${avgDataPct}%\n`;
-           t += `   5. Interpersonal (Wajaran 10%)          : ${avgInterPct}%\n`;
-           t += `   6. Evidens Profesional (Wajaran 10%)    : ${avgEviPct}%\n`;
-           t += `   -------------------------------------------------------------------------------------\n\n`;
-
-           t += `${isKebangsaan ? '4.0' : '3.0'} ANALISIS TABURAN MARKAH KESELURUHAN CALON\n`;
-           t += `   -------------------------------------------------------------------------------------\n`;
-           t += `   • 90.0% dan ke atas               : ${m90} (${totalEvaluated > 0 ? ((m90/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   • 80.0% hingga 89.9%              : ${m80} (${totalEvaluated > 0 ? ((m80/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   • 70.0% hingga 79.9%              : ${m70} (${totalEvaluated > 0 ? ((m70/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   • 60.0% hingga 69.9%              : ${m60} (${totalEvaluated > 0 ? ((m60/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   • 50.0% hingga 59.9%              : ${m50} (${totalEvaluated > 0 ? ((m50/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   • 49.9% dan ke bawah              : ${m49} (${totalEvaluated > 0 ? ((m49/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   -------------------------------------------------------------------------------------\n\n`;
-
-           // JADUAL SME BERFORMAT RAPI (PERFECT ALIGNMENT)
-           const smeMap = {};
-           calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
-              const smeName = safeStr(c.sme_subjek).toUpperCase() || 'TIADA SME';
-              if (!smeMap[smeName]) smeMap[smeName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
-              smeMap[smeName].total++;
-              
-              const res = listZon.find(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp));
-              if (res) {
-                 if (res.totalMarkah >= 90) smeMap[smeName].m90++;
-                 else if (res.totalMarkah >= 80) smeMap[smeName].m80++;
-                 else if (res.totalMarkah >= 70) smeMap[smeName].m70++;
-                 else if (res.totalMarkah >= 60) smeMap[smeName].m60++;
-                 else if (res.totalMarkah >= 50) smeMap[smeName].m50++;
-                 else smeMap[smeName].m49++;
-              }
-           });
-
-           t += `${isKebangsaan ? '5.0' : '4.0'} PRESTASI MENGIKUT BIDANG KEPAKARAN SUBJEK (SME)\n`;
-           t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
-           t += `   | BIDANG KEPAKARAN  | JUMLAH CALON  | >=90% | >=80% | >=70% | >=60% | >=50% | <=49% |\n`;
-           t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
-           Object.keys(smeMap).forEach(sme => {
-              const d = smeMap[sme];
-              t += `   | ${padRight(sme, 17)} | ${padCenter(d.total, 13)} | ${padCenter(d.m90, 5)} | ${padCenter(d.m80, 5)} | ${padCenter(d.m70, 5)} | ${padCenter(d.m60, 5)} | ${padCenter(d.m50, 5)} | ${padCenter(d.m49, 5)} |\n`;
-           });
-           t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n\n`;
-
-           // JADUAL PPD BERFORMAT RAPI (PERFECT ALIGNMENT)
-           const ppdMap = {};
-           calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
-              const ppdName = mapPPDStandard(c.ppd);
-              if (!ppdMap[ppdName]) ppdMap[ppdName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
-              ppdMap[ppdName].total++;
-              
-              const res = listZon.find(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp));
-              if (res) {
-                 if (res.totalMarkah >= 90) ppdMap[ppdName].m90++;
-                 else if (res.totalMarkah >= 80) ppdMap[ppdName].m80++;
-                 else if (res.totalMarkah >= 70) ppdMap[ppdName].m70++;
-                 else if (res.totalMarkah >= 60) ppdMap[ppdName].m60++;
-                 else if (res.totalMarkah >= 50) ppdMap[ppdName].m50++;
-                 else ppdMap[ppdName].m49++;
-              }
-           });
-
-           t += `${isKebangsaan ? '6.0' : '5.0'} ANALISIS MATRIKS MARKAH MENGIKUT PEJABAT PENDIDIKAN DAERAH (PPD)\n`;
-           t += `   +------------------------------------+--------------+-------+-------+-------+-------+-------+-------+\n`;
-           t += `   | PEJABAT PENDIDIKAN DAERAH (PPD)    | JUMLAH CALON | >=90% | >=80% | >=70% | >=60% | >=50% | <=49% |\n`;
-           t += `   +------------------------------------+--------------+-------+-------+-------+-------+-------+-------+\n`;
-           Object.keys(ppdMap).forEach(ppd => {
-              const d = ppdMap[ppd];
-              t += `   | ${padRight(ppd, 34)} | ${padCenter(d.total, 12)} | ${padCenter(d.m90, 5)} | ${padCenter(d.m80, 5)} | ${padCenter(d.m70, 5)} | ${padCenter(d.m60, 5)} | ${padCenter(d.m50, 5)} | ${padCenter(d.m49, 5)} |\n`;
-           });
-           t += `   +------------------------------------+--------------+-------+-------+-------+-------+-------+-------+\n\n`;
-
-           // JIKA KEBANGSAAN -> KUMPUL SINTESIS RUMUSAN SETIAP KETUA ZON
-           if (isKebangsaan) {
-              t += `7.0 SINTESIS RUMUSAN DAN CATATAN KETUA-KETUA ZON\n`;
+              t += `2.0 SINTESIS RUMUSAN DAN CATATAN KETUA-KETUA ZON\n`;
               const allZons = ['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'];
               allZons.forEach(zName => {
                  const savedObj = allSavedRumusan.find(s => safeStr(s.zon).toUpperCase() === zName);
@@ -874,18 +730,7 @@
                  }
               });
            } else {
-              t += `6.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON (${zonAktifPantau})\n`;
-              const pZonArr = getPanelZonListComplete();
-              if (pZonArr.length === 0) {
-                 t += `   (Tiada panel didaftarkan bagi zon ini)\n`;
-              } else {
-                 pZonArr.forEach((p) => {
-                    t += `   ${p.bil}. ${p.nama} | ${p.jawatan} | ${p.tempat_bertugas} | [${p.peranan}]\n`;
-                 });
-              }
-              t += `\n`;
-
-              t += `7.0 RUMUSAN DAN CATATAN KETUA ZON\n`;
+              t += `2.0 RUMUSAN DAN CATATAN KETUA ZON\n`;
               t += `   Laporan ini mengandungi taburan data markah mentah, demografi jantina, serta purata pencapaian\n`;
               t += `   kompetensi bagi Zon ${zonAktifPantau} untuk dikemukakan kepada Pengurusan BPG KPM bagi tindakan selanjutnya.\n\n`;
            }
@@ -945,7 +790,7 @@
               }
            } catch (e) {
               setIsSavingRumusan(false);
-              alert('Sila pastikan anda telah menjalankan script SQL untuk membina/disable RLS pada rumusan_zon dalam Supabase. Ralat: ' + e.message);
+              alert('Ralat menyimpan: ' + e.message);
            }
         };
 
@@ -956,18 +801,75 @@
           return DESKRIPSI_RUBRIK_EKSAK[key]?.[num] || 'Standard Penilaian BARS Ditentukan';
         };
 
-        const listZonForChart = consolidatedLiveList.filter(r => zonAktifPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === zonAktifPantau);
+        const isKebangsaan = (zonAktifPantau === 'SEMUA');
+        const listZonForChart = consolidatedLiveList.filter(r => isKebangsaan || safeStr(r.zon).toUpperCase() === zonAktifPantau);
+        
         let jantinaDataForChart = { lelaki: 0, perempuan: 0 };
         listZonForChart.forEach(r => {
            if (r.jantina === 'PEREMPUAN') jantinaDataForChart.perempuan++;
            else jantinaDataForChart.lelaki++;
         });
 
-        const ppdMapForChart = {};
-        calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+        // TABURAN CARTA MENGIKUT ZON SAHAJA (6 ZON - HAPUSKAN PPD)
+        const zonMapForChart = { 'UTARA':0, 'TIMUR':0, 'TENGAH':0, 'SELATAN':0, 'SABAH':0, 'SARAWAK':0 };
+        calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+           const zName = safeStr(c.zon_temuduga).toUpperCase();
+           if (zonMapForChart[zName] !== undefined) zonMapForChart[zName]++;
+        });
+
+        // DATA JADUAL SME & PPD DUKUNGAN HTML
+        const totalEvaluated = listZonForChart.length;
+        let sumBimb = 0, sumInst = 0, sumStrat = 0, sumData = 0, sumInter = 0, sumEvi = 0;
+        if (totalEvaluated > 0) {
+           listZonForChart.forEach(r => {
+              sumBimb += (r.avgBimb / 5) * 100;
+              sumInst += (r.avgInst / 5) * 100;
+              sumStrat += (r.avgStrat / 5) * 100;
+              sumData += (r.avgData / 5) * 100;
+              sumInter += (r.avgInter / 5) * 100;
+              sumEvi += (r.avgEvi / 5) * 100;
+           });
+        }
+
+        const avgBimbPct = totalEvaluated > 0 ? (sumBimb / totalEvaluated).toFixed(1) : '0.0';
+        const avgInstPct = totalEvaluated > 0 ? (sumInst / totalEvaluated).toFixed(1) : '0.0';
+        const avgStratPct = totalEvaluated > 0 ? (sumStrat / totalEvaluated).toFixed(1) : '0.0';
+        const avgDataPct = totalEvaluated > 0 ? (sumData / totalEvaluated).toFixed(1) : '0.0';
+        const avgInterPct = totalEvaluated > 0 ? (sumInter / totalEvaluated).toFixed(1) : '0.0';
+        const avgEviPct = totalEvaluated > 0 ? (sumEvi / totalEvaluated).toFixed(1) : '0.0';
+
+        const smeMapTable = {};
+        calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+           const smeName = safeStr(c.sme_subjek).toUpperCase() || 'TIADA SME';
+           if (!smeMapTable[smeName]) smeMapTable[smeName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
+           smeMapTable[smeName].total++;
+           
+           const res = listZonForChart.find(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp));
+           if (res) {
+              if (res.totalMarkah >= 90) smeMapTable[smeName].m90++;
+              else if (res.totalMarkah >= 80) smeMapTable[smeName].m80++;
+              else if (res.totalMarkah >= 70) smeMapTable[smeName].m70++;
+              else if (res.totalMarkah >= 60) smeMapTable[smeName].m60++;
+              else if (res.totalMarkah >= 50) smeMapTable[smeName].m50++;
+              else smeMapTable[smeName].m49++;
+           }
+        });
+
+        const ppdMapTable = {};
+        calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
            const ppdName = mapPPDStandard(c.ppd);
-           if (!ppdMapForChart[ppdName]) ppdMapForChart[ppdName] = { total: 0 };
-           ppdMapForChart[ppdName].total++;
+           if (!ppdMapTable[ppdName]) ppdMapTable[ppdName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
+           ppdMapTable[ppdName].total++;
+           
+           const res = listZonForChart.find(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp));
+           if (res) {
+              if (res.totalMarkah >= 90) ppdMapTable[ppdName].m90++;
+              else if (res.totalMarkah >= 80) ppdMapTable[ppdName].m80++;
+              else if (res.totalMarkah >= 70) ppdMapTable[ppdName].m70++;
+              else if (res.totalMarkah >= 60) ppdMapTable[ppdName].m60++;
+              else if (res.totalMarkah >= 50) ppdMapTable[ppdName].m50++;
+              else ppdMapTable[ppdName].m49++;
+           }
         });
 
         return (
@@ -1582,7 +1484,7 @@
                             </div>
                          )}
 
-                         {/* MOD 3: JANAAN LAPORAN ANALISIS EKSEKUTIF (TEKS BOLEH EDIT & SIMPAN KE SUPABASE) */}
+                         {/* MOD 3: JANAAN LAPORAN ANALISIS EKSEKUTIF */}
                          {viewModePantau === 'summary' && (
                             <div className="space-y-6">
                                <div className="bg-slate-950 p-6 rounded-2xl border border-purple-500/40 shadow-xl space-y-4">
@@ -1608,13 +1510,13 @@
                             </div>
                          )}
 
-                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF */}
+                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF (JADUAL HTML RASMI KPM) */}
                          {viewModePantau === 'print_visual' && (
                             <div className="space-y-6">
                                <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-blue-500/30 no-print">
                                   <div>
-                                     <h3 className="text-sm font-extrabold text-blue-400">Paparan Cetakan Dokumen Rasmi A4 (Visual & Naratif)</h3>
-                                     <p className="text-xs text-slate-400 mt-0.5">Laporan visual siap cetak lengkap dengan Logo KPM, Carta Visual, dan Teks Rasmi yang disimpan.</p>
+                                     <h3 className="text-sm font-extrabold text-blue-400">Paparan Cetakan Dokumen Rasmi A4 (Jadual & Visual HTML)</h3>
+                                     <p className="text-xs text-slate-400 mt-0.5">Laporan visual siap cetak lengkap dengan Logo KPM, Carta Cincin/Bar Zon, dan Jadual HTML tersusun.</p>
                                   </div>
                                   <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-lg text-xs shadow-lg transition-transform active:scale-95">
                                      🖨️ Cetak Dokumen A4
@@ -1622,6 +1524,7 @@
                                </div>
 
                                <div className="bg-white p-10 border rounded-xl print-area text-slate-900 shadow-2xl space-y-6">
+                                  
                                   {/* KEPALA SURAT */}
                                   <div className="text-center border-b-2 border-slate-900 pb-4">
                                      <img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" />
@@ -1633,20 +1536,195 @@
                                      <p className="text-xs text-slate-600 font-semibold mt-1">Tarikh Janaan: {new Date().toLocaleDateString('en-GB')}</p>
                                   </div>
 
-                                  {/* VISUAL CARTA DINAMIK A4 */}
-                                  <PrintVisualCharts ppdData={ppdMapForChart} jantinaData={jantinaDataForChart} />
+                                  {/* VISUAL CARTA DINAMIK A4 (JANTINA + BAR ZON) */}
+                                  <PrintVisualCharts zonData={zonMapForChart} jantinaData={jantinaDataForChart} />
 
-                                  {/* TEKS RUMUSAN YANG DISUNTING & DISIMPAN */}
-                                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 whitespace-pre-line text-xs font-mono leading-relaxed text-slate-800">
-                                     {editableZonText || generateZonSummaryText()}
+                                  {/* JADUAL 1.0 MATRIKS ZON (KHAS UNTUK KETUA PANEL UTAMA - MOD SEMUA) */}
+                                  {isKebangsaan && (
+                                     <div className="space-y-2">
+                                        <h3 className="text-xs font-extrabold uppercase text-slate-800">1.0 MATRIKS PERBANDINGAN TAHAP PENCAPAAN MENGIKUT ZON</h3>
+                                        <table className="w-full text-xs border-collapse border border-slate-400">
+                                           <thead>
+                                              <tr className="bg-slate-200 border-b border-slate-400 text-center font-bold">
+                                                 <th className="p-2 border-r border-slate-400 text-left">ZON</th>
+                                                 <th className="p-2 border-r border-slate-400">JUMLAH CALON</th>
+                                                 <th className="p-2 border-r border-slate-400">&gt;= 90%</th>
+                                                 <th className="p-2 border-r border-slate-400">&gt;= 80%</th>
+                                                 <th className="p-2 border-r border-slate-400">&gt;= 70%</th>
+                                                 <th className="p-2 border-r border-slate-400">&gt;= 60%</th>
+                                                 <th className="p-2 border-r border-slate-400">&gt;= 50%</th>
+                                                 <th className="p-2">&lt;= 49%</th>
+                                              </tr>
+                                           </thead>
+                                           <tbody>
+                                              {['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'].map((zName, zIdx) => {
+                                                 const zList = consolidatedLiveList.filter(r => safeStr(r.zon).toUpperCase() === zName);
+                                                 const zTot = zList.length;
+                                                 const zm90 = zList.filter(r => r.totalMarkah >= 90).length;
+                                                 const zm80 = zList.filter(r => r.totalMarkah >= 80 && r.totalMarkah < 90).length;
+                                                 const zm70 = zList.filter(r => r.totalMarkah >= 70 && r.totalMarkah < 80).length;
+                                                 const zm60 = zList.filter(r => r.totalMarkah >= 60 && r.totalMarkah < 70).length;
+                                                 const zm50 = zList.filter(r => r.totalMarkah >= 50 && r.totalMarkah < 60).length;
+                                                 const zm49 = zList.filter(r => r.totalMarkah < 50).length;
+                                                 return (
+                                                    <tr key={zIdx} className="border-b border-slate-300 text-center font-semibold hover:bg-slate-50">
+                                                       <td className="p-2 border-r border-slate-300 text-left font-bold uppercase">ZON {zName}</td>
+                                                       <td className="p-2 border-r border-slate-300 font-bold text-blue-900">{zTot}</td>
+                                                       <td className="p-2 border-r border-slate-300">{zm90}</td>
+                                                       <td className="p-2 border-r border-slate-300">{zm80}</td>
+                                                       <td className="p-2 border-r border-slate-300">{zm70}</td>
+                                                       <td className="p-2 border-r border-slate-300">{zm60}</td>
+                                                       <td className="p-2 border-r border-slate-300">{zm50}</td>
+                                                       <td className="p-2">{zm49}</td>
+                                                    </tr>
+                                                 );
+                                              })}
+                                           </tbody>
+                                        </table>
+                                     </div>
+                                  )}
+
+                                  {/* JADUAL 2.0 PURATA KOMPETENSI 6 ELEMEN */}
+                                  <div className="space-y-2">
+                                     <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '2.0' : '1.0'} ANALISIS PURATA PENGUASAAN KOMPETENSI (6 ELEMEN BARS)</h3>
+                                     <table className="w-full text-xs border-collapse border border-slate-400">
+                                        <thead>
+                                           <tr className="bg-slate-200 border-b border-slate-400 text-left font-bold">
+                                              <th className="p-2 border-r border-slate-400 w-12 text-center">#</th>
+                                              <th className="p-2 border-r border-slate-400">ELEMEN KOMPETENSI</th>
+                                              <th className="p-2 border-r border-slate-400 text-center w-28">WAJARAN (%)</th>
+                                              <th className="p-2 text-center w-36">PURATA SKOR ZON (%)</th>
+                                           </tr>
+                                        </thead>
+                                        <tbody className="font-semibold">
+                                           <tr className="border-b border-slate-300"><td className="p-2 text-center border-r border-slate-300">1</td><td className="p-2 border-r border-slate-300">Bimbingan Profesional</td><td className="p-2 text-center border-r border-slate-300">25%</td><td className="p-2 text-center font-bold text-blue-900">{avgBimbPct}%</td></tr>
+                                           <tr className="border-b border-slate-300"><td className="p-2 text-center border-r border-slate-300">2</td><td className="p-2 border-r border-slate-300">Instruksional</td><td className="p-2 text-center border-r border-slate-300">20%</td><td className="p-2 text-center font-bold text-blue-900">{avgInstPct}%</td></tr>
+                                           <tr className="border-b border-slate-300"><td className="p-2 text-center border-r border-slate-300">3</td><td className="p-2 border-r border-slate-300">Pemikiran Strategik</td><td className="p-2 text-center border-r border-slate-300">20%</td><td className="p-2 text-center font-bold text-blue-900">{avgStratPct}%</td></tr>
+                                           <tr className="border-b border-slate-300"><td className="p-2 text-center border-r border-slate-300">4</td><td className="p-2 border-r border-slate-300">Analisis Data</td><td className="p-2 text-center border-r border-slate-300">15%</td><td className="p-2 text-center font-bold text-blue-900">{avgDataPct}%</td></tr>
+                                           <tr className="border-b border-slate-300"><td className="p-2 text-center border-r border-slate-300">5</td><td className="p-2 border-r border-slate-300">Interpersonal</td><td className="p-2 text-center border-r border-slate-300">10%</td><td className="p-2 text-center font-bold text-blue-900">{avgInterPct}%</td></tr>
+                                           <tr className="border-b border-slate-300"><td className="p-2 text-center border-r border-slate-300">6</td><td className="p-2 border-r border-slate-300">Evidens Profesional</td><td className="p-2 text-center border-r border-slate-300">10%</td><td className="p-2 text-center font-bold text-blue-900">{avgEviPct}%</td></tr>
+                                        </tbody>
+                                     </table>
                                   </div>
+
+                                  {/* JADUAL 3.0 SME SUBJEK */}
+                                  <div className="space-y-2">
+                                     <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '3.0' : '2.0'} PRESTASI MENGIKUT BIDANG KEPAKARAN SUBJEK (SME)</h3>
+                                     <table className="w-full text-xs border-collapse border border-slate-400">
+                                        <thead>
+                                           <tr className="bg-slate-200 border-b border-slate-400 text-center font-bold">
+                                              <th className="p-2 border-r border-slate-400 text-left">BIDANG KEPAKARAN (SME)</th>
+                                              <th className="p-2 border-r border-slate-400">JUMLAH CALON</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 90%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 80%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 70%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 60%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 50%</th>
+                                              <th className="p-2">&lt;= 49%</th>
+                                           </tr>
+                                        </thead>
+                                        <tbody>
+                                           {Object.keys(smeMapTable).map((sme, sIdx) => {
+                                              const d = smeMapTable[sme];
+                                              return (
+                                                 <tr key={sIdx} className="border-b border-slate-300 text-center font-semibold hover:bg-slate-50">
+                                                    <td className="p-2 border-r border-slate-300 text-left font-bold uppercase">{sme}</td>
+                                                    <td className="p-2 border-r border-slate-300 font-bold text-blue-900">{d.total}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m90}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m80}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m70}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m60}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m50}</td>
+                                                    <td className="p-2">{d.m49}</td>
+                                                 </tr>
+                                              );
+                                           })}
+                                        </tbody>
+                                     </table>
+                                  </div>
+
+                                  {/* JADUAL 4.0 PPD */}
+                                  <div className="space-y-2">
+                                     <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '4.0' : '3.0'} ANALISIS MATRIKS MARKAH MENGIKUT PPD</h3>
+                                     <table className="w-full text-xs border-collapse border border-slate-400">
+                                        <thead>
+                                           <tr className="bg-slate-200 border-b border-slate-400 text-center font-bold">
+                                              <th className="p-2 border-r border-slate-400 text-left">PEJABAT PENDIDIKAN DAERAH (PPD)</th>
+                                              <th className="p-2 border-r border-slate-400">JUMLAH CALON</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 90%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 80%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 70%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 60%</th>
+                                              <th className="p-2 border-r border-slate-400">&gt;= 50%</th>
+                                              <th className="p-2">&lt;= 49%</th>
+                                           </tr>
+                                        </thead>
+                                        <tbody>
+                                           {Object.keys(ppdMapTable).map((ppd, pIdx) => {
+                                              const d = ppdMapTable[ppd];
+                                              return (
+                                                 <tr key={pIdx} className="border-b border-slate-300 text-center font-semibold hover:bg-slate-50">
+                                                    <td className="p-2 border-r border-slate-300 text-left font-bold uppercase">{ppd}</td>
+                                                    <td className="p-2 border-r border-slate-300 font-bold text-blue-900">{d.total}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m90}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m80}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m70}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m60}</td>
+                                                    <td className="p-2 border-r border-slate-300">{d.m50}</td>
+                                                    <td className="p-2">{d.m49}</td>
+                                                 </tr>
+                                              );
+                                           })}
+                                        </tbody>
+                                     </table>
+                                  </div>
+
+                                  {/* TEKS NARATIF RUMUSAN YANG DISUNTING & DISIMPAN */}
+                                  <div className="space-y-2">
+                                     <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '5.0' : '4.0'} TEKS RUMUSAN & SINTESIS EKSEKUTIF</h3>
+                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 whitespace-pre-line text-xs font-mono leading-relaxed text-slate-800">
+                                        {editableZonText || generateZonSummaryText()}
+                                     </div>
+                                  </div>
+
+                                  {/* JADUAL SENARAI PANEL PENEMUDUGA (BAGI ZON KHUSUS) */}
+                                  {!isKebangsaan && (
+                                     <div className="space-y-2">
+                                        <h3 className="text-xs font-extrabold uppercase text-slate-800">5.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON ({zonAktifPantau})</h3>
+                                        <table className="w-full text-xs border-collapse border border-slate-400">
+                                           <thead>
+                                              <tr className="bg-slate-200 border-b border-slate-400 text-left font-bold">
+                                                 <th className="p-2 border-r border-slate-400 w-10 text-center">#</th>
+                                                 <th className="p-2 border-r border-slate-400">NAMA PEGAWAI PANEL</th>
+                                                 <th className="p-2 border-r border-slate-400">JAWATAN</th>
+                                                 <th className="p-2 border-r border-slate-400">TEMPAT BERTUGAS</th>
+                                                 <th className="p-2 text-center w-36">PERANAN</th>
+                                              </tr>
+                                           </thead>
+                                           <tbody className="font-semibold">
+                                              {getPanelZonListComplete().map((p, idx) => (
+                                                 <tr key={idx} className="border-b border-slate-300 hover:bg-slate-50">
+                                                    <td className="p-2 text-center border-r border-slate-300 font-bold">{p.bil}</td>
+                                                    <td className="p-2 border-r border-slate-300 font-bold uppercase">{p.nama}</td>
+                                                    <td className="p-2 border-r border-slate-300 uppercase">{p.jawatan}</td>
+                                                    <td className="p-2 border-r border-slate-300 uppercase">{p.tempat_bertugas}</td>
+                                                    <td className="p-2 text-center text-blue-900 font-extrabold uppercase">{p.peranan}</td>
+                                                 </tr>
+                                              ))}
+                                              {getPanelZonListComplete().length === 0 && (
+                                                 <tr><td colSpan="5" className="p-4 text-center italic text-slate-500">Tiada rekod penugasan panel dijumpai bagi zon ini.</td></tr>
+                                              )}
+                                           </tbody>
+                                        </table>
+                                     </div>
+                                  )}
 
                                   {/* RUANGAN TANDATANGAN */}
                                   <div className="mt-12 flex justify-between items-end text-xs text-slate-800 pt-8 border-t border-slate-300">
                                      <div>
                                         <p className="font-bold text-slate-500 uppercase text-[10px] mb-1">Disediakan Oleh:</p>
                                         <p className="font-bold uppercase text-sm">{safeStr(currentPanel?.nama_penuh).toUpperCase()}</p>
-                                        <p className="uppercase text-[11px] text-slate-600">KETUA ZON PANEL PENEMUDUGA ({zonAktifPantau})</p>
+                                        <p className="uppercase text-[11px] text-slate-600">{isKebangsaan ? 'KETUA PANEL UTAMA' : `KETUA ZON PANEL PENEMUDUGA (${zonAktifPantau})`}</p>
                                      </div>
                                      <div className="text-right">
                                         <p className="font-bold text-slate-500 uppercase text-[10px] mb-1">Disahkan Oleh:</p>
@@ -1655,6 +1733,7 @@
                                         <p className="mt-1 text-[10px] font-semibold text-slate-500">Tarikh Pengesahan: {new Date().toLocaleDateString('en-GB')}</p>
                                      </div>
                                   </div>
+
                                </div>
                             </div>
                          )}
