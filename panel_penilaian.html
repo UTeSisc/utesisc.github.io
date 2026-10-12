@@ -45,6 +45,21 @@
 
       const safeStr = (val) => (val ? String(val).trim() : '');
 
+      // HELPER FORMAT JADUAL TEKS RAPI (FIXED PADDING ALIGNMENT)
+      const padRight = (str, len) => {
+         const s = String(str);
+         if (s.length >= len) return s.substring(0, len);
+         return s + ' '.repeat(len - s.length);
+      };
+
+      const padCenter = (str, len) => {
+         const s = String(str);
+         if (s.length >= len) return s.substring(0, len);
+         const left = Math.floor((len - s.length) / 2);
+         const right = len - s.length - left;
+         return ' '.repeat(left) + s + ' '.repeat(right);
+      };
+
       const cleanSesiName = (sStr) => {
          if (!sStr) return '';
          return safeStr(sStr).split('(')[0].trim().toUpperCase();
@@ -192,7 +207,6 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      // CARTA VISUAL A4 TERBAIKI DENGAN RENDER DELAY AKURAT
       function PrintVisualCharts({ ppdData, jantinaData }) {
         const doughnutRef = useRef(null);
         const barRef = useRef(null);
@@ -250,7 +264,7 @@
                 }
               });
             }
-          }, 100);
+          }, 150);
 
           return () => {
             clearTimeout(timer);
@@ -310,6 +324,7 @@
 
         const [msg, setMsg] = useState({ type: '', text: '' });
         const [allResults, setAllResults] = useState([]);
+        const [allSavedRumusan, setAllSavedRumusan] = useState([]);
         
         const [filterZonPantau, setFilterZonPantau] = useState('SEMUA');
         const [minScorePantau, setMinScorePantau] = useState(50);
@@ -358,6 +373,9 @@
 
           const { data: rData } = await sb.from('penilaian_skor').select('*');
           if (rData) setAllResults(rData);
+
+          const { data: rumData } = await sb.from('rumusan_zon').select('*');
+          if (rumData) setAllSavedRumusan(rumData);
         };
 
         const calonBilik = selectedTugas ? calonList.filter(c => {
@@ -642,11 +660,10 @@
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
-        // SENARAI LENGKAP PANEL ZON (DENGAN NAMA, JAWATAN, TEMPAT BERTUGAS, PERANAN)
+        // SENARAI LENGKAP PANEL ZON (LENGKAP NAMA, JAWATAN, TEMPAT BERTUGAS, PERANAN)
         const getPanelZonListComplete = () => {
            let mapComplete = {};
 
-           // 1. Dapatkan dari Jadual Penugasan
            penugasanList.forEach(t => {
               if (zonAktifPantau === 'SEMUA' || safeStr(t.zon_bertugas).toUpperCase() === zonAktifPantau) {
                  const kp = safeStr(t.no_kp_panel);
@@ -659,7 +676,6 @@
               }
            });
 
-           // 2. Dapatkan juga dari Rekod Penilaian Calon Zon Ini
            validResults.forEach(r => {
               if (zonAktifPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === zonAktifPantau) {
                  const pName = safeStr(r.nama_panel).toUpperCase();
@@ -674,7 +690,6 @@
               }
            });
 
-           // 3. Gabung dengan Profil Panel (Jawatan & Tempat Bertugas)
            return Object.keys(mapComplete).map((kp, idx) => {
               const pObj = panelList.find(p => safeStr(p.no_kp) === kp || safeStr(p.nama_penuh).toUpperCase() === kp);
               return {
@@ -687,18 +702,15 @@
            });
         };
 
-        // ENJIN JANAAN RUMUSAN ZON PINTAR DBP / KPM
+        // ENJIN JANAAN RUMUSAN ZON & SINTESIS KEBANGSAAN (DENGAN JADUAL ALIGNMENT TEPAT)
         const generateZonSummaryText = () => {
-           const listZon = consolidatedLiveList.filter(r => zonAktifPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === zonAktifPantau);
-           const totalCalonZon = calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).length;
+           const isKebangsaan = (zonAktifPantau === 'SEMUA');
+           const listZon = consolidatedLiveList.filter(r => isKebangsaan || safeStr(r.zon).toUpperCase() === zonAktifPantau);
+           const totalCalonZon = calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).length;
            const totalEvaluated = listZon.length;
 
-           let countLelaki = 0;
-           let countPerempuan = 0;
-           listZon.forEach(r => {
-              if (r.jantina === 'PEREMPUAN') countPerempuan++;
-              else countLelaki++;
-           });
+           let countLelaki = 0, countPerempuan = 0;
+           listZon.forEach(r => { if (r.jantina === 'PEREMPUAN') countPerempuan++; else countLelaki++; });
 
            let sumBimb = 0, sumInst = 0, sumStrat = 0, sumData = 0, sumInter = 0, sumEvi = 0;
            if (totalEvaluated > 0) {
@@ -728,12 +740,17 @@
 
            let t = `BAHAGIAN PROFESIONALISME GURU\nKEMENTERIAN PENDIDIKAN MALAYSIA\n`;
            t += `========================================================================================\n`;
-           t += `LAPORAN ANALISIS STRATEGIK DAN RUMUSAN PENILAIAN KOMPETENSI PEMILIHAN PEGAWAI SISC+\n`;
-           t += `ZON: ${zonAktifPantau !== 'SEMUA' ? zonAktifPantau : 'KESELURUHAN ZON'} | TARIKH JANAAN: ${new Date().toLocaleDateString('en-GB')}\n`;
+           if (isKebangsaan) {
+              t += `LAPORAN SINTESIS STRATEGIK KEBANGSAAN PENILAIAN KOMPETENSI PEMILIHAN PEGAWAI SISC+\n`;
+              t += `PERINGKAT: KESELURUHAN MALAYSIA (6 ZON) | TARIKH JANAAN: ${new Date().toLocaleDateString('en-GB')}\n`;
+           } else {
+              t += `LAPORAN ANALISIS STRATEGIK DAN RUMUSAN PENILAIAN KOMPETENSI PEMILIHAN PEGAWAI SISC+\n`;
+              t += `ZON: ${zonAktifPantau} | TARIKH JANAAN: ${new Date().toLocaleDateString('en-GB')}\n`;
+           }
            t += `========================================================================================\n\n`;
            
            t += `1.0 STATUS KEHADIRAN DAN DEMOGRAFI CALON\n`;
-           t += `   Seramai ${totalCalonZon} calon telah didaftarkan bagi sesi penilaian pemilihan Pegawai SISC+ di Zon ${zonAktifPantau}.\n`;
+           t += `   Seramai ${totalCalonZon} calon telah didaftarkan bagi sesi penilaian pemilihan Pegawai SISC+ ${isKebangsaan ? 'di seluruh negara' : 'di Zon ' + zonAktifPantau}.\n`;
            t += `   Setakat tarikh laporan ini dijana, seramai ${totalEvaluated} calon (${totalCalonZon > 0 ? Math.round((totalEvaluated/totalCalonZon)*100) : 0}%) telah selesai menduduki sesi\n`;
            t += `   temu duga penilaian berstruktur berasaskan Rubrik BARS KPM.\n\n`;
            t += `   Pecahan Demografi Calon Dinilai:\n`;
@@ -742,8 +759,31 @@
            t += `   • Perempuan  : ${countPerempuan} (${totalEvaluated > 0 ? ((countPerempuan/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
            t += `   -------------------------------------------------------------------------------------\n\n`;
 
-           t += `2.0 ANALISIS PURATA PENGUASAAN KOMPETENSI ZON (SKALA WAJARAN 100%)\n`;
-           t += `   Pencapaian purata zon bagi setiap elemen kompetensi BARS adalah seperti yang berikut:\n`;
+           // JIKA KEBANGSAAN -> TAMPILKAN JADUAL PERBANDINGAN ZON
+           if (isKebangsaan) {
+              t += `2.0 MATRIKS PERBANDINGAN TAHAP PENCAPAAN MENGIKUT ZON (PERINGKAT KEBANGSAAN)\n`;
+              t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
+              t += `   | ZON               | JUMLAH CALON  | >=90% | >=80% | >=70% | >=60% | >=50% | <=49% |\n`;
+              t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
+              
+              const allZons = ['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'];
+              allZons.forEach(zName => {
+                 const zList = consolidatedLiveList.filter(r => safeStr(r.zon).toUpperCase() === zName);
+                 const zTot = zList.length;
+                 const zm90 = zList.filter(r => r.totalMarkah >= 90).length;
+                 const zm80 = zList.filter(r => r.totalMarkah >= 80 && r.totalMarkah < 90).length;
+                 const zm70 = zList.filter(r => r.totalMarkah >= 70 && r.totalMarkah < 80).length;
+                 const zm60 = zList.filter(r => r.totalMarkah >= 60 && r.totalMarkah < 70).length;
+                 const zm50 = zList.filter(r => r.totalMarkah >= 50 && r.totalMarkah < 60).length;
+                 const zm49 = zList.filter(r => r.totalMarkah < 50).length;
+
+                 t += `   | ${padRight('ZON ' + zName, 17)} | ${padCenter(zTot, 13)} | ${padCenter(zm90, 5)} | ${padCenter(zm80, 5)} | ${padCenter(zm70, 5)} | ${padCenter(zm60, 5)} | ${padCenter(zm50, 5)} | ${padCenter(zm49, 5)} |\n`;
+              });
+              t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n\n`;
+           }
+
+           t += `${isKebangsaan ? '3.0' : '2.0'} ANALISIS PURATA PENGUASAAN KOMPETENSI ${isKebangsaan ? 'KEBANGSAAN' : 'ZON'} (SKALA WAJARAN 100%)\n`;
+           t += `   Pencapaian purata bagi setiap elemen kompetensi BARS adalah seperti yang berikut:\n`;
            t += `   -------------------------------------------------------------------------------------\n`;
            t += `   1. Bimbingan Profesional (Wajaran 25%)  : ${avgBimbPct}%\n`;
            t += `   2. Instruksional (Wajaran 20%)          : ${avgInstPct}%\n`;
@@ -753,7 +793,7 @@
            t += `   6. Evidens Profesional (Wajaran 10%)    : ${avgEviPct}%\n`;
            t += `   -------------------------------------------------------------------------------------\n\n`;
 
-           t += `3.0 ANALISIS TABURAN MARKAH KESELURUHAN CALON\n`;
+           t += `${isKebangsaan ? '4.0' : '3.0'} ANALISIS TABURAN MARKAH KESELURUHAN CALON\n`;
            t += `   -------------------------------------------------------------------------------------\n`;
            t += `   • 90.0% dan ke atas               : ${m90} (${totalEvaluated > 0 ? ((m90/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
            t += `   • 80.0% hingga 89.9%              : ${m80} (${totalEvaluated > 0 ? ((m80/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
@@ -763,8 +803,9 @@
            t += `   • 49.9% dan ke bawah              : ${m49} (${totalEvaluated > 0 ? ((m49/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
            t += `   -------------------------------------------------------------------------------------\n\n`;
 
+           // JADUAL SME BERFORMAT RAPI (PERFECT ALIGNMENT)
            const smeMap = {};
-           calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+           calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
               const smeName = safeStr(c.sme_subjek).toUpperCase() || 'TIADA SME';
               if (!smeMap[smeName]) smeMap[smeName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
               smeMap[smeName].total++;
@@ -780,20 +821,19 @@
               }
            });
 
-           t += `4.0 PRESTASI MENGIKUT BIDANG KEPAKARAN SUBJEK (SME)\n`;
-           t += `   +-------------------+---------------+-----------+-----------+-----------+-----------+-----------+-----------+\n`;
-           t += `   | BIDANG KEPAKARAN  | JUMLAH CALON  |  >= 90%   |  >= 80%   |  >= 70%   |  >= 60%   |  >= 50%   |  <= 49%   |\n`;
-           t += `   +-------------------+---------------+-----------+-----------+-----------+-----------+-----------+-----------+\n`;
+           t += `${isKebangsaan ? '5.0' : '4.0'} PRESTASI MENGIKUT BIDANG KEPAKARAN SUBJEK (SME)\n`;
+           t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
+           t += `   | BIDANG KEPAKARAN  | JUMLAH CALON  | >=90% | >=80% | >=70% | >=60% | >=50% | <=49% |\n`;
+           t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n`;
            Object.keys(smeMap).forEach(sme => {
               const d = smeMap[sme];
-              const namePadded = (sme + "                   ").substring(0, 17);
-              const totalPadded = (d.total + "               ").substring(0, 13);
-              t += `   | ${namePadded} | ${totalPadded} |     ${d.m90}     |     ${d.m80}     |     ${d.m70}     |     ${d.m60}     |     ${d.m50}     |     ${d.m49}     |\n`;
+              t += `   | ${padRight(sme, 17)} | ${padCenter(d.total, 13)} | ${padCenter(d.m90, 5)} | ${padCenter(d.m80, 5)} | ${padCenter(d.m70, 5)} | ${padCenter(d.m60, 5)} | ${padCenter(d.m50, 5)} | ${padCenter(d.m49, 5)} |\n`;
            });
-           t += `   +-------------------+---------------+-----------+-----------+-----------+-----------+-----------+-----------+\n\n`;
+           t += `   +-------------------+---------------+-------+-------+-------+-------+-------+-------+\n\n`;
 
+           // JADUAL PPD BERFORMAT RAPI (PERFECT ALIGNMENT)
            const ppdMap = {};
-           calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+           calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
               const ppdName = mapPPDStandard(c.ppd);
               if (!ppdMap[ppdName]) ppdMap[ppdName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
               ppdMap[ppdName].total++;
@@ -809,36 +849,50 @@
               }
            });
 
-           t += `5.0 ANALISIS MATRIKS MARKAH MENGIKUT PEJABAT PENDIDIKAN DAERAH (PPD)\n`;
-           t += `   +------------------------------------+--------------+-----------+-----------+-----------+-----------+-----------+-----------+\n`;
-           t += `   | PEJABAT PENDIDIKAN DAERAH (PPD)    | JUMLAH CALON |  >= 90%   |  >= 80%   |  >= 70%   |  >= 60%   |  >= 50%   |  <= 49%   |\n`;
-           t += `   +------------------------------------+--------------+-----------+-----------+-----------+-----------+-----------+-----------+\n`;
+           t += `${isKebangsaan ? '6.0' : '5.0'} ANALISIS MATRIKS MARKAH MENGIKUT PEJABAT PENDIDIKAN DAERAH (PPD)\n`;
+           t += `   +------------------------------------+--------------+-------+-------+-------+-------+-------+-------+\n`;
+           t += `   | PEJABAT PENDIDIKAN DAERAH (PPD)    | JUMLAH CALON | >=90% | >=80% | >=70% | >=60% | >=50% | <=49% |\n`;
+           t += `   +------------------------------------+--------------+-------+-------+-------+-------+-------+-------+\n`;
            Object.keys(ppdMap).forEach(ppd => {
               const d = ppdMap[ppd];
-              const namePadded = (ppd + "                                    ").substring(0, 34);
-              const totalPadded = (d.total + "              ").substring(0, 12);
-              t += `   | ${namePadded} | ${totalPadded} |     ${d.m90}     |     ${d.m80}     |     ${d.m70}     |     ${d.m60}     |     ${d.m50}     |     ${d.m49}     |\n`;
+              t += `   | ${padRight(ppd, 34)} | ${padCenter(d.total, 12)} | ${padCenter(d.m90, 5)} | ${padCenter(d.m80, 5)} | ${padCenter(d.m70, 5)} | ${padCenter(d.m60, 5)} | ${padCenter(d.m50, 5)} | ${padCenter(d.m49, 5)} |\n`;
            });
-           t += `   +------------------------------------+--------------+-----------+-----------+-----------+-----------+-----------+-----------+\n\n`;
+           t += `   +------------------------------------+--------------+-------+-------+-------+-------+-------+-------+\n\n`;
 
-           t += `6.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON (${zonAktifPantau})\n`;
-           const pZonArr = getPanelZonListComplete();
-           if (pZonArr.length === 0) {
-              t += `   (Tiada panel didaftarkan bagi zon ini)\n`;
-           } else {
-              pZonArr.forEach((p) => {
-                 t += `   ${p.bil}. ${p.nama} | ${p.jawatan} | ${p.tempat_bertugas} | [${p.peranan}]\n`;
+           // JIKA KEBANGSAAN -> KUMPUL SINTESIS RUMUSAN SETIAP KETUA ZON
+           if (isKebangsaan) {
+              t += `7.0 SINTESIS RUMUSAN DAN CATATAN KETUA-KETUA ZON\n`;
+              const allZons = ['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'];
+              allZons.forEach(zName => {
+                 const savedObj = allSavedRumusan.find(s => safeStr(s.zon).toUpperCase() === zName);
+                 t += `   • ZON ${zName}:\n`;
+                 if (savedObj && savedObj.teks_rumusan) {
+                    const lines = savedObj.teks_rumusan.split('\n').map(l => '     ' + l).join('\n');
+                    t += `${lines}\n\n`;
+                 } else {
+                    t += `     (Laporan rasmi bagi Zon ${zName} belum disunting/disimpan oleh Ketua Zon).\n\n`;
+                 }
               });
-           }
-           t += `\n`;
+           } else {
+              t += `6.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON (${zonAktifPantau})\n`;
+              const pZonArr = getPanelZonListComplete();
+              if (pZonArr.length === 0) {
+                 t += `   (Tiada panel didaftarkan bagi zon ini)\n`;
+              } else {
+                 pZonArr.forEach((p) => {
+                    t += `   ${p.bil}. ${p.nama} | ${p.jawatan} | ${p.tempat_bertugas} | [${p.peranan}]\n`;
+                 });
+              }
+              t += `\n`;
 
-           t += `7.0 RUMUSAN DAN CATATAN KETUA ZON\n`;
-           t += `   Laporan ini mengandungi taburan data markah mentah, demografi jantina, serta purata pencapaian\n`;
-           t += `   kompetensi bagi Zon ${zonAktifPantau} untuk dikemukakan kepada Pengurusan BPG KPM bagi tindakan selanjutnya.\n\n`;
+              t += `7.0 RUMUSAN DAN CATATAN KETUA ZON\n`;
+              t += `   Laporan ini mengandungi taburan data markah mentah, demografi jantina, serta purata pencapaian\n`;
+              t += `   kompetensi bagi Zon ${zonAktifPantau} untuk dikemukakan kepada Pengurusan BPG KPM bagi tindakan selanjutnya.\n\n`;
+           }
 
            t += `========================================================================================\n`;
            t += `Laporan ini dijana secara automatik oleh Sistem Pengurusan Temu Duga SISC+ dan disahkan\n`;
-           t += `oleh Ketua Zon Panel Penemuduga.\n`;
+           t += `oleh ${isKebangsaan ? 'Ketua Panel Utama' : 'Ketua Zon Panel Penemuduga'}.\n`;
 
            return t;
         };
@@ -887,10 +941,11 @@
                  alert('Gagal menyimpan rumusan: ' + err.message);
               } else {
                  alert(`Rumusan Laporan Eksekutif bagi Zon ${zonAktifPantau} berjaya disimpan!`);
+                 fetchPenugasanAndData(currentPanel.no_kp);
               }
            } catch (e) {
               setIsSavingRumusan(false);
-              alert('Sila pastikan anda telah menjalankan script SQL untuk membina jadual rumusan_zon dalam Supabase. Ralat: ' + e.message);
+              alert('Sila pastikan anda telah menjalankan script SQL untuk membina/disable RLS pada rumusan_zon dalam Supabase. Ralat: ' + e.message);
            }
         };
 
@@ -1553,7 +1608,7 @@
                             </div>
                          )}
 
-                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF (CARTA CINCIN + CARTA BAR MELINTANG + TEXT + PANEL LIST) */}
+                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF */}
                          {viewModePantau === 'print_visual' && (
                             <div className="space-y-6">
                                <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-blue-500/30 no-print">
