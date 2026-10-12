@@ -17,6 +17,12 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
+      @media print {
+        .no-print { display: none !important; }
+        body { background: white !important; color: black !important; font-family: 'Arial', sans-serif; }
+        .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
+        @page { size: A4 portrait; margin: 10mm; }
+      }
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: #0f172a; }
       ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
@@ -190,7 +196,11 @@
 
         const [msg, setMsg] = useState({ type: '', text: '' });
         const [allResults, setAllResults] = useState([]);
+        
+        // TETAPAN PEMANTAUAN KETUA ZON & KETUA PANEL UTAMA
         const [filterZonPantau, setFilterZonPantau] = useState('SEMUA');
+        const [minScorePantau, setMinScorePantau] = useState(50);
+        const [viewModePantau, setViewModePantau] = useState('monitor'); // 'monitor' ATAU 'report'
 
         const handleLogin = async (e) => {
           e.preventDefault();
@@ -231,7 +241,6 @@
           if (rData) setAllResults(rData);
         };
 
-        // TAPIS CALON DALAM BILIK TERGABUNG PINTAR (MEMADANKAN NAMA SESI TANPA TERJEJAS TARIKH)
         const calonBilik = selectedTugas ? calonList.filter(c => {
           const zonCalon = safeStr(c.zon_temuduga).toUpperCase();
           const zonTugas = safeStr(selectedTugas.zon_bertugas).toUpperCase();
@@ -298,9 +307,11 @@
            ).toFixed(1));
 
            return {
-              no_kp: calon.no_kp,
-              nama_penuh: safeStr(calon.nama_penuh).toUpperCase(),
+              no_kp_calon: calon.no_kp,
+              nama_calon: safeStr(calon.nama_penuh).toUpperCase(),
               zon: safeStr(calon.zon_temuduga).toUpperCase(),
+              ppd: safeStr(calon.ppd).toUpperCase(),
+              sme_subjek: safeStr(calon.sme_subjek).toUpperCase(),
               avgBimb, avgInst, avgStrat, avgData, avgInter, avgEvi,
               totalMarkah: totalMuktamad,
               isLulus: totalMuktamad >= 75,
@@ -471,6 +482,35 @@
           window.location.href = 'index.html';
         };
 
+        // KEPUTUSAN TERBISA DILUARIKAN DENGAN TAPISAN PERATUSAN MINIMUM KETUA ZON / KETUA PANEL
+        const zonAktifPantau = selectedTugas?.peranan === 'Ketua Zon Panel Penemuduga' 
+           ? safeStr(selectedTugas.zon_bertugas).toUpperCase() 
+           : filterZonPantau;
+
+        const filteredReportListPantau = consolidatedLiveList.filter(r => {
+           const melepasiMarkah = r.totalMarkah >= minScorePantau;
+           const padanZon = zonAktifPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === zonAktifPantau;
+           return melepasiMarkah && padanZon;
+        }).sort((a,b) => b.totalMarkah - a.totalMarkah);
+
+        const handleDownloadExcelPantau = () => {
+          let csvContent = "BIL,NAMA CALON,NO. KAD PENGENALAN,SUBJEK,PPD,ZON,MARKAH MUKTAMAD (%)\n";
+          filteredReportListPantau.forEach((res, index) => {
+             const nama = safeStr(res.nama_calon).replace(/"/g, '""');
+             const no_kp = safeStr(res.no_kp_calon);
+             const subjek = safeStr(res.sme_subjek).replace(/"/g, '""');
+             const ppd = safeStr(res.ppd).replace(/"/g, '""');
+             const zon = safeStr(res.zon);
+             const row = [index + 1, `"${nama}"`, `="${no_kp}"`, `"${subjek}"`, `"${ppd}"`, `"${zon}"`, res.totalMarkah];
+             csvContent += row.join(",") + "\n";
+          });
+          const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement("a");
+          link.setAttribute("href", URL.createObjectURL(blob));
+          link.setAttribute("download", `Laporan_Keputusan_SISC_${zonAktifPantau}_${minScorePantau}Peratus.csv`);
+          document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        };
+
         const getRubrikTextEksak = (key, val, isActive) => {
           if (!isActive) return '❌ KOMPETENSI INI TIDAK DINILAI DI STESEN INI.';
           const num = Math.round(Number(val));
@@ -482,7 +522,7 @@
           <div className="min-h-screen flex flex-col">
             
             {/* HEADER */}
-            <div className="bg-white w-full py-4 px-6 md:px-10 flex justify-between items-center shadow-md z-10 border-b-4 border-amber-500">
+            <div className="bg-white w-full py-4 px-6 md:px-10 flex justify-between items-center shadow-md z-10 border-b-4 border-amber-500 no-print">
               <div className="flex items-center gap-4">
                  <img src="logo-kpm.png" alt="Logo KPM" className="h-12 object-contain" />
                  <span className="font-extrabold text-xl text-slate-900 tracking-wider hidden md:block">MODUL PANEL PENEMUDUGA SISC+</span>
@@ -590,7 +630,7 @@
               {isLoggedIn && selectedTugas && (
                 <div className="space-y-8">
                    
-                   <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4 shadow">
+                   <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4 shadow no-print">
                       <div className="flex items-center gap-3">
                          <button onClick={() => { setSelectedTugas(null); setSelectedCalon(null); setSelectedCalonKp(''); }} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors">
                             <span>⬅️</span> <span>Tukar Tugas</span>
@@ -606,13 +646,13 @@
                    </div>
 
                    {msg.text && (
-                      <div className={`p-4 rounded-xl text-sm font-bold text-center shadow-md animate-pulse ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
+                      <div className={`p-4 rounded-xl text-sm font-bold text-center shadow-md animate-pulse no-print ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
                          {msg.text}
                       </div>
                    )}
 
                    {/* PILIHAN CALON + DROPDOWN TAPISAN SESI (DILENGKAPI ENJIN TERGABUNG PINTAR) */}
-                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4">
+                   <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4 no-print">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-3">
                          <label className="text-xs font-extrabold uppercase text-amber-400">PILIH CALON UNTUK DINILAI ({safeStr(selectedTugas.zon_bertugas).toUpperCase()})</label>
                          
@@ -647,7 +687,7 @@
                    </div>
 
                    {selectedCalon && (
-                      <div className="space-y-6">
+                      <div className="space-y-6 no-print">
                          
                          <div className="bg-slate-900 border border-amber-500/40 p-4 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-center gap-4">
                             <div>
@@ -889,83 +929,196 @@
                       </div>
                    )}
 
+                   {/* PUSAT PEMANTAUAN & LAPORAN KEPUTUSAN KETUA ZON / KETUA PANEL UTAMA */}
                    {(selectedTugas.peranan === 'Ketua Panel Utama' || selectedTugas.peranan === 'Ketua Zon Panel Penemuduga') && (
                       <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12">
-                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
+                         
+                         {/* TOGGLE MOD PAPARAN (MONITOR LIVE VS LAPORAN KEPUTUSAN RASMI) */}
+                         <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4 no-print">
                             <div>
-                               <h2 className="text-lg font-bold text-amber-400 uppercase flex items-center gap-2">🌐 Pusat Pemantauan Multi-Panel Live ({selectedTugas.peranan})</h2>
-                               <p className="text-xs text-slate-400 mt-1">Gandingan markah purata daripada pelbagai stesen dan penilai untuk calon yang sama.</p>
+                               <h2 className="text-lg font-bold text-amber-400 uppercase flex items-center gap-2">
+                                  🌐 PUSAT KAWALAN KEPIMPILAN ({selectedTugas.peranan})
+                               </h2>
+                               <p className="text-xs text-slate-400 mt-1">
+                                  {selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' 
+                                     ? `Akses Kawalan Khas Bagi Zon ${safeStr(selectedTugas.zon_bertugas).toUpperCase()}`
+                                     : 'Akses Kawalan Tertinggi Keseluruhan Zon'}
+                               </p>
                             </div>
-                            {selectedTugas.peranan === 'Ketua Panel Utama' && (
-                               <select className="p-3 border border-slate-700 rounded-lg bg-slate-950 text-amber-400 font-bold text-sm" value={filterZonPantau} onChange={e => setFilterZonPantau(e.target.value)}>
-                                  <option value="SEMUA">KESEMUA ZON</option>
-                                  <option value="UTARA">ZON UTARA</option>
-                                  <option value="TIMUR">ZON TIMUR</option>
-                                  <option value="TENGAH">ZON TENGAH</option>
-                                  <option value="SELATAN">ZON SELATAN</option>
-                                  <option value="SABAH">ZON SABAH</option>
-                                  <option value="SARAWAK">ZON SARAWAK</option>
-                               </select>
-                            )}
+                            
+                            <div className="flex gap-2">
+                               <button onClick={() => setViewModePantau('monitor')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${viewModePantau === 'monitor' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
+                                  📊 Pemantauan Live
+                               </button>
+                               <button onClick={() => setViewModePantau('report')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${viewModePantau === 'report' ? 'bg-emerald-500 text-slate-950 border-emerald-400 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
+                                  📑 Laporan Keputusan Rasmi
+                               </button>
+                            </div>
                          </div>
 
-                         <div className="overflow-x-auto max-h-[450px] overflow-y-auto">
-                            <table className="w-full text-left text-xs border-collapse">
-                               <thead className="bg-slate-950 sticky top-0 shadow">
-                                  <tr className="text-amber-400 uppercase border-b border-slate-800">
-                                     <th className="p-3">#</th>
-                                     <th className="p-3">Calon & KP</th>
-                                     <th className="p-3">Zon</th>
-                                     <th className="p-3">Penilai & Elemen Dinilai</th>
-                                     <th className="p-3 text-center">Pecahan Purata Skor (Skala 5)</th>
-                                     <th className="p-3 text-center">Markah Muktamad (%)</th>
-                                     <th className="p-3 text-center">Status</th>
-                                  </tr>
-                               </thead>
-                               <tbody>
-                                  {consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon).toUpperCase() === safeStr(selectedTugas.zon_bertugas).toUpperCase() : (filterZonPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === filterZonPantau))).length === 0 ? (
-                                     <tr><td colSpan="7" className="text-center p-8 text-slate-500 italic">Tiada rekod penilaian bagi calon aktif.</td></tr>
-                                  ) : consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon).toUpperCase() === safeStr(selectedTugas.zon_bertugas).toUpperCase() : (filterZonPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === filterZonPantau))).map((res, idx) => {
-                                     return (
-                                        <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/50">
-                                           <td className="p-3 font-bold text-slate-500">{idx + 1}</td>
-                                           <td className="p-3">
-                                              <span className="font-extrabold text-slate-100 text-sm block uppercase">{res.nama_penuh}</span>
-                                              <span className="font-mono text-slate-400 text-[10px]">{res.no_kp}</span>
-                                           </td>
-                                           <td className="p-3 font-bold text-amber-300 uppercase">{res.zon}</td>
-                                           <td className="p-3 text-slate-300">
-                                              <ul className="space-y-1">
-                                                 {res.panelInfoArr.map((p, pIdx) => (
-                                                    <li key={pIdx} className="text-[11px]">
-                                                       <span className="font-bold text-emerald-400">• {p.nama}</span>
-                                                       <span className="text-slate-400 text-[10px] block pl-2 font-mono">({p.elemen})</span>
-                                                    </li>
-                                                 ))}
-                                              </ul>
-                                           </td>
-                                           <td className="p-3">
-                                              <div className="grid grid-cols-3 gap-1 text-[10px] text-center font-mono">
-                                                 <span className="bg-slate-950 p-1 rounded border border-slate-800" title="Bimbingan">Bimb: <b className="text-amber-400">{res.avgBimb.toFixed(1)}</b></span>
-                                                 <span className="bg-slate-950 p-1 rounded border border-slate-800" title="Instruksional">Inst: <b className="text-amber-400">{res.avgInst.toFixed(1)}</b></span>
-                                                 <span className="bg-slate-950 p-1 rounded border border-slate-800" title="Strategik">Strat: <b className="text-amber-400">{res.avgStrat.toFixed(1)}</b></span>
-                                                 <span className="bg-slate-950 p-1 rounded border border-slate-800" title="Analisis Data">Data: <b className="text-amber-400">{res.avgData.toFixed(1)}</b></span>
-                                                 <span className="bg-slate-950 p-1 rounded border border-slate-800" title="Interpersonal">Inter: <b className="text-amber-400">{res.avgInter.toFixed(1)}</b></span>
-                                                 <span className="bg-slate-950 p-1 rounded border border-slate-800" title="Evidens">Evi: <b className="text-amber-400">{res.avgEvi.toFixed(1)}</b></span>
-                                              </div>
-                                           </td>
-                                           <td className="p-3 text-center font-extrabold text-emerald-400">{res.totalMarkah}%</td>
-                                           <td className="p-3 text-center">
-                                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${res.isLulus ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
-                                                 {res.isLulus ? 'LAYAK' : 'BELUM LAYAK'}
-                                              </span>
-                                           </td>
+                         {/* MOD 1: JADUAL PEMANTAUAN MULTI-PANEL LIVE */}
+                         {viewModePantau === 'monitor' && (
+                            <div className="no-print">
+                               <div className="flex justify-between items-center mb-4">
+                                  <p className="text-xs text-slate-400 italic">Gandingan markah purata daripada pelbagai stesen dan penilai untuk calon yang sama.</p>
+                                  {selectedTugas.peranan === 'Ketua Panel Utama' && (
+                                     <select className="p-2.5 border border-slate-700 rounded-lg bg-slate-950 text-amber-400 font-bold text-xs" value={filterZonPantau} onChange={e => setFilterZonPantau(e.target.value)}>
+                                        <option value="SEMUA">KESEMUA ZON</option>
+                                        <option value="UTARA">ZON UTARA</option>
+                                        <option value="TIMUR">ZON TIMUR</option>
+                                        <option value="TENGAH">ZON TENGAH</option>
+                                        <option value="SELATAN">ZON SELATAN</option>
+                                        <option value="SABAH">ZON SABAH</option>
+                                        <option value="SARAWAK">ZON SARAWAK</option>
+                                     </select>
+                                  )}
+                               </div>
+
+                               <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+                                  <table className="w-full text-left text-xs border-collapse">
+                                     <thead className="bg-slate-950 sticky top-0 shadow z-10">
+                                        <tr className="text-amber-400 uppercase border-b border-slate-800">
+                                           <th className="p-4">#</th>
+                                           <th className="p-4">Calon & KP</th>
+                                           <th className="p-4">Zon</th>
+                                           <th className="p-4">Penilai & Elemen Dinilai</th>
+                                           <th className="p-4 text-center">Pecahan Purata Skor (Skala 5)</th>
+                                           <th className="p-4 text-center">Markah Muktamad (%)</th>
+                                           <th className="p-4 text-center">Status</th>
                                         </tr>
-                                     );
-                                  })}
-                               </tbody>
-                            </table>
-                         </div>
+                                     </thead>
+                                     <tbody>
+                                        {consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon).toUpperCase() === safeStr(selectedTugas.zon_bertugas).toUpperCase() : (filterZonPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === filterZonPantau))).length === 0 ? (
+                                           <tr><td colSpan="7" className="text-center p-8 text-slate-500 italic">Tiada rekod penilaian bagi calon aktif.</td></tr>
+                                        ) : consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon).toUpperCase() === safeStr(selectedTugas.zon_bertugas).toUpperCase() : (filterZonPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === filterZonPantau))).map((res, idx) => {
+                                           return (
+                                              <tr key={idx} className="border-b border-slate-700/80 hover:bg-slate-800/60 transition-colors">
+                                                 <td className="p-4 font-bold text-slate-500">{idx + 1}</td>
+                                                 <td className="p-4">
+                                                    <span className="font-extrabold text-slate-100 text-sm block uppercase">{res.nama_calon}</span>
+                                                    <span className="font-mono text-slate-400 text-[11px]">{res.no_kp_calon}</span>
+                                                 </td>
+                                                 <td className="p-4 font-bold text-amber-300 uppercase">{res.zon}</td>
+                                                 <td className="p-4 text-slate-300">
+                                                    <ul className="space-y-1.5">
+                                                       {res.panelInfoArr.map((p, pIdx) => (
+                                                          <li key={pIdx} className="text-[11px]">
+                                                             <span className="font-bold text-emerald-400">• {p.nama}</span>
+                                                             <span className="text-slate-400 text-[10px] block pl-2 font-mono">({p.elemen})</span>
+                                                          </li>
+                                                       ))}
+                                                    </ul>
+                                                 </td>
+                                                 <td className="p-4">
+                                                    <div className="grid grid-cols-3 gap-1.5 text-[10px] text-center font-mono">
+                                                       <span className="bg-slate-950 p-1.5 rounded border border-slate-800" title="Bimbingan">Bimb: <b className="text-amber-400">{res.avgBimb.toFixed(1)}</b></span>
+                                                       <span className="bg-slate-950 p-1.5 rounded border border-slate-800" title="Instruksional">Inst: <b className="text-amber-400">{res.avgInst.toFixed(1)}</b></span>
+                                                       <span className="bg-slate-950 p-1.5 rounded border border-slate-800" title="Strategik">Strat: <b className="text-amber-400">{res.avgStrat.toFixed(1)}</b></span>
+                                                       <span className="bg-slate-950 p-1.5 rounded border border-slate-800" title="Analisis Data">Data: <b className="text-amber-400">{res.avgData.toFixed(1)}</b></span>
+                                                       <span className="bg-slate-950 p-1.5 rounded border border-slate-800" title="Interpersonal">Inter: <b className="text-amber-400">{res.avgInter.toFixed(1)}</b></span>
+                                                       <span className="bg-slate-950 p-1.5 rounded border border-slate-800" title="Evidens">Evi: <b className="text-amber-400">{res.avgEvi.toFixed(1)}</b></span>
+                                                    </div>
+                                                 </td>
+                                                 <td className="p-4 text-center font-black text-emerald-400 text-base">{res.totalMarkah}%</td>
+                                                 <td className="p-4 text-center">
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${res.isLulus ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
+                                                       {res.isLulus ? 'LAYAK' : 'BELUM LAYAK'}
+                                                    </span>
+                                                 </td>
+                                              </tr>
+                                           );
+                                        })}
+                                     </tbody>
+                                  </table>
+                               </div>
+                            </div>
+                         )}
+
+                         {/* MOD 2: JANAAN LAPORAN KEPUTUSAN RASMI BOLEH LARAS (%) */}
+                         {viewModePantau === 'report' && (
+                            <div className="space-y-6">
+                               <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 no-print">
+                                  <div>
+                                     <h3 className="text-base font-extrabold text-emerald-400">Janaan Laporan Keputusan Rasmi</h3>
+                                     <p className="text-xs text-slate-400 mt-0.5">Penapisan kelulusan calon berdasarkan had peratusan minimum yang dilaraskan.</p>
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                                     {selectedTugas.peranan === 'Ketua Panel Utama' ? (
+                                        <select className="p-3 border border-slate-700 rounded-lg text-xs font-bold bg-slate-900 text-emerald-400" value={filterZonPantau} onChange={e => setFilterZonPantau(e.target.value)}>
+                                           <option value="SEMUA">KESEMUA ZON</option>
+                                           <option value="UTARA">ZON UTARA</option>
+                                           <option value="TIMUR">ZON TIMUR</option>
+                                           <option value="TENGAH">ZON TENGAH</option>
+                                           <option value="SELATAN">ZON SELATAN</option>
+                                           <option value="SABAH">ZON SABAH</option>
+                                           <option value="SARAWAK">ZON SARAWAK</option>
+                                        </select>
+                                     ) : (
+                                        <div className="p-3 border border-amber-500/40 rounded-lg bg-amber-500/10 text-amber-300 font-extrabold text-xs uppercase">
+                                           📍 ZON {safeStr(selectedTugas.zon_bertugas).toUpperCase()}
+                                        </div>
+                                     )}
+
+                                     <div className="relative w-28">
+                                        <input type="number" min="0" max="100" value={minScorePantau} onChange={e => setMinScorePantau(e.target.value)} className="w-full p-2.5 border border-slate-700 rounded-lg text-lg font-bold bg-slate-900 text-emerald-400 focus:border-emerald-500 focus:outline-none text-center pr-6" />
+                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500">%</span>
+                                     </div>
+
+                                     <button onClick={handleDownloadExcelPantau} className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-4 py-3 rounded-lg text-xs shadow transition-transform active:scale-95">📊 Muat Turun Excel</button>
+                                     <button onClick={() => window.print()} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold px-4 py-3 rounded-lg text-xs shadow transition-transform active:scale-95">🖨️ Cetak Senarai</button>
+                                  </div>
+                               </div>
+
+                               <div className="bg-white p-8 border rounded-xl print-area text-slate-900 shadow-xl">
+                                  <div className="text-center mb-8">
+                                     <img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" />
+                                     <h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan</h3>
+                                     <h4 className="text-xs font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
+                                     
+                                     <h2 className="text-lg font-extrabold uppercase mt-3 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">
+                                        SENARAI KEPUTUSAN CALON SISC+ {zonAktifPantau !== 'SEMUA' ? `(ZON ${zonAktifPantau})` : '(KESELURUHAN)'}
+                                     </h2>
+                                     <p className="mt-2 font-bold text-slate-700">Tahap Kelulusan Minimum: {minScorePantau}% dan ke atas</p>
+                                  </div>
+                                  
+                                  <table className="w-full text-sm border-collapse border border-slate-400">
+                                     <thead>
+                                        <tr className="bg-slate-200 border-b border-slate-400 text-center font-extrabold">
+                                           <th className="p-3 border-r border-slate-400 w-12">#</th>
+                                           <th className="p-3 border-r border-slate-400 text-left">NAMA CALON</th>
+                                           <th className="p-3 border-r border-slate-400">NO. KAD PENGENALAN</th>
+                                           <th className="p-3 border-r border-slate-400">SUBJEK</th>
+                                           <th className="p-3 border-r border-slate-400">PPD</th>
+                                           <th className="p-3 border-r border-slate-400">ZON</th>
+                                           <th className="p-3 text-center w-28">MARKAH MUKTAMAD</th>
+                                        </tr>
+                                     </thead>
+                                     <tbody>
+                                        {filteredReportListPantau.map((res, idx) => (
+                                           <tr key={idx} className="border-b border-slate-400 hover:bg-slate-50">
+                                              <td className="p-2 border-r border-slate-400 text-center font-bold">{idx + 1}</td>
+                                              <td className="p-2 border-r border-slate-400 font-bold uppercase">{safeStr(res.nama_calon)}</td>
+                                              <td className="p-2 border-r border-slate-400 text-center font-mono text-xs">{safeStr(res.no_kp_calon)}</td>
+                                              <td className="p-2 border-r border-slate-400 text-center uppercase">{res.sme_subjek || '-'}</td>
+                                              <td className="p-2 border-r border-slate-400 text-center uppercase">{res.ppd || '-'}</td>
+                                              <td className="p-2 border-r border-slate-400 text-center uppercase">{safeStr(res.zon)}</td>
+                                              <td className="p-2 text-center font-extrabold text-base text-blue-900">{res.totalMarkah}%</td>
+                                           </tr>
+                                        ))}
+                                        {filteredReportListPantau.length === 0 && (
+                                           <tr><td colSpan="7" className="p-8 text-center italic text-slate-500 font-semibold">Tiada calon di kawasan pilihan yang melepasi had markah {minScorePantau}% yang ditetapkan.</td></tr>
+                                        )}
+                                     </tbody>
+                                  </table>
+                                  
+                                  <div className="mt-8 text-xs text-slate-500 italic border-t border-slate-300 pt-3 text-center">
+                                     * Markah janaan ini merupakan purata terkumpul daripada kesemua panel penemuduga yang menilai calon setakat {new Date().toLocaleDateString('en-GB')}.
+                                  </div>
+                               </div>
+                            </div>
+                         )}
+
                       </div>
                    )}
 
