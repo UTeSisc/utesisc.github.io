@@ -52,6 +52,12 @@
 
       const safeStr = (val) => (val ? String(val).trim() : '');
 
+      // HELPER: EKSTRAK NAMA SESI UTAMA (MEMBUANG TARIKH DALAM KURUNGAN JIKA ADA)
+      const cleanSesiName = (sStr) => {
+         if (!sStr) return '';
+         return safeStr(sStr).split('(')[0].trim().toUpperCase();
+      };
+
       const consolidateCalonResults = (calonList, resultsList) => {
         return calonList.map(calon => {
           const calonRes = resultsList.filter(r => safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
@@ -590,22 +596,27 @@
 
         const availableZonCalonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga).toUpperCase()))].filter(Boolean).sort();
         
-        // NORMALISASI SESI AGAR TIADA PEMISAHAN ANTARA 'Sesi 5' DAN 'SESI 5 (13/10/2026)'
-        const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon).map(c => safeStr(c.sesi).toUpperCase()))].filter(Boolean).sort();
+        // PENGGABUNGAN SESI PINTAR (BERSIHKAN TARIKH DALAM KURUNGAN UNTUK DROPDOWN)
+        const availableSesiCalonList = [...new Set(
+           calonList
+             .filter(c => filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon)
+             .map(c => cleanSesiName(c.sesi))
+        )].filter(Boolean).sort();
         
         const showCalonData = searchCalon.trim() !== '' || filterZonCalon !== 'SEMUA';
         
+        // PENILAIAN & PENAPISAN CALON TERGABUNG PINTAR
         const filteredCalons = calonList.filter(c => { 
            const matchZon = filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon; 
-           const matchSesi = filterSesiCalon === 'SEMUA' || safeStr(c.sesi).toUpperCase() === filterSesiCalon.toUpperCase(); 
+           const matchSesi = filterSesiCalon === 'SEMUA' || cleanSesiName(c.sesi) === cleanSesiName(filterSesiCalon); 
            const matchSearch = safeStr(c.nama_penuh).toUpperCase().includes(searchCalon.toUpperCase()) || safeStr(c.no_kp).includes(searchCalon); 
            return matchZon && matchSesi && matchSearch; 
         });
         const totalPagesCalon = Math.ceil(filteredCalons.length / ITEMS_PER_PAGE) || 1;
         const displayedCalons = filteredCalons.slice((pageCalon - 1) * ITEMS_PER_PAGE, pageCalon * ITEMS_PER_PAGE);
 
-        const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon).map(c => safeStr(c.sesi).toUpperCase()))].filter(Boolean).sort() : [];
-        const cetakCalonFiltered = cetakSesi ? calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon && safeStr(c.sesi).toUpperCase() === String(cetakSesi).toUpperCase()) : [];
+        const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon).map(c => cleanSesiName(c.sesi)))].filter(Boolean).sort() : [];
+        const cetakCalonFiltered = cetakSesi ? calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon && cleanSesiName(c.sesi) === cleanSesiName(cetakSesi)) : [];
 
         const filteredLaporanList = consolidatedResults.filter(r => {
            const melepasiMarkah = r.jumlah_markah >= minScore;
