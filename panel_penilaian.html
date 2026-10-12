@@ -50,7 +50,6 @@
          return safeStr(sStr).split('(')[0].trim().toUpperCase();
       };
 
-      // HELPER AUTO-MAPPER PPD & ORGANISASI
       const mapPPDStandard = (rawPpd) => {
          const str = safeStr(rawPpd).toUpperCase();
          if (!str) return 'TIADA PPD';
@@ -77,7 +76,6 @@
          return str.startsWith('PPD ') ? str : `PPD ${str}`;
       };
 
-      // HELPER AUTO DETECT JANTINA DARI KP (GENAP=PEREMPUAN, GANJIL=LELAKI)
       const detectJantinaFromKP = (noKp) => {
          const cleanKp = safeStr(noKp).replace(/[^0-9]/g, '');
          if (!cleanKp) return 'LELAKI';
@@ -194,6 +192,86 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
+      // CARTA VISUAL MESRA CETAKAN A4 (PENTING DAHULU)
+      function PrintVisualCharts({ listZon, ppdData, jantinaData }) {
+        const doughnutRef = useRef(null);
+        const barRef = useRef(null);
+        const doughnutChart = useRef(null);
+        const barChart = useRef(null);
+
+        useEffect(() => {
+          if (doughnutRef.current) {
+            const ctx1 = doughnutRef.current.getContext('2d');
+            if (doughnutChart.current) doughnutChart.current.destroy();
+            doughnutChart.current = new Chart(ctx1, {
+              type: 'doughnut',
+              data: {
+                labels: ['Lelaki', 'Perempuan'],
+                datasets: [{
+                  data: [jantinaData.lelaki, jantinaData.perempuan],
+                  backgroundColor: ['#2563EB', '#EC4899'],
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' } } } }
+              }
+            });
+          }
+
+          if (barRef.current) {
+            const ctx2 = barRef.current.getContext('2d');
+            if (barChart.current) barChart.current.destroy();
+
+            const ppdNames = Object.keys(ppdData);
+            const ppdTotals = ppdNames.map(k => ppdData[k].total);
+
+            barChart.current = new Chart(ctx2, {
+              type: 'bar',
+              data: {
+                labels: ppdNames,
+                datasets: [{
+                  label: 'Jumlah Calon Dinilai',
+                  data: ppdTotals,
+                  backgroundColor: '#0D9488',
+                  borderRadius: 4
+                }]
+              },
+              options: {
+                indexAxis: 'y', // CARTA BAR MELINTANG UNTUK >6 DATA
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                  x: { ticks: { precision: 0, font: { size: 9 } } },
+                  y: { ticks: { font: { size: 9, weight: 'bold' } } }
+                },
+                plugins: { legend: { display: false } }
+              }
+            });
+          }
+
+          return () => {
+            if (doughnutChart.current) doughnutChart.current.destroy();
+            if (barChart.current) barChart.current.destroy();
+          };
+        }, [ppdData, jantinaData]);
+
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6 border p-4 rounded-xl bg-slate-50 border-slate-200">
+             <div className="h-52 flex flex-col items-center">
+                <p className="text-xs font-bold text-slate-700 uppercase mb-2">Pecahan Demografi Jantina Calon</p>
+                <div className="w-full h-40"><canvas ref={doughnutRef}></canvas></div>
+             </div>
+             <div className="h-52 flex flex-col items-center">
+                <p className="text-xs font-bold text-slate-700 uppercase mb-2">Taburan Calon Mengikut PPD (Bar Melintang)</p>
+                <div className="w-full h-40"><canvas ref={barRef}></canvas></div>
+             </div>
+          </div>
+        );
+      }
+
       function PanelApp() {
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [currentPanel, setCurrentPanel] = useState(null);
@@ -203,6 +281,7 @@
         const [penugasanList, setPenugasanList] = useState([]);
         const [selectedTugas, setSelectedTugas] = useState(null);
         const [calonList, setCalonList] = useState([]);
+        const [panelList, setPanelList] = useState([]);
         const [selectedCalonKp, setSelectedCalonKp] = useState('');
         const [selectedCalon, setSelectedCalon] = useState(null);
         const [filterSesiTapis, setFilterSesiTapis] = useState('SEMUA');
@@ -234,6 +313,9 @@
         const [filterZonPantau, setFilterZonPantau] = useState('SEMUA');
         const [minScorePantau, setMinScorePantau] = useState(50);
         const [viewModePantau, setViewModePantau] = useState('monitor'); // 'monitor' | 'report' | 'summary' | 'print_visual'
+
+        const [editableZonText, setEditableZonText] = useState('');
+        const [isSavingRumusan, setIsSavingRumusan] = useState(false);
 
         const handleLogin = async (e) => {
           e.preventDefault();
@@ -270,6 +352,9 @@
           const { data: cData } = await sb.from('calon').select('*').order('nama_penuh', { ascending: true });
           if (cData) setCalonList(cData);
 
+          const { data: pData } = await sb.from('panel_penemuduga').select('*');
+          if (pData) setPanelList(pData);
+
           const { data: rData } = await sb.from('penilaian_skor').select('*');
           if (rData) setAllResults(rData);
         };
@@ -295,7 +380,6 @@
 
         const validResults = allResults.filter(r => calonList.some(c => safeStr(c.no_kp) === safeStr(r.no_kp_calon)));
 
-        // ENJIN KONSOLIDASI MUKTAMAD (UNIQUE PANEL GROUPING + PPD MAPPER + JANTINA)
         const consolidatedLiveList = calonList.map(calon => {
            const calonResList = validResults.filter(r => safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
            if (calonResList.length === 0) return null;
@@ -557,7 +641,24 @@
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
-        // RUMUSAN & ANALISIS STRATEGIK PINTAR DBP / KPM BERLARAS DOKUMEN RASMI DENGAN DEMOGRAFI & JULAT 10%
+        // SENARAI PANEL PENEMUDUGA ZON UNTUK LAMPIRAN LAPORAN
+        const getPanelZonList = () => {
+           const tugasZonList = penugasanList.filter(t => zonAktifPantau === 'SEMUA' || safeStr(t.zon_bertugas).toUpperCase() === zonAktifPantau);
+           const pKpSet = [...new Set(tugasZonList.map(t => safeStr(t.no_kp_panel)))];
+           
+           return pKpSet.map(kp => {
+              const pObj = panelList.find(p => safeStr(p.no_kp) === kp);
+              const tObj = tugasZonList.find(t => safeStr(t.no_kp_panel) === kp);
+              return {
+                 nama: pObj ? safeStr(pObj.nama_penuh).toUpperCase() : kp,
+                 kp: kp,
+                 jawatan: pObj ? safeStr(pObj.jawatan).toUpperCase() : 'PANEL PENEMUDUGA',
+                 peranan: tObj ? safeStr(tObj.peranan).toUpperCase() : 'PANEL'
+              };
+           });
+        };
+
+        // ENJIN JANAAN RUMUSAN ZON
         const generateZonSummaryText = () => {
            const listZon = consolidatedLiveList.filter(r => zonAktifPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === zonAktifPantau);
            const totalCalonZon = calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).length;
@@ -570,7 +671,6 @@
               else countLelaki++;
            });
 
-           // PURATA 6 KOMPETENSI
            let sumBimb = 0, sumInst = 0, sumStrat = 0, sumData = 0, sumInter = 0, sumEvi = 0;
            if (totalEvaluated > 0) {
               listZon.forEach(r => {
@@ -590,7 +690,6 @@
            const avgInterPct = totalEvaluated > 0 ? (sumInter / totalEvaluated).toFixed(1) : '0.0';
            const avgEviPct = totalEvaluated > 0 ? (sumEvi / totalEvaluated).toFixed(1) : '0.0';
 
-           // BREAKDOWN JULAT 10%
            const m90 = listZon.filter(r => r.totalMarkah >= 90).length;
            const m80 = listZon.filter(r => r.totalMarkah >= 80 && r.totalMarkah < 90).length;
            const m70 = listZon.filter(r => r.totalMarkah >= 70 && r.totalMarkah < 80).length;
@@ -635,7 +734,6 @@
            t += `   • 49.9% dan ke bawah              : ${m49} (${totalEvaluated > 0 ? ((m49/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
            t += `   -------------------------------------------------------------------------------------\n\n`;
 
-           // BREAKDOWN SME
            const smeMap = {};
            calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
               const smeName = safeStr(c.sme_subjek).toUpperCase() || 'TIADA SME';
@@ -665,7 +763,6 @@
            });
            t += `   +-------------------+---------------+-----------+-----------+-----------+-----------+-----------+-----------+\n\n`;
 
-           // BREAKDOWN PPD TERLARAS
            const ppdMap = {};
            calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
               const ppdName = mapPPDStandard(c.ppd);
@@ -695,7 +792,18 @@
            });
            t += `   +------------------------------------+--------------+-----------+-----------+-----------+-----------+-----------+-----------+\n\n`;
 
-           t += `6.0 RUMUSAN DAN CATATAN KETUA ZON\n`;
+           t += `6.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON (${zonAktifPantau})\n`;
+           const pZonArr = getPanelZonList();
+           if (pZonArr.length === 0) {
+              t += `   (Tiada panel didaftarkan bagi zon ini)\n`;
+           } else {
+              pZonArr.forEach((p, pIdx) => {
+                 t += `   ${pIdx + 1}. ${p.nama} (${p.jawatan}) - [${p.peranan}]\n`;
+              });
+           }
+           t += `\n`;
+
+           t += `7.0 RUMUSAN DAN CATATAN KETUA ZON\n`;
            t += `   Laporan ini mengandungi taburan data markah mentah, demografi jantina, serta purata pencapaian\n`;
            t += `   kompetensi bagi Zon ${zonAktifPantau} untuk dikemukakan kepada Pengurusan BPG KPM bagi tindakan selanjutnya.\n\n`;
 
@@ -706,12 +814,67 @@
            return t;
         };
 
+        // MEMATIKAN TEKS RUMUSAN DARI DATABASE JIKA ADA, JIKA TIADA JANA BAHARU
+        useEffect(() => {
+           if (viewModePantau === 'summary' || viewModePantau === 'print_visual') {
+              const fetchRumusanDB = async () => {
+                 const { data } = await sb.from('rumusan_zon').select('teks_rumusan').eq('zon', zonAktifPantau).single();
+                 if (data && data.teks_rumusan) {
+                    setEditableZonText(data.teks_rumusan);
+                 } else {
+                    setEditableZonText(generateZonSummaryText());
+                 }
+              };
+              fetchRumusanDB();
+           }
+        }, [viewModePantau, zonAktifPantau]);
+
+        const handleSaveRumusanToDB = async () => {
+           setIsSavingRumusan(true);
+           const payload = {
+              zon: zonAktifPantau,
+              teks_rumusan: editableZonText,
+              updated_by: currentPanel?.nama_penuh || 'KETUA ZON',
+              updated_at: new Date().toISOString()
+           };
+
+           const { data: existing } = await sb.from('rumusan_zon').select('id').eq('zon', zonAktifPantau).single();
+
+           let err = null;
+           if (existing) {
+              const { error } = await sb.from('rumusan_zon').update(payload).eq('id', existing.id);
+              err = error;
+           } else {
+              const { error } = await sb.from('rumusan_zon').insert([payload]);
+              err = error;
+           }
+
+           setIsSavingRumusan(false);
+           if (err) alert('Gagal menyimpan rumusan: ' + err.message);
+           else alert(`Rumusan Laporan Eksekutif bagi Zon ${zonAktifPantau} berjaya disimpan!`);
+        };
+
         const getRubrikTextEksak = (key, val, isActive) => {
           if (!isActive) return '❌ KOMPETENSI INI TIDAK DINILAI DI STESEN INI.';
           const num = Math.round(Number(val));
           if (num === 0) return 'Sila pilih julat skor 1 hingga 5 untuk melihat panduan rubrik BARS rasmi.';
           return DESKRIPSI_RUBRIK_EKSAK[key]?.[num] || 'Standard Penilaian BARS Ditentukan';
         };
+
+        // KIRA DATA JANTINA DAN PPD UNTUK CARTA VISUAL
+        const listZonForChart = consolidatedLiveList.filter(r => zonAktifPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === zonAktifPantau);
+        let jantinaDataForChart = { lelaki: 0, perempuan: 0 };
+        listZonForChart.forEach(r => {
+           if (r.jantina === 'PEREMPUAN') jantinaDataForChart.perempuan++;
+           else jantinaDataForChart.lelaki++;
+        });
+
+        const ppdMapForChart = {};
+        calonList.filter(c => zonAktifPantau === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
+           const ppdName = mapPPDStandard(c.ppd);
+           if (!ppdMapForChart[ppdName]) ppdMapForChart[ppdName] = { total: 0 };
+           ppdMapForChart[ppdName].total++;
+        });
 
         return (
           <div className="min-h-screen flex flex-col">
@@ -1149,7 +1312,7 @@
                                   📑 Laporan Keputusan
                                </button>
                                <button onClick={() => setViewModePantau('summary')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${viewModePantau === 'summary' ? 'bg-purple-500 text-white border-purple-400 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
-                                  ⚡ Rumusan Pintar DBP
+                                  ⚡ Janaan Laporan Analisis
                                </button>
                                <button onClick={() => setViewModePantau('print_visual')} className={`px-4 py-2 rounded-xl text-xs font-black transition-all border ${viewModePantau === 'print_visual' ? 'bg-blue-500 text-white border-blue-400 shadow' : 'bg-slate-950 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
                                   🖨️ Paparan Cetakan A4
@@ -1325,31 +1488,39 @@
                             </div>
                          )}
 
-                         {/* MOD 3: RUMUSAN & ANALISIS PINTAR KETUA ZON BERLARAS BAHASA DBP / KPM */}
+                         {/* MOD 3: JANAAN LAPORAN ANALISIS EKSEKUTIF (TEKS BOLEH EDIT & SIMPAN) */}
                          {viewModePantau === 'summary' && (
                             <div className="space-y-6">
                                <div className="bg-slate-950 p-6 rounded-2xl border border-purple-500/40 shadow-xl space-y-4">
-                                  <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                                     <h3 className="text-base font-extrabold text-purple-400 flex items-center gap-2">
-                                        ⚡ Janaan Laporan Analisis Eksekutif Pintar DBP/KPM ({zonAktifPantau})
-                                     </h3>
-                                     <button onClick={() => { navigator.clipboard.writeText(generateZonSummaryText()); alert('Rumusan laporan analisis DBP/KPM berjaya disalin!'); }} className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-4 py-2 rounded-lg text-xs shadow transition-transform active:scale-95">
-                                        📋 Salin Teks Laporan Rasmi
-                                     </button>
+                                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-3">
+                                     <div>
+                                        <h3 className="text-base font-extrabold text-purple-400 flex items-center gap-2">
+                                           ⚡ Janaan Laporan Analisis Eksekutif ({zonAktifPantau})
+                                        </h3>
+                                        <p className="text-xs text-slate-400 mt-0.5">Sila sunting teks laporan di bawah jika ada ulasan tambahan, kemudian tekan 'Simpan Rumusan Zon'.</p>
+                                     </div>
+                                     <div className="flex gap-2">
+                                        <button onClick={handleSaveRumusanToDB} disabled={isSavingRumusan} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 py-2 rounded-lg text-xs shadow transition-transform active:scale-95 disabled:opacity-50">
+                                           {isSavingRumusan ? '💾 Menyimpan...' : '💾 Simpan Rumusan Zon'}
+                                        </button>
+                                        <button onClick={() => { navigator.clipboard.writeText(editableZonText); alert('Teks laporan analisis berjaya disalin!'); }} className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-4 py-2 rounded-lg text-xs shadow transition-transform active:scale-95">
+                                           📋 Salin Teks
+                                        </button>
+                                     </div>
                                   </div>
 
-                                  <textarea rows="22" readOnly className="w-full p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono leading-relaxed text-slate-200 focus:outline-none" value={generateZonSummaryText()}></textarea>
+                                  <textarea rows="24" className="w-full p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono leading-relaxed text-slate-100 focus:border-purple-500 focus:outline-none" value={editableZonText} onChange={e => setEditableZonText(e.target.value)}></textarea>
                                </div>
                             </div>
                          )}
 
-                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF */}
+                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF (CARTA CINCIN + CARTA BAR MELINTANG + TEXT) */}
                          {viewModePantau === 'print_visual' && (
                             <div className="space-y-6">
                                <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-blue-500/30 no-print">
                                   <div>
-                                     <h3 className="text-sm font-extrabold text-blue-400">Paparan Cetakan Dokumen Rasmi A4</h3>
-                                     <p className="text-xs text-slate-400 mt-0.5">Laporan visual siap cetak lengkap dengan logo, matriks data, dan ruangan pengesahan.</p>
+                                     <h3 className="text-sm font-extrabold text-blue-400">Paparan Cetakan Dokumen Rasmi A4 (Visual & Naratif)</h3>
+                                     <p className="text-xs text-slate-400 mt-0.5">Laporan visual siap cetak lengkap dengan Logo KPM, Carta Visual, dan Teks Rasmi yang disimpan.</p>
                                   </div>
                                   <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-lg text-xs shadow-lg transition-transform active:scale-95">
                                      🖨️ Cetak Dokumen A4
@@ -1357,6 +1528,7 @@
                                </div>
 
                                <div className="bg-white p-10 border rounded-xl print-area text-slate-900 shadow-2xl space-y-6">
+                                  {/* KEPALA SURAT */}
                                   <div className="text-center border-b-2 border-slate-900 pb-4">
                                      <img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" />
                                      <h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan Malaysia</h3>
@@ -1367,10 +1539,15 @@
                                      <p className="text-xs text-slate-600 font-semibold mt-1">Tarikh Janaan: {new Date().toLocaleDateString('en-GB')}</p>
                                   </div>
 
+                                  {/* VISUAL CARTA DINAMIK A4 */}
+                                  <PrintVisualCharts listZon={listZonForChart} ppdData={ppdMapForChart} jantinaData={jantinaDataForChart} />
+
+                                  {/* TEKS RUMUSAN YANG DISUNTING & DISIMPAN */}
                                   <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 whitespace-pre-line text-xs font-mono leading-relaxed text-slate-800">
-                                     {generateZonSummaryText()}
+                                     {editableZonText || generateZonSummaryText()}
                                   </div>
 
+                                  {/* RUANGAN TANDATANGAN */}
                                   <div className="mt-12 flex justify-between items-end text-xs text-slate-800 pt-8 border-t border-slate-300">
                                      <div>
                                         <p className="font-bold text-slate-500 uppercase text-[10px] mb-1">Disediakan Oleh:</p>
