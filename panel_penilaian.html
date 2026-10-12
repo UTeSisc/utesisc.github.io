@@ -37,7 +37,13 @@
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      const safeStr = (val) => (val ? String(val) : '');
+      const safeStr = (val) => (val ? String(val).trim() : '');
+
+      // HELPER: EKSTRAK NAMA SESI UTAMA (BUANG TARIKH DALAM KURUNGAN JIKA ADA)
+      const cleanSesiName = (sStr) => {
+         if (!sStr) return '';
+         return safeStr(sStr).split('(')[0].trim().toUpperCase();
+      };
 
       const DESKRIPSI_RUBRIK_EKSAK = {
         skor_bimbingan: {
@@ -225,31 +231,30 @@
           if (rData) setAllResults(rData);
         };
 
+        // TAPIS CALON DALAM BILIK TERGABUNG PINTAR (MEMADANKAN NAMA SESI TANPA TERJEJAS TARIKH)
         const calonBilik = selectedTugas ? calonList.filter(c => {
-          const zonCalon = safeStr(c.zon_temuduga).toUpperCase().trim();
-          const zonTugas = safeStr(selectedTugas.zon_bertugas).toUpperCase().trim();
+          const zonCalon = safeStr(c.zon_temuduga).toUpperCase();
+          const zonTugas = safeStr(selectedTugas.zon_bertugas).toUpperCase();
           const zonSama = zonCalon === zonTugas || zonTugas === 'SEMUA ZON';
 
           if (!zonSama) return false;
 
-          const sesiCalonStr = safeStr(c.sesi).toLowerCase().trim();
-          const sesiFilterStr = filterSesiTapis.toLowerCase().trim();
+          const sesiCalonClean = cleanSesiName(c.sesi);
+          const sesiFilterClean = cleanSesiName(filterSesiTapis);
 
-          if (sesiFilterStr === 'semua') {
-            const sesiTugas = safeStr(selectedTugas.sesi_bertugas).toLowerCase();
-            if (sesiTugas.includes("semua sesi")) return true;
-
-            const namaSesiBersih = sesiTugas.split(" [")[0].trim();
-            return sesiCalonStr.includes(namaSesiBersih);
+          if (filterSesiTapis === 'SEMUA') {
+            const sesiTugasClean = cleanSesiName(selectedTugas.sesi_bertugas);
+            if (safeStr(selectedTugas.sesi_bertugas).toUpperCase().includes("SEMUA SESI")) return true;
+            return sesiCalonClean === sesiTugasClean;
           }
 
-          return sesiCalonStr.includes(sesiFilterStr);
+          return sesiCalonClean === sesiFilterClean;
         }) : [];
 
-        const validResults = allResults.filter(r => calonList.some(c => safeStr(c.no_kp).trim() === safeStr(r.no_kp_calon).trim()));
+        const validResults = allResults.filter(r => calonList.some(c => safeStr(c.no_kp) === safeStr(r.no_kp_calon)));
 
         const consolidatedLiveList = calonList.map(calon => {
-           const calonResList = validResults.filter(r => safeStr(r.no_kp_calon).trim() === safeStr(calon.no_kp).trim());
+           const calonResList = validResults.filter(r => safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
            if (calonResList.length === 0) return null;
 
            let sums = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
@@ -267,12 +272,12 @@
               if (Number(r.skor_evidens) > 0) { sums.evi += Number(r.skor_evidens); counts.evi++; compList.push("Evidens"); }
 
               panelInfoArr.push({
-                 nama: r.nama_panel,
+                 nama: safeStr(r.nama_panel).toUpperCase(),
                  elemen: compList.length > 0 ? compList.join(", ") : "Semua Elemen"
               });
 
               if (r.ulasan_panel && r.ulasan_panel.trim() !== "") {
-                 ulasanArr.push(`${r.nama_panel}: ${r.ulasan_panel}`);
+                 ulasanArr.push(`${safeStr(r.nama_panel).toUpperCase()}: ${r.ulasan_panel}`);
               }
            });
 
@@ -294,8 +299,8 @@
 
            return {
               no_kp: calon.no_kp,
-              nama_penuh: calon.nama_penuh,
-              zon: calon.zon_temuduga,
+              nama_penuh: safeStr(calon.nama_penuh).toUpperCase(),
+              zon: safeStr(calon.zon_temuduga).toUpperCase(),
               avgBimb, avgInst, avgStrat, avgData, avgInter, avgEvi,
               totalMarkah: totalMuktamad,
               isLulus: totalMuktamad >= 75,
@@ -306,12 +311,12 @@
 
         const handleSelectCalon = (kp) => {
           setSelectedCalonKp(kp);
-          const c = calonList.find(cal => cal.no_kp === kp);
+          const c = calonList.find(cal => safeStr(cal.no_kp) === safeStr(kp));
           setSelectedCalon(c || null);
 
           const existingRes = validResults.find(r => 
-             safeStr(r.no_kp_calon).trim() === safeStr(kp).trim() && 
-             safeStr(r.nama_panel).trim() === safeStr(currentPanel?.nama_penuh).trim()
+             safeStr(r.no_kp_calon) === safeStr(kp) && 
+             safeStr(r.nama_panel).toUpperCase() === safeStr(currentPanel?.nama_penuh).toUpperCase()
           );
 
           if (existingRes) {
@@ -379,7 +384,7 @@
           if (sInter > 0 && sInter <= 2) peningkatanArr.push("penyampaian hujah secara tersusun serta kawalan emosi yang konsisten");
           if (sEvi > 0 && sEvi <= 2) peningkatanArr.push("penyusunan bukti impak bimbingan yang lebih relevan dengan peranan SISC+");
 
-          let ulasanPenuh = `Calon ${selectedCalon.nama_penuh} telah melalui sesi temu duga penilaian kompetensi SISC+.\n\n`;
+          let ulasanPenuh = `Calon ${safeStr(selectedCalon.nama_penuh).toUpperCase()} telah melalui sesi temu duga penilaian kompetensi SISC+.\n\n`;
 
           if (kekuatanArr.length > 0) {
              ulasanPenuh += `Teras kekuatan calon terbukti menerusi ${kekuatanArr.join(", ")}. `;
@@ -417,8 +422,8 @@
 
           const payload = {
             no_kp_calon: selectedCalon.no_kp,
-            nama_panel: currentPanel.nama_penuh,
-            zon: selectedTugas.zon_bertugas,
+            nama_panel: safeStr(currentPanel.nama_penuh).toUpperCase(),
+            zon: safeStr(selectedTugas.zon_bertugas).toUpperCase(),
             skor_bimbingan: activeKompetensi.skor_bimbingan ? Number(scores.skor_bimbingan) : 0,
             skor_instruksional: activeKompetensi.skor_instruksional ? Number(scores.skor_instruksional) : 0,
             skor_pemikiran_strategik: activeKompetensi.skor_pemikiran_strategik ? Number(scores.skor_pemikiran_strategik) : 0,
@@ -431,8 +436,8 @@
           };
 
           const existingRes = validResults.find(r => 
-             safeStr(r.no_kp_calon).trim() === safeStr(selectedCalon.no_kp).trim() &&
-             safeStr(r.nama_panel).trim() === safeStr(currentPanel.nama_penuh).trim()
+             safeStr(r.no_kp_calon) === safeStr(selectedCalon.no_kp) &&
+             safeStr(r.nama_panel).toUpperCase() === safeStr(currentPanel.nama_penuh).toUpperCase()
           );
 
           let err = null;
@@ -447,7 +452,7 @@
           if (err) {
             setMsg({ type: 'error', text: 'Gagal menyimpan penilaian: ' + err.message });
           } else {
-            setMsg({ type: 'success', text: `Penilaian anda untuk ${selectedCalon.nama_penuh} berjaya disimpan!` });
+            setMsg({ type: 'success', text: `Penilaian anda untuk ${safeStr(selectedCalon.nama_penuh).toUpperCase()} berjaya disimpan!` });
             fetchPenugasanAndData(currentPanel.no_kp);
           }
         };
@@ -485,7 +490,7 @@
               <div className="flex items-center gap-4">
                  {isLoggedIn ? (
                     <>
-                       <span className="text-sm font-bold text-slate-800 uppercase hidden md:inline">{currentPanel?.nama_penuh}</span>
+                       <span className="text-sm font-bold text-slate-800 uppercase hidden md:inline">{safeStr(currentPanel?.nama_penuh).toUpperCase()}</span>
                        <button onClick={handleLogoutAccount} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-sm transition-colors border border-red-200">
                           Log Keluar
                        </button>
@@ -535,7 +540,7 @@
               {isLoggedIn && !selectedTugas && (
                 <div className="space-y-6">
                    <div className="text-center max-w-2xl mx-auto">
-                      <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-wide">SELAMAT DATANG, {currentPanel?.nama_penuh}</h1>
+                      <h1 className="text-2xl md:text-3xl font-black text-amber-400 uppercase tracking-wide">SELAMAT DATANG, {safeStr(currentPanel?.nama_penuh).toUpperCase()}</h1>
                       <p className="text-slate-400 text-sm mt-1">Sila pilih Surat Penugasan anda di bawah untuk memulakan sesi penilaian calon.</p>
                    </div>
 
@@ -553,11 +558,11 @@
                                <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 border-b border-slate-800">
                                   <div className="flex justify-between items-center mb-2">
                                      <span className="px-3 py-1 bg-amber-500/20 text-amber-300 font-extrabold text-xs rounded-full border border-amber-500/40 uppercase tracking-wider">
-                                        📍 ZON {tugas.zon_bertugas}
+                                        📍 ZON {safeStr(tugas.zon_bertugas).toUpperCase()}
                                      </span>
                                      <span className="text-[11px] text-slate-500 font-mono">ID #{tugas.id}</span>
                                   </div>
-                                  <h3 className="text-lg font-extrabold text-white mt-2 leading-snug">{tugas.sesi_bertugas}</h3>
+                                  <h3 className="text-lg font-extrabold text-white mt-2 leading-snug uppercase">{tugas.sesi_bertugas}</h3>
                                </div>
 
                                <div className="p-5 flex-grow flex flex-col justify-center items-center text-center">
@@ -592,7 +597,7 @@
                          </button>
                          <div>
                             <span className="text-xs text-slate-400 uppercase font-bold">Penugasan Aktif:</span>
-                            <h2 className="text-sm font-extrabold text-amber-400 uppercase">{selectedTugas.zon_bertugas} — {selectedTugas.sesi_bertugas} ({selectedTugas.peranan})</h2>
+                            <h2 className="text-sm font-extrabold text-amber-400 uppercase">{safeStr(selectedTugas.zon_bertugas).toUpperCase()} — {safeStr(selectedTugas.sesi_bertugas).toUpperCase()} ({selectedTugas.peranan})</h2>
                          </div>
                       </div>
                       <div className="text-xs text-slate-400 font-bold bg-slate-950 px-4 py-2 rounded-lg border border-slate-800">
@@ -606,10 +611,10 @@
                       </div>
                    )}
 
-                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI (LENGKAP SESI 1 HINGGA 5) */}
+                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI (DILENGKAPI ENJIN TERGABUNG PINTAR) */}
                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-3">
-                         <label className="text-xs font-extrabold uppercase text-amber-400">PILIH CALON UNTUK DINILAI ({selectedTugas.zon_bertugas})</label>
+                         <label className="text-xs font-extrabold uppercase text-amber-400">PILIH CALON UNTUK DINILAI ({safeStr(selectedTugas.zon_bertugas).toUpperCase()})</label>
                          
                          <div className="flex items-center gap-2 w-full md:w-auto">
                             <span className="text-xs text-slate-400 font-bold uppercase whitespace-nowrap">Tapis Sesi:</span>
@@ -625,16 +630,16 @@
                          </div>
                       </div>
 
-                      <select className="w-full p-4 border border-slate-700 rounded-xl text-base font-bold bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none" value={selectedCalonKp} onChange={e => handleSelectCalon(e.target.value)}>
+                      <select className="w-full p-4 border border-slate-700 rounded-xl text-base font-bold bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none uppercase" value={selectedCalonKp} onChange={e => handleSelectCalon(e.target.value)}>
                          <option value="">-- Sila Pilih Nama Calon --</option>
                          {calonBilik.map(c => {
                             const dinilaiByMe = validResults.some(r => 
-                               safeStr(r.no_kp_calon).trim() === safeStr(c.no_kp).trim() && 
-                               safeStr(r.nama_panel).trim() === safeStr(currentPanel?.nama_penuh).trim()
+                               safeStr(r.no_kp_calon) === safeStr(c.no_kp) && 
+                               safeStr(r.nama_panel).toUpperCase() === safeStr(currentPanel?.nama_penuh).toUpperCase()
                             );
                             return (
                                <option key={c.no_kp} value={c.no_kp}>
-                                  {dinilaiByMe ? '✅ ' : '⏳ '} {c.nama_penuh} ({c.no_kp}) - PPD: {c.ppd || 'N/A'} [{c.sesi}]
+                                  {dinilaiByMe ? '✅ ' : '⏳ '} {safeStr(c.nama_penuh).toUpperCase()} ({c.no_kp}) - PPD: {safeStr(c.ppd).toUpperCase() || 'N/A'} [{safeStr(c.sesi).toUpperCase()}]
                                </option>
                             );
                          })}
@@ -665,8 +670,8 @@
                                
                                <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow flex justify-between items-center">
                                   <div>
-                                     <h2 className="text-xl font-extrabold text-white uppercase">{selectedCalon.nama_penuh}</h2>
-                                     <p className="text-xs text-slate-400 font-mono mt-0.5">NO. KP: {selectedCalon.no_kp} | PPD: {selectedCalon.ppd} | SME: {selectedCalon.sme_subjek || 'N/A'}</p>
+                                     <h2 className="text-xl font-extrabold text-white uppercase">{safeStr(selectedCalon.nama_penuh).toUpperCase()}</h2>
+                                     <p className="text-xs text-slate-400 font-mono mt-0.5">NO. KP: {selectedCalon.no_kp} | PPD: {safeStr(selectedCalon.ppd).toUpperCase()} | SME: {safeStr(selectedCalon.sme_subjek).toUpperCase() || 'N/A'}</p>
                                   </div>
                                   <span className={`px-4 py-1.5 rounded-full text-xs font-bold border ${selectedCalon.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-red-500/20 text-red-400 border-red-500/50'}`}>
                                      STATUS: {selectedCalon.kehadiran || 'BELUM'}
@@ -918,14 +923,14 @@
                                   </tr>
                                </thead>
                                <tbody>
-                                  {consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).length === 0 ? (
+                                  {consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon).toUpperCase() === safeStr(selectedTugas.zon_bertugas).toUpperCase() : (filterZonPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === filterZonPantau))).length === 0 ? (
                                      <tr><td colSpan="7" className="text-center p-8 text-slate-500 italic">Tiada rekod penilaian bagi calon aktif.</td></tr>
-                                  ) : consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon) === safeStr(selectedTugas.zon_bertugas) : (filterZonPantau === 'SEMUA' || safeStr(r.zon) === filterZonPantau))).map((res, idx) => {
+                                  ) : consolidatedLiveList.filter(r => (selectedTugas.peranan === 'Ketua Zon Panel Penemuduga' ? safeStr(r.zon).toUpperCase() === safeStr(selectedTugas.zon_bertugas).toUpperCase() : (filterZonPantau === 'SEMUA' || safeStr(r.zon).toUpperCase() === filterZonPantau))).map((res, idx) => {
                                      return (
                                         <tr key={idx} className="border-b border-slate-800 hover:bg-slate-800/50">
                                            <td className="p-3 font-bold text-slate-500">{idx + 1}</td>
                                            <td className="p-3">
-                                              <span className="font-extrabold text-slate-100 text-sm block">{res.nama_penuh}</span>
+                                              <span className="font-extrabold text-slate-100 text-sm block uppercase">{res.nama_penuh}</span>
                                               <span className="font-mono text-slate-400 text-[10px]">{res.no_kp}</span>
                                            </td>
                                            <td className="p-3 font-bold text-amber-300 uppercase">{res.zon}</td>
