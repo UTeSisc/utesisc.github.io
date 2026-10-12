@@ -39,7 +39,6 @@
 
       const safeStr = (val) => (val ? String(val) : '');
 
-      // DESKRIPSI RUBRIK EKSAK SISC+ BARS 5-1 (DOKUMEN RASMI KPM)
       const DESKRIPSI_RUBRIK_EKSAK = {
         skor_bimbingan: {
           5: "Mengemudi sesi bimbingan berasaskan keperluan guru. Menggunakan soalan reflektif secara mendalam. Mencetus perubahan amalan guru yang dapat dibuktikan. Menjadi rujukan kepakaran bimbingan pada peringkat PPD.",
@@ -85,7 +84,6 @@
         }
       };
 
-      // CARTA RADAR KOMPETENSI
       function RadarChartPenilaian({ skor }) {
         const canvasRef = useRef(null);
         const chartRef = useRef(null);
@@ -150,7 +148,6 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      // APLIKASI UTAMA PANEL
       function PanelApp() {
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [currentPanel, setCurrentPanel] = useState(null);
@@ -228,7 +225,6 @@
           if (rData) setAllResults(rData);
         };
 
-        // TAPIS CALON DALAM BILIK
         const calonBilik = selectedTugas ? calonList.filter(c => {
           const zonCalon = safeStr(c.zon_temuduga).toUpperCase().trim();
           const zonTugas = safeStr(selectedTugas.zon_bertugas).toUpperCase().trim();
@@ -250,10 +246,8 @@
           return sesiCalonStr.includes(sesiFilterStr);
         }) : [];
 
-        // HANYA REKOD PENILAIAN YANG MEMPUNYAI CALON SAH WUJUD
         const validResults = allResults.filter(r => calonList.some(c => safeStr(c.no_kp).trim() === safeStr(r.no_kp_calon).trim()));
 
-        // KONSOLIDASI DATA DARI MULTI-PANEL / MULTI-STESEN (GROUP BY CALON)
         const consolidatedLiveList = calonList.map(calon => {
            const calonResList = validResults.filter(r => safeStr(r.no_kp_calon).trim() === safeStr(calon.no_kp).trim());
            if (calonResList.length === 0) return null;
@@ -458,7 +452,6 @@
           }
         };
 
-        // FUNGSI LOG KELUAR (KEMBALI KE SKRIN LOGIN AKAN DILAKUKAN, BUKAN LOGOUT PORTAL)
         const handleLogoutAccount = () => {
           setIsLoggedIn(false);
           setCurrentPanel(null);
@@ -469,7 +462,6 @@
           setPassInput('');
         };
 
-        // FUNGSI KEMBALI KE MENU UTAMA (PORTAL INDEX)
         const handleGoToMenuUtama = () => {
           window.location.href = 'index.html';
         };
@@ -614,7 +606,7 @@
                       </div>
                    )}
 
-                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI */}
+                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI (LENGKAP SESI 1 HINGGA 5) */}
                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-3">
                          <label className="text-xs font-extrabold uppercase text-amber-400">PILIH CALON UNTUK DINILAI ({selectedTugas.zon_bertugas})</label>
@@ -626,6 +618,8 @@
                                <option value="SESI 1">SESI 1</option>
                                <option value="SESI 2">SESI 2</option>
                                <option value="SESI 3">SESI 3</option>
+                               <option value="SESI 4">SESI 4</option>
+                               <option value="SESI 5">SESI 5</option>
                                <option value="SESI KHAS">SESI KHAS</option>
                             </select>
                          </div>
@@ -650,7 +644,6 @@
                    {selectedCalon && (
                       <div className="space-y-6">
                          
-                         {/* PILIHAN SUB-MODUL PENILAIAN */}
                          <div className="bg-slate-900 border border-amber-500/40 p-4 rounded-2xl shadow-md flex flex-col md:flex-row justify-between items-center gap-4">
                             <div>
                                <span className="text-xs text-amber-400 font-extrabold uppercase tracking-wide">PILIH SUB-MODUL PENILAIAN:</span>
@@ -845,7 +838,6 @@
                                      )}
                                   </div>
 
-                                  {/* ULASAN & BUTANG JANA RUMUSAN */}
                                   <div className="pt-2 space-y-2">
                                      <div className="flex justify-between items-center">
                                         <label className="block text-xs font-bold text-slate-400 uppercase">Ulasan & Penjanaan Rumusan Rasmi Panel</label>
@@ -892,7 +884,6 @@
                       </div>
                    )}
 
-                   {/* PEMANTAUAN MULTI-PANEL LIVE PADAT (GROUP BY CALON) */}
                    {(selectedTugas.peranan === 'Ketua Panel Utama' || selectedTugas.peranan === 'Ketua Zon Panel Penemuduga') && (
                       <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12">
                          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
