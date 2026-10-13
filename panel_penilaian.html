@@ -44,16 +44,43 @@
       const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
       const safeStr = (val) => (val ? String(val).trim() : '');
-      const cleanKpNum = (val) => safeStr(val).replace(/[^0-9]/g, '');
 
       const cleanSesiName = (sStr) => {
          if (!sStr) return '';
          return safeStr(sStr).split('(')[0].trim().toUpperCase();
       };
 
+      // PENYELARASAN TEMPAT BERTUGAS PANEL (IAB -> INSTITUT AMINUDDIN BAKI)
+      const cleanTempatBertugasPanel = (rawPlace) => {
+         const str = safeStr(rawPlace).toUpperCase();
+         if (!str) return 'KEMENTERIAN PENDIDIKAN MALAYSIA';
+         if (str === 'IAB' || str.startsWith('IAB ') || str.includes('INSTITUT AMINUDDIN BAKI')) {
+            if (str.includes('GENTING') || str.includes('CGH')) return 'INSTITUT AMINUDDIN BAKI CAWANGAN GENTING HIGHLANDS';
+            if (str.includes('NORTH') || str.includes('UTARA')) return 'INSTITUT AMINUDDIN BAKI CAWANGAN UTARA';
+            if (str.includes('SARAWAK')) return 'INSTITUT AMINUDDIN BAKI CAWANGAN SARAWAK';
+            if (str.includes('SABAH')) return 'INSTITUT AMINUDDIN BAKI CAWANGAN SABAH';
+            return 'INSTITUT AMINUDDIN BAKI';
+         }
+         return str;
+      };
+
       const mapPPDStandard = (rawPpd) => {
          const str = safeStr(rawPpd).toUpperCase();
          if (!str) return 'TIADA PPD';
+         if (str.includes('LABUAN')) return 'PPD LABUAN';
+         if (str.includes('KENINGAU') || str.includes('ST ANTHONY')) return 'PPD KENINGAU';
+         if (str.includes('PENAMPANG')) return 'PPD PENAMPANG';
+         if (str.includes('ELOPURA') || str.includes('SUNG SIEW') || str.includes('ST MICHAEL SANDAKAN') || str.includes('SANDAKAN')) return 'PPD SANDAKAN';
+         if (str.includes('GAYA') || str.includes('LOK YUK') || str.includes('KOTA KINABALU')) return 'PPD KOTA KINABALU';
+         if (str.includes('SEMPORNA')) return 'PPD SEMPORNA';
+         if (str.includes('LAHAD DATU') || str.includes('SEGANA')) return 'PPD LAHAD DATU';
+         if (str.includes('SAINT PETER') || str.includes('KUDAT')) return 'PPD KUDAT';
+         if (str.includes('PITAS') || str.includes('PINGGAN PINGGAN')) return 'PPD PITAS';
+         if (str.includes('SIPITANG')) return 'PPD SIPITANG';
+         if (str.includes('TAWAU')) return 'PPD TAWAU';
+         if (str.includes('BEAUFORT') || str.includes('ST JOHN BEAUFORT')) return 'PPD BEAUFORT';
+         if (str.includes('TENOM')) return 'PPD TENOM';
+         if (str.includes('RANAU')) return 'PPD RANAU';
          if (str.includes('RAMAKRISHNA') || str.includes('TIMUR LAUT')) return 'PPD TIMUR LAUT';
          if (str.includes('TELOI KANAN') || str.includes('BALING')) return 'PPD BALING';
          if (str.includes('TASEK GELUGOR') || str.includes('SEBERANG PERAI UTARA')) return 'PPD SEBERANG PERAI UTARA';
@@ -78,7 +105,7 @@
       };
 
       const detectJantinaFromKP = (noKp) => {
-         const cleanKp = cleanKpNum(noKp);
+         const cleanKp = safeStr(noKp).replace(/[^0-9]/g, '');
          if (!cleanKp) return 'LELAKI';
          const lastDigit = parseInt(cleanKp.slice(-1), 10);
          return (lastDigit % 2 === 0) ? 'PEREMPUAN' : 'LELAKI';
@@ -193,7 +220,7 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      function PrintVisualCharts({ zonData, jantinaData }) {
+      function PrintVisualCharts({ zonAttendanceData, jantinaData }) {
         const doughnutRef = useRef(null);
         const barRef = useRef(null);
 
@@ -202,50 +229,74 @@
           let barChart = null;
 
           const timer = setTimeout(() => {
+            const totalJantina = (jantinaData.lelaki || 0) + (jantinaData.perempuan || 0);
+            
             if (doughnutRef.current) {
               const ctx1 = doughnutRef.current.getContext('2d');
               doughnutChart = new Chart(ctx1, {
                 type: 'doughnut',
                 data: {
-                  labels: ['Lelaki', 'Perempuan'],
+                  labels: [
+                    `Lelaki: ${jantinaData.lelaki || 0} Orang (${totalJantina > 0 ? ((jantinaData.lelaki/totalJantina)*100).toFixed(1) : 0}%)`, 
+                    `Perempuan: ${jantinaData.perempuan || 0} Orang (${totalJantina > 0 ? ((jantinaData.perempuan/totalJantina)*100).toFixed(1) : 0}%)`
+                  ],
                   datasets: [{
                     data: [jantinaData.lelaki || 0, jantinaData.perempuan || 0],
                     backgroundColor: ['#2563EB', '#EC4899'],
-                    borderWidth: 1
+                    borderWidth: 1.5
                   }]
                 },
                 options: {
                   responsive: true,
                   maintainAspectRatio: false,
-                  plugins: { legend: { position: 'bottom', labels: { font: { size: 10, weight: 'bold' } } } }
+                  plugins: { 
+                     legend: { 
+                        position: 'bottom', 
+                        labels: { font: { size: 11, weight: 'bold' }, color: '#1e293b' } 
+                     } 
+                  }
                 }
               });
             }
 
             if (barRef.current) {
               const ctx2 = barRef.current.getContext('2d');
-              const zonNames = Object.keys(zonData);
-              const zonTotals = zonNames.map(k => zonData[k]);
+              const zonNames = Object.keys(zonAttendanceData);
+              const totalRegistered = zonNames.map(k => zonAttendanceData[k].registered);
+              const totalEvaluated = zonNames.map(k => zonAttendanceData[k].evaluated);
 
               barChart = new Chart(ctx2, {
                 type: 'bar',
                 data: {
                   labels: zonNames.length > 0 ? zonNames : ['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'],
-                  datasets: [{
-                    label: 'Jumlah Calon Dinilai',
-                    data: zonTotals.length > 0 ? zonTotals : [0,0,0,0,0,0],
-                    backgroundColor: '#0D9488',
-                    borderRadius: 4
-                  }]
+                  datasets: [
+                     {
+                        label: 'Jumlah Calon Berdaftar',
+                        data: totalRegistered,
+                        backgroundColor: '#0D9488',
+                        borderRadius: 4
+                     },
+                     {
+                        label: 'Jumlah Calon Hadir / Dinilai',
+                        data: totalEvaluated,
+                        backgroundColor: '#F59E0B',
+                        borderRadius: 4
+                     }
+                  ]
                 },
                 options: {
                   responsive: true,
                   maintainAspectRatio: false,
                   scales: {
-                    x: { ticks: { font: { size: 9, weight: 'bold' } } },
+                    x: { ticks: { font: { size: 9, weight: 'bold' }, color: '#1e293b' } },
                     y: { ticks: { precision: 0, font: { size: 9 } } }
                   },
-                  plugins: { legend: { display: false } }
+                  plugins: { 
+                     legend: { 
+                        position: 'bottom',
+                        labels: { font: { size: 10, weight: 'bold' }, color: '#1e293b' }
+                     } 
+                  }
                 }
               });
             }
@@ -256,17 +307,17 @@
             if (doughnutChart) doughnutChart.destroy();
             if (barChart) barChart.destroy();
           };
-        }, [zonData, jantinaData]);
+        }, [zonAttendanceData, jantinaData]);
 
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-6 border p-4 rounded-xl bg-slate-50 border-slate-200">
-             <div className="h-56 flex flex-col items-center">
-                <p className="text-xs font-bold text-slate-700 uppercase mb-2">Demografi Jantina Calon</p>
-                <div className="w-full h-44"><canvas ref={doughnutRef}></canvas></div>
+             <div className="h-60 flex flex-col items-center">
+                <p className="text-xs font-bold text-slate-800 uppercase mb-2">Demografi Jantina Calon (Bilangan & %)</p>
+                <div className="w-full h-48"><canvas ref={doughnutRef}></canvas></div>
              </div>
-             <div className="h-56 flex flex-col items-center">
-                <p className="text-xs font-bold text-slate-700 uppercase mb-2">Taburan Calon Mengikut Zon</p>
-                <div className="w-full h-44"><canvas ref={barRef}></canvas></div>
+             <div className="h-60 flex flex-col items-center">
+                <p className="text-xs font-bold text-slate-800 uppercase mb-2">Taburan Calon Berdaftar vs Hadir Dinilai</p>
+                <div className="w-full h-48"><canvas ref={barRef}></canvas></div>
              </div>
           </div>
         );
@@ -322,7 +373,7 @@
           e.preventDefault();
           setMsg({ type: '', text: '' });
 
-          const cleanIc = cleanKpNum(icInput);
+          const cleanIc = safeStr(icInput).replace(/[^0-9]/g, '');
 
           const { data: panelData, error } = await sb
             .from('panel_penemuduga')
@@ -333,7 +384,7 @@
             return;
           }
 
-          const matchedPanel = panelData.find(p => cleanKpNum(p.no_kp) === cleanIc || safeStr(p.no_kp) === safeStr(icInput));
+          const matchedPanel = panelData.find(p => safeStr(p.no_kp).replace(/[^0-9]/g, '') === cleanIc || safeStr(p.no_kp) === safeStr(icInput));
 
           if (!matchedPanel) {
             setMsg({ type: 'error', text: 'No. Kad Pengenalan tidak dijumpai dalam pangkalan data.' });
@@ -351,11 +402,11 @@
         };
 
         const fetchPenugasanAndData = async (no_kp) => {
-          const cleanKp = cleanKpNum(no_kp);
+          const cleanKp = safeStr(no_kp).replace(/[^0-9]/g, '');
           
           const { data: tugasData } = await sb.from('penugasan_panel').select('*');
           if (tugasData) {
-             const myTugas = tugasData.filter(t => cleanKpNum(t.no_kp_panel) === cleanKp || safeStr(t.no_kp_panel) === safeStr(no_kp));
+             const myTugas = tugasData.filter(t => safeStr(t.no_kp_panel).replace(/[^0-9]/g, '') === cleanKp || safeStr(t.no_kp_panel) === safeStr(no_kp));
              setPenugasanList(myTugas.length > 0 ? myTugas : tugasData);
           }
 
@@ -383,25 +434,22 @@
           const sesiFilterClean = cleanSesiName(filterSesiTapis);
 
           if (filterSesiTapis === 'SEMUA') {
-            const sesiTugasClean = cleanSesiName(selectedTugas.sesi_bertugas);
-            if (safeStr(selectedTugas.sesi_bertugas).toUpperCase().includes("SEMUA SESI")) return true;
-            return sesiCalonClean === sesiTugasClean || true; // DIBUKA KEPADA SEMUA SESI SUPAYA TIADA DATA TERSEMBUNYI
+            return true;
           }
 
           return sesiCalonClean === sesiFilterClean;
         }) : [];
 
-        // AMBIL SEMUA REKOD PENILAIAN WUJUD TANPA PENAPISAN KETAT
         const validResults = allResults;
 
-        // REKOD PENILAIAN SENDIRI PANEL LOG MASUK (PEMADANAN LONGGAR)
+        // REKOD PENILAIAN KENDIRI PANEL
         const myPersonalAssessments = validResults.filter(r => {
            if (!currentPanel) return false;
            const nameR = safeStr(r.nama_panel).toUpperCase();
            const nameP = safeStr(currentPanel.nama_penuh).toUpperCase();
            return nameR.includes(nameP) || nameP.includes(nameR);
         }).map(r => {
-           const cObj = calonList.find(c => cleanKpNum(c.no_kp) === cleanKpNum(r.no_kp_calon) || safeStr(c.no_kp) === safeStr(r.no_kp_calon));
+           const cObj = calonList.find(c => safeStr(c.no_kp).replace(/[^0-9]/g, '') === safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') || safeStr(c.no_kp) === safeStr(r.no_kp_calon));
            return {
               ...r,
               nama_calon: cObj ? safeStr(cObj.nama_penuh).toUpperCase() : (safeStr(r.no_kp_calon) || 'CALON'),
@@ -410,10 +458,10 @@
            };
         });
 
-        // KONSOLIDASI SEMUA MARKAH CALON (100% DIPAPARKAN)
+        // ENJIN KONSOLIDASI MULTI-PANEL LENGKAP KEMBALI SEPERTI IMEJ 2
         const consolidatedLiveList = calonList.map(calon => {
-           const cleanCkp = cleanKpNum(calon.no_kp);
-           const calonResList = validResults.filter(r => cleanKpNum(r.no_kp_calon) === cleanCkp || safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
+           const cleanCkp = safeStr(calon.no_kp).replace(/[^0-9]/g, '');
+           const calonResList = validResults.filter(r => safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') === cleanCkp || safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
            if (calonResList.length === 0) return null;
 
            let sums = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
@@ -484,11 +532,11 @@
 
         const handleSelectCalon = (kp) => {
           setSelectedCalonKp(kp);
-          const c = calonList.find(cal => cleanKpNum(cal.no_kp) === cleanKpNum(kp) || safeStr(cal.no_kp) === safeStr(kp));
+          const c = calonList.find(cal => safeStr(cal.no_kp).replace(/[^0-9]/g, '') === safeStr(kp).replace(/[^0-9]/g, '') || safeStr(cal.no_kp) === safeStr(kp));
           setSelectedCalon(c || null);
 
           const existingRes = validResults.find(r => 
-             (cleanKpNum(r.no_kp_calon) === cleanKpNum(kp) || safeStr(r.no_kp_calon) === safeStr(kp)) && 
+             (safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') === safeStr(kp).replace(/[^0-9]/g, '') || safeStr(r.no_kp_calon) === safeStr(kp)) && 
              (safeStr(r.nama_panel).toUpperCase().includes(safeStr(currentPanel?.nama_penuh).toUpperCase()) || safeStr(currentPanel?.nama_penuh).toUpperCase().includes(safeStr(r.nama_panel).toUpperCase()))
           );
 
@@ -609,7 +657,7 @@
           };
 
           const existingRes = validResults.find(r => 
-             cleanKpNum(r.no_kp_calon) === cleanKpNum(selectedCalon.no_kp) &&
+             safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') === safeStr(selectedCalon.no_kp).replace(/[^0-9]/g, '') &&
              safeStr(r.nama_panel).toUpperCase() === safeStr(currentPanel.nama_penuh).toUpperCase()
           );
 
@@ -708,7 +756,7 @@
                  bil: idx + 1,
                  nama: pObj ? safeStr(pObj.nama_penuh).toUpperCase() : kp,
                  jawatan: pObj ? (safeStr(pObj.jawatan).toUpperCase() || 'PEG. PERKHIDMATAN PENDIDIKAN') : 'PEG. PERKHIDMATAN PENDIDIKAN',
-                 tempat_bertugas: pObj ? (safeStr(pObj.tempat_bertugas).toUpperCase() || 'KEMENTERIAN PENDIDIKAN MALAYSIA') : 'KEMENTERIAN PENDIDIKAN MALAYSIA',
+                 tempat_bertugas: cleanTempatBertugasPanel(pObj ? pObj.tempat_bertugas : ''),
                  peranan: mapComplete[kp].peranan
               };
            });
@@ -814,10 +862,23 @@
            else jantinaDataForChart.lelaki++;
         });
 
-        const zonMapForChart = { 'UTARA':0, 'TIMUR':0, 'TENGAH':0, 'SELATAN':0, 'SABAH':0, 'SARAWAK':0 };
+        // CARTA ZON DWILAJUR (BERDAFTAR VS HADIR DINILAI)
+        const zonAttendanceMapForChart = { 
+           'UTARA': { registered:0, evaluated:0 }, 
+           'TIMUR': { registered:0, evaluated:0 }, 
+           'TENGAH': { registered:0, evaluated:0 }, 
+           'SELATAN': { registered:0, evaluated:0 }, 
+           'SABAH': { registered:0, evaluated:0 }, 
+           'SARAWAK': { registered:0, evaluated:0 } 
+        };
+
         calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
            const zName = safeStr(c.zon_temuduga).toUpperCase();
-           if (zonMapForChart[zName] !== undefined) zonMapForChart[zName]++;
+           if (zonAttendanceMapForChart[zName]) {
+              zonAttendanceMapForChart[zName].registered++;
+              const hasEvaluated = validResults.some(r => safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') === safeStr(c.no_kp).replace(/[^0-9]/g, '') || safeStr(r.no_kp_calon) === safeStr(c.no_kp));
+              if (hasEvaluated) zonAttendanceMapForChart[zName].evaluated++;
+           }
         });
 
         const totalEvaluated = listZonForChart.length;
@@ -846,7 +907,7 @@
            if (!smeMapTable[smeName]) smeMapTable[smeName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
            smeMapTable[smeName].total++;
            
-           const res = listZonForChart.find(r => cleanKpNum(r.no_kp_calon) === cleanKpNum(c.no_kp) || safeStr(r.no_kp_calon) === safeStr(c.no_kp));
+           const res = listZonForChart.find(r => safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') === safeStr(c.no_kp).replace(/[^0-9]/g, '') || safeStr(r.no_kp_calon) === safeStr(c.no_kp));
            if (res) {
               if (res.totalMarkah >= 90) smeMapTable[smeName].m90++;
               else if (res.totalMarkah >= 80) smeMapTable[smeName].m80++;
@@ -863,7 +924,7 @@
            if (!ppdMapTable[ppdName]) ppdMapTable[ppdName] = { total: 0, m90:0, m80:0, m70:0, m60:0, m50:0, m49:0 };
            ppdMapTable[ppdName].total++;
            
-           const res = listZonForChart.find(r => cleanKpNum(r.no_kp_calon) === cleanKpNum(c.no_kp) || safeStr(r.no_kp_calon) === safeStr(c.no_kp));
+           const res = listZonForChart.find(r => safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') === safeStr(c.no_kp).replace(/[^0-9]/g, '') || safeStr(r.no_kp_calon) === safeStr(c.no_kp));
            if (res) {
               if (res.totalMarkah >= 90) ppdMapTable[ppdName].m90++;
               else if (res.totalMarkah >= 80) ppdMapTable[ppdName].m80++;
@@ -1030,9 +1091,8 @@
                       <select className="w-full p-4 border border-slate-700 rounded-xl text-base font-bold bg-slate-950 text-slate-100 focus:border-amber-500 focus:outline-none uppercase" value={selectedCalonKp} onChange={e => handleSelectCalon(e.target.value)}>
                          <option value="">-- Sila Pilih Nama Calon --</option>
                          {calonBilik.map(c => {
-                            const cleanCkp = cleanKpNum(c.no_kp);
                             const dinilaiByMe = validResults.some(r => 
-                               (cleanKpNum(r.no_kp_calon) === cleanCkp || safeStr(r.no_kp_calon) === safeStr(c.no_kp)) && 
+                               (safeStr(r.no_kp_calon).replace(/[^0-9]/g, '') === safeStr(c.no_kp).replace(/[^0-9]/g, '') || safeStr(r.no_kp_calon) === safeStr(c.no_kp)) && 
                                (safeStr(r.nama_panel).toUpperCase().includes(safeStr(currentPanel?.nama_penuh).toUpperCase()) || safeStr(currentPanel?.nama_penuh).toUpperCase().includes(safeStr(r.nama_panel).toUpperCase()))
                             );
                             return (
@@ -1287,7 +1347,7 @@
                       </div>
                    )}
 
-                   {/* JADUAL REKOD PENILAIAN KENDIRI PANEL */}
+                   {/* JADUAL REKOD PENILAIAN KENDIRI PANEL (DIBUANG LAJUR STATUS) */}
                    {selectedTugas && (
                       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl mt-8 no-print">
                          <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
@@ -1317,13 +1377,12 @@
                                      <th className="p-3 text-center">Inter (10%)</th>
                                      <th className="p-3 text-center">Evi (10%)</th>
                                      <th className="p-3 text-center">Jumlah (%)</th>
-                                     <th className="p-3 text-center">Status</th>
                                   </tr>
                                </thead>
                                <tbody>
                                   {myPersonalAssessments.length === 0 ? (
                                      <tr>
-                                        <td colSpan="10" className="text-center p-6 text-slate-500 italic">
+                                        <td colSpan="9" className="text-center p-6 text-slate-500 italic">
                                            Anda belum merekodkan sebarang penilaian calon untuk sesi ini.
                                         </td>
                                      </tr>
@@ -1342,11 +1401,6 @@
                                            <td className="p-3 text-center font-mono text-amber-300">{r.skor_interpersonal || 0}/5</td>
                                            <td className="p-3 text-center font-mono text-amber-300">{r.skor_evidens || 0}/5</td>
                                            <td className="p-3 text-center font-black text-emerald-400 text-sm">{r.jumlah_markah}%</td>
-                                           <td className="p-3 text-center">
-                                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${r.status_lulus ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-red-500/20 text-red-400 border-red-500/40'}`}>
-                                                 {r.status_lulus ? 'LAYAK' : 'BELUM'}
-                                              </span>
-                                           </td>
                                         </tr>
                                      ))
                                   )}
@@ -1356,7 +1410,7 @@
                       </div>
                    )}
 
-                   {/* PUSAT KAWALAN KEPUTUSAN KETUA ZON / KETUA PANEL UTAMA */}
+                   {/* PUSAT KAWALAN KEPUTUSAN KETUA ZON / KETUA PANEL UTAMA (SAMA SEPERTI IMEJ 2) */}
                    {(selectedTugas.peranan === 'Ketua Panel Utama' || selectedTugas.peranan === 'Ketua Zon Panel Penemuduga') && (
                       <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12 max-w-full overflow-hidden">
                          
@@ -1389,7 +1443,7 @@
                             </div>
                          </div>
 
-                         {/* MOD 1: JADUAL PEMANTAUAN MULTI-PANEL LIVE */}
+                         {/* MOD 1: JADUAL PEMANTAUAN MULTI-PANEL LIVE (GANDINGAN MULTI-PANEL LENGKAP SEPERTI IMEJ 2) */}
                          {viewModePantau === 'monitor' && (
                             <div className="no-print">
                                <div className="flex justify-between items-center mb-4">
@@ -1589,7 +1643,7 @@
                                <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-blue-500/30 no-print">
                                   <div>
                                      <h3 className="text-sm font-extrabold text-blue-400">Paparan Cetakan Dokumen Rasmi A4 (Jadual & Visual HTML)</h3>
-                                     <p className="text-xs text-slate-400 mt-0.5">Laporan visual siap cetak lengkap dengan Logo KPM, Carta Cincin/Bar Zon, dan Jadual HTML tersusun.</p>
+                                     <p className="text-xs text-slate-400 mt-0.5">Laporan visual siap cetak lengkap dengan Logo KPM, Carta Cincin/Bar Dwilajur, dan Jadual HTML tersusun.</p>
                                   </div>
                                   <button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white font-black px-6 py-2.5 rounded-lg text-xs shadow-lg transition-transform active:scale-95">
                                      🖨️ Cetak Dokumen A4
@@ -1609,8 +1663,8 @@
                                      <p className="text-xs text-slate-600 font-semibold mt-1">Tarikh Janaan: {new Date().toLocaleDateString('en-GB')}</p>
                                   </div>
 
-                                  {/* VISUAL CARTA DINAMIK A4 (JANTINA + BAR ZON) */}
-                                  <PrintVisualCharts zonData={zonMapForChart} jantinaData={jantinaDataForChart} />
+                                  {/* VISUAL CARTA DINAMIK A4 (JANTINA WITH COUNT/% + BAR BERDAFTAR VS HADIR) */}
+                                  <PrintVisualCharts zonAttendanceData={zonAttendanceMapForChart} jantinaData={jantinaDataForChart} />
 
                                   {/* JADUAL 1.0 MATRIKS ZON (KHAS UNTUK KETUA PANEL UTAMA - MOD SEMUA) */}
                                   {isKebangsaan && (
@@ -1752,7 +1806,7 @@
                                      </table>
                                   </div>
 
-                                  {/* JADUAL SENARAI PANEL PENEMUDUGA (BAGI ZON KHUSUS) */}
+                                  {/* JADUAL SENARAI PANEL PENEMUDUGA (BAGI ZON KHUSUS DENGAN NAMA TEMPAT BERTUGAS DISERAGAMKAN) */}
                                   {!isKebangsaan && (
                                      <div className="space-y-2 overflow-x-auto">
                                         <h3 className="text-xs font-extrabold uppercase text-slate-800">4.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON ({zonAktifPantau})</h3>
@@ -1772,7 +1826,7 @@
                                                     <td className="p-2 text-center border-r border-slate-300 font-bold">{p.bil}</td>
                                                     <td className="p-2 border-r border-slate-300 font-bold uppercase">{p.nama}</td>
                                                     <td className="p-2 border-r border-slate-300 uppercase">{p.jawatan}</td>
-                                                    <td className="p-2 border-r border-slate-300 uppercase">{p.tempat_bertugas}</td>
+                                                    <td className="p-2 border-r border-slate-300 uppercase font-bold text-slate-800">{p.tempat_bertugas}</td>
                                                     <td className="p-2 text-center text-blue-900 font-extrabold uppercase">{p.peranan}</td>
                                                  </tr>
                                               ))}
