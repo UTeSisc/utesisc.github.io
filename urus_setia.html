@@ -79,7 +79,7 @@
         const [passInput, setPassInput] = useState('');
 
         const [selectedZon, setSelectedZon] = useState('SABAH');
-        const [activeTab, setActiveTab] = useState('daftar'); // 'daftar' | 'panel' | 'keputusan'
+        const [activeTab, setActiveTab] = useState('daftar');
         
         const [calonList, setCalonList] = useState([]);
         const [panelList, setPanelList] = useState([]);
@@ -90,7 +90,6 @@
         const [minScore, setMinScore] = useState(50);
         const [msg, setMsg] = useState({ type: '', text: '' });
 
-        // FORM CALON (CRUD)
         const [editingCalonKp, setEditingCalonKp] = useState(null);
         const [formCalon, setFormCalon] = useState({
            nama_penuh: '',
@@ -101,43 +100,53 @@
            kehadiran: 'BELUM'
         });
 
-        // LOG MASUK DARI JADUAL urus_setia SUPABASE
+        // ENJIN LOG MASUK MULTI-LAJUR (DIPERBAIKI)
         const handleLogin = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
 
-          const cleanId = safeStr(idInput);
+          const cleanId = safeStr(idInput).replace(/[^a-zA-Z0-9_]/g, '');
           const cleanPass = safeStr(passInput);
 
-          const { data: uData, error } = await sb
-            .from('urus_setia')
-            .select('*')
-            .or(`id.eq.${cleanId},no_kp.eq.${cleanId}`)
-            .single();
-
-          if (error || !uData) {
-            // SEMAKAN RIZAF JIKA AKAUN BPG UTAMA
-            if (cleanId === 'urusetia' && cleanPass === 'bpg2026') {
-               const bpgObj = { nama_penuh: 'URUS SETIA BPG', id: 'urusetia', zon: 'SEMUA' };
-               setCurrentUrusSetia(bpgObj);
-               setSelectedZon('SEMUA');
-               setIsLoggedIn(true);
-               fetchData();
-               return;
-            }
-            setMsg({ type: 'error', text: 'ID / No. KP Urus Setia tidak dijumpai.' });
-            return;
+          // AKAN RIZAF UNTUK URUS SETIA BPG UTAMA
+          if (cleanId.toLowerCase() === 'urusetia' && cleanPass === 'bpg2026') {
+             const bpgObj = { nama_penuh: 'URUS SETIA BPG', id: 'urusetia', zon: 'SEMUA' };
+             setCurrentUrusSetia(bpgObj);
+             setSelectedZon('SEMUA');
+             setIsLoggedIn(true);
+             fetchData();
+             return;
           }
 
-          if (safeStr(uData.kata_laluan) !== cleanPass) {
-            setMsg({ type: 'error', text: 'Kata laluan tidak tepat. Sila cuba lagi.' });
-            return;
+          // TARIK KESELURUHAN PROFIL URUS SETIA UNTUK PADANAN SELAMAT
+          const { data: allUS, error } = await sb.from('urus_setia').select('*');
+
+          if (error || !allUS || allUS.length === 0) {
+             setMsg({ type: 'error', text: 'Gagal menghubung pangkalan data urus_setia.' });
+             return;
           }
 
-          setCurrentUrusSetia(uData);
+          // CARIAN PADANAN KP / ID MULTI-LAJUR
+          const matchedUser = allUS.find(u => {
+             const kpVal = safeStr(u.no_kp || u.id_no_kp || u.id || u.no_ic);
+             return kpVal === cleanId || kpVal === safeStr(idInput);
+          });
+
+          if (!matchedUser) {
+             setMsg({ type: 'error', text: 'ID / No. KP Urus Setia tidak dijumpai dalam pangkalan data.' });
+             return;
+          }
+
+          // SEMAKAN KATA LALUAN MULTI-LAJUR
+          const dbPass = safeStr(matchedUser.kata_laluan || matchedUser.katalaluan || matchedUser.password);
+          if (dbPass && dbPass !== cleanPass) {
+             setMsg({ type: 'error', text: 'Kata laluan tidak tepat. Sila cuba lagi.' });
+             return;
+          }
+
+          setCurrentUrusSetia(matchedUser);
           
-          // KETETAPAN ZON DARI PROFIL
-          let uZon = safeStr(uData.zon || uData.kata_laluan).toUpperCase();
+          let uZon = safeStr(matchedUser.zon || matchedUser.kata_laluan || matchedUser.katalaluan).toUpperCase();
           if (uZon.includes('SABAH')) setSelectedZon('SABAH');
           else if (uZon.includes('UTARA')) setSelectedZon('UTARA');
           else if (uZon.includes('TIMUR')) setSelectedZon('TIMUR');
@@ -168,7 +177,6 @@
           if (isLoggedIn) fetchData();
         }, [isLoggedIn, selectedZon]);
 
-        // OPERASI SIMPAN / EDIT CALON (CRUD)
         const handleSaveCalon = async (e) => {
            e.preventDefault();
            setMsg({ type: '', text: '' });
@@ -228,7 +236,6 @@
            }
         };
 
-        // CALON TERAPIS ZON
         const filteredCalon = calonList.filter(c => {
            const padanZon = selectedZon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === selectedZon;
            if (!padanZon) return false;
@@ -236,7 +243,6 @@
            return safeStr(c.sesi).toUpperCase().includes(filterSesi);
         });
 
-        // KONSOLIDASI MARKAH CALON ZON
         const consolidatedCalon = filteredCalon.map(c => {
            const cRes = penilaianList.filter(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp));
            if (cRes.length === 0) {
@@ -286,7 +292,6 @@
            };
         });
 
-        // SENARAI PANEL ZON
         const panelZonList = () => {
            let mapComplete = {};
            penugasanList.forEach(t => {
@@ -361,7 +366,7 @@
 
             <div className="p-6 md:p-10 max-w-7xl mx-auto w-full flex-grow">
               
-              {/* LOG MASUK URUS SETIA (NO. KP & KATA LALUAN RASMI) */}
+              {/* LOG MASUK URUS SETIA */}
               {!isLoggedIn && (
                 <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl mt-12">
                    <div className="text-center mb-6">
@@ -379,7 +384,7 @@
                    <form onSubmit={handleLogin} className="space-y-4">
                       <div>
                          <label className="block text-xs font-bold text-slate-400 uppercase mb-1">ID / No. Kad Pengenalan</label>
-                         <input type="text" required placeholder="Contoh: 870922145767 / urusetia" className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-emerald-500 focus:outline-none font-mono" value={idInput} onChange={e => setIdInput(e.target.value)} />
+                         <input type="text" required placeholder="Contoh: 830322055374 / urusetia" className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-emerald-500 focus:outline-none font-mono" value={idInput} onChange={e => setIdInput(e.target.value)} />
                       </div>
 
                       <div>
@@ -529,7 +534,7 @@
                             </div>
                          </div>
 
-                         {/* JADUAL CETAKAN CALON HTML RASMI KPM (SAMA SEPERTI ADMIN) */}
+                         {/* JADUAL CETAKAN CALON HTML RASMI KPM */}
                          <div className="bg-white p-8 border rounded-xl print-area text-slate-900 shadow-xl overflow-x-auto">
                             <div className="text-center mb-6">
                                <img src="logo-kpm.png" alt="Logo KPM" className="h-16 mx-auto mb-2 object-contain" />
