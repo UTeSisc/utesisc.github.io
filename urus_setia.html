@@ -11,6 +11,8 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Babel Compiler -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
@@ -31,7 +33,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-      const { useState, useEffect } = React;
+      const { useState, useEffect, useRef } = React;
 
       const SUPABASE_URL = 'https://beyxrxnuuwegkvziglmg.supabase.co';
       const SUPABASE_KEY = 'sb_publishable_Ei-t0rPawbj3j8EpOOdAvQ_lwPz-oKO';
@@ -72,6 +74,50 @@
          return (lastDigit % 2 === 0) ? 'PEREMPUAN' : 'LELAKI';
       };
 
+      // CARTA RADAR HEXAGON INDIVIDU MESRA CETAKAN
+      function RadarIndividuChart({ skor }) {
+        const canvasRef = useRef(null);
+
+        useEffect(() => {
+          if (!canvasRef.current) return;
+          const ctx = canvasRef.current.getContext('2d');
+          let chartObj = new Chart(ctx, {
+            type: 'radar',
+            data: {
+              labels: ['BIMBINGAN (25%)', 'INSTRUKSIONAL (20%)', 'STRATEGIK (20%)', 'ANALISIS DATA (15%)', 'INTERPERSONAL (10%)', 'EVIDENS (10%)'],
+              datasets: [{
+                label: 'Profil Hexagon Muktamad',
+                data: [skor.bimb, skor.inst, skor.strat, skor.data, skor.inter, skor.evi],
+                backgroundColor: 'rgba(212, 175, 55, 0.35)',
+                borderColor: '#D4AF37',
+                borderWidth: 2.5,
+                pointBackgroundColor: '#D4AF37',
+                pointRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                r: {
+                  angleLines: { color: '#94a3b8' },
+                  grid: { color: '#cbd5e1' },
+                  ticks: { display: false },
+                  pointLabels: { font: { size: 9, weight: 'bold' }, color: '#334155' },
+                  suggestedMin: 0,
+                  suggestedMax: 5
+                }
+              },
+              plugins: { legend: { display: false } }
+            }
+          });
+
+          return () => { chartObj.destroy(); };
+        }, [skor]);
+
+        return <div className="w-full h-56"><canvas ref={canvasRef}></canvas></div>;
+      }
+
       function UrusSetiaApp() {
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [currentUrusSetia, setCurrentUrusSetia] = useState(null);
@@ -79,7 +125,7 @@
         const [passInput, setPassInput] = useState('');
 
         const [selectedZon, setSelectedZon] = useState('SABAH');
-        const [activeTab, setActiveTab] = useState('daftar');
+        const [activeTab, setActiveTab] = useState('daftar'); // 'daftar' | 'panel' | 'keputusan' | 'individu'
         
         const [calonList, setCalonList] = useState([]);
         const [panelList, setPanelList] = useState([]);
@@ -90,6 +136,11 @@
         const [minScore, setMinScore] = useState(50);
         const [msg, setMsg] = useState({ type: '', text: '' });
 
+        // STATE CETAK INDIVIDU
+        const [selectedIndividuSesi, setSelectedIndividuSesi] = useState('SEMUA');
+        const [selectedIndividuKp, setSelectedIndividuKp] = useState('');
+
+        // FORM CALON (CRUD)
         const [editingCalonKp, setEditingCalonKp] = useState(null);
         const [formCalon, setFormCalon] = useState({
            nama_penuh: '',
@@ -100,7 +151,7 @@
            kehadiran: 'BELUM'
         });
 
-        // ENJIN LOG MASUK MULTI-LAJUR (DIPERBAIKI)
+        // ENJIN LOG MASUK
         const handleLogin = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -108,7 +159,6 @@
           const cleanId = safeStr(idInput).replace(/[^a-zA-Z0-9_]/g, '');
           const cleanPass = safeStr(passInput);
 
-          // AKAN RIZAF UNTUK URUS SETIA BPG UTAMA
           if (cleanId.toLowerCase() === 'urusetia' && cleanPass === 'bpg2026') {
              const bpgObj = { nama_penuh: 'URUS SETIA BPG', id: 'urusetia', zon: 'SEMUA' };
              setCurrentUrusSetia(bpgObj);
@@ -118,7 +168,6 @@
              return;
           }
 
-          // TARIK KESELURUHAN PROFIL URUS SETIA UNTUK PADANAN SELAMAT
           const { data: allUS, error } = await sb.from('urus_setia').select('*');
 
           if (error || !allUS || allUS.length === 0) {
@@ -126,7 +175,6 @@
              return;
           }
 
-          // CARIAN PADANAN KP / ID MULTI-LAJUR
           const matchedUser = allUS.find(u => {
              const kpVal = safeStr(u.no_kp || u.id_no_kp || u.id || u.no_ic);
              return kpVal === cleanId || kpVal === safeStr(idInput);
@@ -137,7 +185,6 @@
              return;
           }
 
-          // SEMAKAN KATA LALUAN MULTI-LAJUR
           const dbPass = safeStr(matchedUser.kata_laluan || matchedUser.katalaluan || matchedUser.password);
           if (dbPass && dbPass !== cleanPass) {
              setMsg({ type: 'error', text: 'Kata laluan tidak tepat. Sila cuba lagi.' });
@@ -251,12 +298,16 @@
                  jantina: detectJantinaFromKP(c.no_kp),
                  ppdClean: mapPPDStandard(c.ppd),
                  totalMarkah: 0,
-                 statusDinilai: 'BELUM'
+                 statusDinilai: 'BELUM',
+                 avgBimb:0, avgInst:0, avgStrat:0, avgData:0, avgInter:0, avgEvi:0,
+                 ulasanList: [], panelNames: []
               };
            }
 
            let sums = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
            let counts = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
+           let ulasanArr = [];
+           let panelNamesArr = [];
 
            cRes.forEach(r => {
               if (Number(r.skor_bimbingan) > 0) { sums.bimb += Number(r.skor_bimbingan); counts.bimb++; }
@@ -265,6 +316,13 @@
               if (Number(r.skor_analisis_data) > 0) { sums.data += Number(r.skor_analisis_data); counts.data++; }
               if (Number(r.skor_interpersonal) > 0) { sums.inter += Number(r.skor_interpersonal); counts.inter++; }
               if (Number(r.skor_evidens) > 0) { sums.evi += Number(r.skor_evidens); counts.evi++; }
+
+              const pName = safeStr(r.nama_panel).toUpperCase();
+              if (pName && !panelNamesArr.includes(pName)) panelNamesArr.push(pName);
+
+              if (r.ulasan_panel && r.ulasan_panel.trim() !== '') {
+                 ulasanArr.push({ panel: pName, ulasan: r.ulasan_panel.trim() });
+              }
            });
 
            const avgBimb = counts.bimb > 0 ? (sums.bimb / counts.bimb) : 0;
@@ -288,7 +346,10 @@
               jantina: detectJantinaFromKP(c.no_kp),
               ppdClean: mapPPDStandard(c.ppd),
               totalMarkah: total,
-              statusDinilai: 'SELESAI'
+              statusDinilai: 'SELESAI',
+              avgBimb, avgInst, avgStrat, avgData, avgInter, avgEvi,
+              ulasanList: ulasanArr,
+              panelNames: panelNamesArr
            };
         });
 
@@ -336,6 +397,14 @@
           link.setAttribute("download", `Senarai_Calon_SISC_Zon_${selectedZon}.csv`);
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
+
+        // DATA UNTUK BORANG RUMUSAN INDIVIDU
+        const calonIndividuList = consolidatedCalon.filter(c => {
+           if (selectedIndividuSesi === 'SEMUA') return true;
+           return safeStr(c.sesi).toUpperCase().includes(selectedIndividuSesi);
+        });
+
+        const selectedCalonIndividu = calonIndividuList.find(c => safeStr(c.no_kp) === selectedIndividuKp) || calonIndividuList[0] || null;
 
         return (
           <div className="min-h-screen flex flex-col">
@@ -419,7 +488,10 @@
                             📋 Panel Penemuduga Zon
                          </button>
                          <button onClick={() => setActiveTab('keputusan')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all border ${activeTab === 'keputusan' ? 'bg-blue-500 text-white border-blue-400 shadow-lg' : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
-                            🖨️ Laporan Keputusan Rasmi A4
+                            📑 Laporan Keputusan Rasmi
+                         </button>
+                         <button onClick={() => setActiveTab('individu')} className={`px-5 py-2.5 rounded-xl font-extrabold text-xs transition-all border ${activeTab === 'individu' ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-lg' : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800'}`}>
+                            🖨️ Cetak Individu (Borang Muktamad)
                          </button>
                       </div>
 
@@ -718,6 +790,193 @@
                             </div>
 
                          </div>
+                      </div>
+                   )}
+
+                   {/* TAB 4: CETAK INDIVIDU (BORANG RUMUSAN SKOR INDIVIDU MUKTAMAD SISC+) */}
+                   {activeTab === 'individu' && (
+                      <div className="space-y-6">
+                         
+                         {/* PENAPIS INDIVIDU */}
+                         <div className="bg-slate-900 p-6 rounded-2xl border border-amber-500/40 shadow-xl space-y-4 no-print">
+                            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                               <div>
+                                  <h3 className="text-base font-extrabold text-amber-400 uppercase">Cetakan Rumusan Skor Individu Muktamad</h3>
+                                  <p className="text-xs text-slate-400 mt-0.5">Pilih Sesi dan Nama Calon bagi Zon {selectedZon} untuk menjana Borang Muktamad A4.</p>
+                               </div>
+                               <button onClick={() => window.print()} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-2.5 rounded-lg text-xs shadow transition-transform active:scale-95 flex items-center gap-2">
+                                  <span>🖨️ Cetak Borang Muktamad</span>
+                               </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                               <div>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">1. Zon Bertugas</label>
+                                  <input type="text" readOnly className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-bold text-emerald-400 uppercase" value={`ZON ${selectedZon}`} />
+                               </div>
+
+                               <div>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">2. Pilih Sesi</label>
+                                  <select className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-bold text-amber-400 focus:border-amber-500 focus:outline-none" value={selectedIndividuSesi} onChange={e => { setSelectedIndividuSesi(e.target.value); setSelectedIndividuKp(''); }}>
+                                     <option value="SEMUA">KESEMUA SESI</option>
+                                     <option value="SESI 1">SESI 1</option>
+                                     <option value="SESI 2">SESI 2</option>
+                                     <option value="SESI 3">SESI 3</option>
+                                     <option value="SESI 4">SESI 4</option>
+                                     <option value="SESI 5">SESI 5</option>
+                                     <option value="SESI 6">SESI 6</option>
+                                     <option value="SESI KHAS">SESI KHAS</option>
+                                  </select>
+                               </div>
+
+                               <div>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">3. Pilih Nama Calon</label>
+                                  <select className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-bold text-slate-100 uppercase focus:border-amber-500 focus:outline-none" value={selectedIndividuKp} onChange={e => setSelectedIndividuKp(e.target.value)}>
+                                     <option value="">-- Sila Pilih Calon --</option>
+                                     {calonIndividuList.map(c => (
+                                        <option key={c.no_kp} value={c.no_kp}>
+                                           {safeStr(c.nama_penuh).toUpperCase()} ({c.no_kp}) [{c.totalMarkah}%]
+                                        </option>
+                                     ))}
+                                  </select>
+                               </div>
+                            </div>
+                         </div>
+
+                         {/* PAPARAN BORANG RUMUSAN INDIVIDU MUKTAMAD (A4 READY) */}
+                         {selectedCalonIndividu ? (
+                            <div className="bg-white p-8 md:p-10 border rounded-xl print-area text-slate-900 shadow-2xl space-y-6">
+                               
+                               {/* KEPALA SURAT */}
+                               <div className="text-center border-b-2 border-slate-900 pb-4">
+                                  <img src="logo-kpm.png" alt="Logo KPM" className="h-16 mx-auto mb-2 object-contain" />
+                                  <h3 className="text-xs font-bold uppercase tracking-wider">Kementerian Pendidikan</h3>
+                                  <h4 className="text-[11px] font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
+                                  <h2 className="text-base font-black uppercase mt-2 text-slate-900 border-b-2 border-slate-900 pb-0.5 inline-block">
+                                     BORANG RUMUSAN SKOR INDIVIDU MUKTAMAD SISC+
+                                  </h2>
+                               </div>
+
+                               {/* JADUAL PROFIL & MARKAH MUKTAMAD CALON */}
+                               <table className="w-full text-xs border-collapse border border-slate-400">
+                                  <tbody>
+                                     <tr className="border-b border-slate-400">
+                                        <td className="p-2.5 border-r border-slate-400 font-bold bg-slate-100 uppercase w-48">NAMA CALON</td>
+                                        <td className="p-2.5 font-black uppercase text-sm">{safeStr(selectedCalonIndividu.nama_penuh)}</td>
+                                     </tr>
+                                     <tr className="border-b border-slate-400">
+                                        <td className="p-2.5 border-r border-slate-400 font-bold bg-slate-100 uppercase">NO. KAD PENGENALAN</td>
+                                        <td className="p-2.5 font-mono font-bold">{selectedCalonIndividu.no_kp}</td>
+                                     </tr>
+                                     <tr className="border-b border-slate-400">
+                                        <td className="p-2.5 border-r border-slate-400 font-bold bg-slate-100 uppercase">PPD & SUBJEK</td>
+                                        <td className="p-2.5 font-bold uppercase">{selectedCalonIndividu.ppdClean} ({safeStr(selectedCalonIndividu.sme_subjek) || 'SME'})</td>
+                                     </tr>
+                                  </tbody>
+                               </table>
+
+                               {/* JADUAL PECAHAN 6 KOMPETENSI BARS */}
+                               <table className="w-full text-xs border-collapse border border-slate-400">
+                                  <thead>
+                                     <tr className="bg-slate-200 border-b border-slate-400 font-bold uppercase">
+                                        <th className="p-2.5 border-r border-slate-400 text-left">KOMPETENSI (PURATA MUKTAMAD)</th>
+                                        <th className="p-2.5 text-center w-32">MARKAH (%)</th>
+                                     </tr>
+                                  </thead>
+                                  <tbody className="font-semibold">
+                                     <tr className="border-b border-slate-300">
+                                        <td className="p-2 border-r border-slate-300">BIMBINGAN (25%)</td>
+                                        <td className="p-2 text-center font-bold">{((selectedCalonIndividu.avgBimb / 5) * 25).toFixed(1)}</td>
+                                     </tr>
+                                     <tr className="border-b border-slate-300">
+                                        <td className="p-2 border-r border-slate-300">INSTRUKSIONAL (20%)</td>
+                                        <td className="p-2 text-center font-bold">{((selectedCalonIndividu.avgInst / 5) * 20).toFixed(1)}</td>
+                                     </tr>
+                                     <tr className="border-b border-slate-300">
+                                        <td className="p-2 border-r border-slate-300">STRATEGIK (20%)</td>
+                                        <td className="p-2 text-center font-bold">{((selectedCalonIndividu.avgStrat / 5) * 20).toFixed(1)}</td>
+                                     </tr>
+                                     <tr className="border-b border-slate-300">
+                                        <td className="p-2 border-r border-slate-300">ANALISIS DATA (15%)</td>
+                                        <td className="p-2 text-center font-bold">{((selectedCalonIndividu.avgData / 5) * 15).toFixed(1)}</td>
+                                     </tr>
+                                     <tr className="border-b border-slate-300">
+                                        <td className="p-2 border-r border-slate-300">INTERPERSONAL (10%)</td>
+                                        <td className="p-2 text-center font-bold">{((selectedCalonIndividu.avgInter / 5) * 10).toFixed(1)}</td>
+                                     </tr>
+                                     <tr className="border-b border-slate-300">
+                                        <td className="p-2 border-r border-slate-300">EVIDENS (10%)</td>
+                                        <td className="p-2 text-center font-bold">{((selectedCalonIndividu.avgEvi / 5) * 10).toFixed(1)}</td>
+                                     </tr>
+                                     <tr className="bg-amber-100 font-extrabold border-t-2 border-slate-900">
+                                        <td className="p-2.5 border-r border-slate-400 uppercase text-slate-900">JUMLAH MARKAH MUKTAMAD</td>
+                                        <td className="p-2.5 text-center text-base text-blue-900">{selectedCalonIndividu.totalMarkah}%</td>
+                                     </tr>
+                                  </tbody>
+                               </table>
+
+                               {/* SINTESIS ULASAN PANEL PENEMUDUGA */}
+                               <div className="space-y-2">
+                                  <h3 className="text-xs font-extrabold uppercase text-slate-900 border-b border-slate-300 pb-1">Sintesis Ulasan Panel Penemuduga:</h3>
+                                  {selectedCalonIndividu.ulasanList && selectedCalonIndividu.ulasanList.length > 0 ? (
+                                     <div className="space-y-2 text-xs font-mono text-slate-800 leading-relaxed bg-slate-50 p-3 rounded border border-slate-300">
+                                        {selectedCalonIndividu.ulasanList.map((u, uIdx) => (
+                                           <div key={uIdx} className="border-b border-slate-200 pb-2 last:border-b-0">
+                                              <p className="font-bold text-amber-900 uppercase">• {u.panel}:</p>
+                                              <p className="pl-3 whitespace-pre-line">{u.ulasan}</p>
+                                           </div>
+                                        ))}
+                                     </div>
+                                  ) : (
+                                     <p className="text-xs italic text-slate-500 bg-slate-50 p-3 rounded border border-slate-300">Tiada ulasan naratif direkodkan oleh panel penemuduga bagi calon ini.</p>
+                                  )}
+                               </div>
+
+                               {/* PROFIL HEXAGON RADAR & SENARAI PANEL */}
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center pt-2">
+                                  <div className="text-center">
+                                     <p className="text-xs font-bold text-slate-800 uppercase mb-1">PROFIL HEXAGON MUKTAMAD</p>
+                                     <RadarIndividuChart skor={{
+                                        bimb: selectedCalonIndividu.avgBimb,
+                                        inst: selectedCalonIndividu.avgInst,
+                                        strat: selectedCalonIndividu.avgStrat,
+                                        data: selectedCalonIndividu.avgData,
+                                        inter: selectedCalonIndividu.avgInter,
+                                        evi: selectedCalonIndividu.avgEvi
+                                     }} />
+                                  </div>
+
+                                  <div className="text-xs text-slate-800 space-y-3">
+                                     <div>
+                                        <p className="font-extrabold uppercase text-slate-900">SENARAI PANEL PENEMUDUGA YANG MENILAI CALON INI:</p>
+                                        <p className="font-bold text-emerald-800 uppercase mt-1">
+                                           {selectedCalonIndividu.panelNames && selectedCalonIndividu.panelNames.length > 0 ? selectedCalonIndividu.panelNames.join(', ') : 'BELUM DINILAI'}
+                                        </p>
+                                     </div>
+
+                                     <div className="pt-4 border-t border-slate-300">
+                                        <p className="font-bold text-slate-500 uppercase text-[10px]">DICETAK OLEH:</p>
+                                        <p className="font-extrabold uppercase text-xs">{safeStr(currentUrusSetia?.nama_penuh).toUpperCase() || 'URUS SETIA ZON'}</p>
+                                        <p className="text-[10px] text-slate-600 font-semibold">URUS SETIA TEMU DUGA SISC+ (ZON {selectedZon})</p>
+                                        <p className="text-[10px] text-slate-500 font-bold mt-1">Tarikh Cetakan: {new Date().toLocaleDateString('en-GB')}</p>
+                                     </div>
+                                  </div>
+                               </div>
+
+                               {/* CATATAN kaki cetakan */}
+                               <div className="text-[10px] text-slate-500 italic border-t border-slate-300 pt-2 text-center">
+                                  * Dokumen rumusan muktamad ini dijana secara automatik oleh Sistem Pengurusan Temu Duga SISC+ dan tidak memerlukan tandatangan fizikal.
+                               </div>
+
+                            </div>
+                         ) : (
+                            <div className="bg-slate-900 p-12 rounded-2xl border border-slate-800 text-center">
+                               <span className="text-5xl text-slate-600">👤</span>
+                               <h3 className="text-base font-bold text-slate-300 mt-2">Tiada Calon Dipilih</h3>
+                               <p className="text-xs text-slate-500 mt-1">Sila pilih Sesi dan Nama Calon pada kotak carian di atas untuk memaparkan Borang Muktamad.</p>
+                            </div>
+                         )}
+
                       </div>
                    )}
 
