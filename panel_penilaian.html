@@ -192,7 +192,6 @@
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      // CARTA VISUAL A4 TERBAIKI: BAR MENGIKUT ZON SAHAJA (BERSIH & TIDAK SESAK)
       function PrintVisualCharts({ zonData, jantinaData }) {
         const doughnutRef = useRef(null);
         const barRef = useRef(null);
@@ -645,7 +644,6 @@
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
-        // SENARAI LENGKAP PANEL ZON
         const getPanelZonListComplete = () => {
            let mapComplete = {};
 
@@ -687,57 +685,34 @@
            });
         };
 
-        // DRAF RUMUSAN TEXT RINGKAS DBP
-        const generateZonSummaryText = () => {
+        const generatePureNaratifText = () => {
            const isKebangsaan = (zonAktifPantau === 'SEMUA');
            const listZon = consolidatedLiveList.filter(r => isKebangsaan || safeStr(r.zon).toUpperCase() === zonAktifPantau);
            const totalCalonZon = calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).length;
            const totalEvaluated = listZon.length;
 
-           let countLelaki = 0, countPerempuan = 0;
-           listZon.forEach(r => { if (r.jantina === 'PEREMPUAN') countPerempuan++; else countLelaki++; });
-
-           let t = `BAHAGIAN PROFESIONALISME GURU\nKEMENTERIAN PENDIDIKAN MALAYSIA\n`;
-           t += `========================================================================================\n`;
-           if (isKebangsaan) {
-              t += `LAPORAN SINTESIS STRATEGIK KEBANGSAAN PENILAIAN KOMPETENSI PEMILIHAN PEGAWAI SISC+\n`;
-              t += `PERINGKAT: KESELURUHAN MALAYSIA (6 ZON) | TARIKH JANAAN: ${new Date().toLocaleDateString('en-GB')}\n`;
-           } else {
-              t += `LAPORAN ANALISIS STRATEGIK DAN RUMUSAN PENILAIAN KOMPETENSI PEMILIHAN PEGAWAI SISC+\n`;
-              t += `ZON: ${zonAktifPantau} | TARIKH JANAAN: ${new Date().toLocaleDateString('en-GB')}\n`;
-           }
-           t += `========================================================================================\n\n`;
-           
-           t += `1.0 STATUS KEHADIRAN DAN DEMOGRAFI CALON\n`;
-           t += `   Seramai ${totalCalonZon} calon telah didaftarkan bagi sesi penilaian pemilihan Pegawai SISC+ ${isKebangsaan ? 'di seluruh negara' : 'di Zon ' + zonAktifPantau}.\n`;
-           t += `   Setakat tarikh laporan ini dijana, seramai ${totalEvaluated} calon (${totalCalonZon > 0 ? Math.round((totalEvaluated/totalCalonZon)*100) : 0}%) telah selesai menduduki sesi\n`;
-           t += `   temu duga penilaian berstruktur berasaskan Rubrik BARS KPM.\n\n`;
-           t += `   Pecahan Demografi Calon Dinilai:\n`;
-           t += `   • Lelaki     : ${countLelaki} (${totalEvaluated > 0 ? ((countLelaki/totalEvaluated)*100).toFixed(1) : 0}%)\n`;
-           t += `   • Perempuan  : ${countPerempuan} (${totalEvaluated > 0 ? ((countPerempuan/totalEvaluated)*100).toFixed(1) : 0}%)\n\n`;
+           let t = `ULASAN NARATIF & SINTESIS EKSEKUTIF (${isKebangsaan ? 'KESELURUHAN MALAYSIA' : 'ZON ' + zonAktifPantau})\n`;
+           t += `----------------------------------------------------------------------------------------\n`;
+           t += `Proses penilaian berstruktur bagi calon Pegawai SISC+ ${isKebangsaan ? 'di seluruh zon' : 'di Zon ' + zonAktifPantau} telah dilaksanakan berasaskan Rubrik BARS KPM. Daripada jumlah seramai ${totalCalonZon} calon yang terdaftar, seramai ${totalEvaluated} calon (${totalCalonZon > 0 ? Math.round((totalEvaluated/totalCalonZon)*100) : 0}%) telah selesai menduduki sesi temu duga secara rasmi.\n\n`;
 
            if (isKebangsaan) {
-              t += `2.0 SINTESIS RUMUSAN DAN CATATAN KETUA-KETUA ZON\n`;
+              t += `DAPATAN SINTESIS KEBANGSAAN KETUA PANEL UTAMA:\n`;
               const allZons = ['UTARA', 'TIMUR', 'TENGAH', 'SELATAN', 'SABAH', 'SARAWAK'];
               allZons.forEach(zName => {
                  const savedObj = allSavedRumusan.find(s => safeStr(s.zon).toUpperCase() === zName);
-                 t += `   • ZON ${zName}:\n`;
+                 t += `• RUMUSAN ZON ${zName}:\n`;
                  if (savedObj && savedObj.teks_rumusan) {
-                    const lines = savedObj.teks_rumusan.split('\n').map(l => '     ' + l).join('\n');
-                    t += `${lines}\n\n`;
+                    t += `  ${savedObj.teks_rumusan.trim()}\n\n`;
                  } else {
-                    t += `     (Laporan rasmi bagi Zon ${zName} belum disunting/disimpan oleh Ketua Zon).\n\n`;
+                    t += `  (Ketua Zon ${zName} belum menyunting/menyimpan ulasan rasmi zon).\n\n`;
                  }
               });
            } else {
-              t += `2.0 RUMUSAN DAN CATATAN KETUA ZON\n`;
-              t += `   Laporan ini mengandungi taburan data markah mentah, demografi jantina, serta purata pencapaian\n`;
-              t += `   kompetensi bagi Zon ${zonAktifPantau} untuk dikemukakan kepada Pengurusan BPG KPM bagi tindakan selanjutnya.\n\n`;
+              t += `DAPATAN UTAMA & ULASAN KETUA ZON (${zonAktifPantau}):\n`;
+              t += `1. Secara umumnya, calon-calon yang dinilai mempamerkan kesediaan kompetensi bimbingan instruksional yang kukuh, khususnya dalam aspek komunikasi interpersonal serta penghayatan fungsi SISC+.\n`;
+              t += `2. Aspek analisis data dan pemikiran strategik perlu diberi penekanan susulan menerusi program peningkatan profesionalisme berterusan bagi memantapkan kualiti bimbingan di peringkat daerah (PPD).\n`;
+              t += `3. Seluruh dapatan skor telah disahkan oleh panel penemuduga bagi tindakan pertimbangan Pengurusan BPG KPM.\n`;
            }
-
-           t += `========================================================================================\n`;
-           t += `Laporan ini dijana secara automatik oleh Sistem Pengurusan Temu Duga SISC+ dan disahkan\n`;
-           t += `oleh ${isKebangsaan ? 'Ketua Panel Utama' : 'Ketua Zon Panel Penemuduga'}.\n`;
 
            return t;
         };
@@ -750,10 +725,10 @@
                     if (data && data.teks_rumusan) {
                        setEditableZonText(data.teks_rumusan);
                     } else {
-                       setEditableZonText(generateZonSummaryText());
+                       setEditableZonText(generatePureNaratifText());
                     }
                  } catch(err) {
-                    setEditableZonText(generateZonSummaryText());
+                    setEditableZonText(generatePureNaratifText());
                  }
               };
               fetchRumusanDB();
@@ -785,7 +760,7 @@
               if (err) {
                  alert('Gagal menyimpan rumusan: ' + err.message);
               } else {
-                 alert(`Rumusan Laporan Eksekutif bagi Zon ${zonAktifPantau} berjaya disimpan!`);
+                 alert(`Ulasan Laporan Eksekutif bagi Zon ${zonAktifPantau} berjaya disimpan!`);
                  fetchPenugasanAndData(currentPanel.no_kp);
               }
            } catch (e) {
@@ -810,14 +785,12 @@
            else jantinaDataForChart.lelaki++;
         });
 
-        // TABURAN CARTA MENGIKUT ZON SAHAJA (6 ZON - HAPUSKAN PPD)
         const zonMapForChart = { 'UTARA':0, 'TIMUR':0, 'TENGAH':0, 'SELATAN':0, 'SABAH':0, 'SARAWAK':0 };
         calonList.filter(c => isKebangsaan || safeStr(c.zon_temuduga).toUpperCase() === zonAktifPantau).forEach(c => {
            const zName = safeStr(c.zon_temuduga).toUpperCase();
            if (zonMapForChart[zName] !== undefined) zonMapForChart[zName]++;
         });
 
-        // DATA JADUAL SME & PPD DUKUNGAN HTML
         const totalEvaluated = listZonForChart.length;
         let sumBimb = 0, sumInst = 0, sumStrat = 0, sumData = 0, sumInter = 0, sumEvi = 0;
         if (totalEvaluated > 0) {
@@ -1005,7 +978,7 @@
                       </div>
                    )}
 
-                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI */}
+                   {/* PILIHAN CALON + DROPDOWN TAPISAN SESI (DITAMBAH SESI 6) */}
                    <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg space-y-4 no-print">
                       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-3">
                          <label className="text-xs font-extrabold uppercase text-amber-400">PILIH CALON UNTUK DINILAI ({safeStr(selectedTugas.zon_bertugas).toUpperCase()})</label>
@@ -1019,6 +992,7 @@
                                <option value="SESI 3">SESI 3</option>
                                <option value="SESI 4">SESI 4</option>
                                <option value="SESI 5">SESI 5</option>
+                               <option value="SESI 6">SESI 6</option>
                                <option value="SESI KHAS">SESI KHAS</option>
                             </select>
                          </div>
@@ -1285,7 +1259,7 @@
 
                    {/* PUSAT PEMANTAUAN & LAPORAN KEPUTUSAN KETUA ZON / KETUA PANEL UTAMA */}
                    {(selectedTugas.peranan === 'Ketua Panel Utama' || selectedTugas.peranan === 'Ketua Zon Panel Penemuduga') && (
-                      <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12">
+                      <div className="bg-slate-900 border-2 border-amber-500/40 p-6 rounded-2xl shadow-2xl mt-12 max-w-full overflow-hidden">
                          
                          {/* TOGGLE MOD PAPARAN */}
                          <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4 no-print">
@@ -1433,7 +1407,7 @@
                                   </div>
                                </div>
 
-                               <div className="bg-white p-8 border rounded-xl print-area text-slate-900 shadow-xl">
+                               <div className="bg-white p-8 border rounded-xl print-area text-slate-900 shadow-xl overflow-x-auto">
                                   <div className="text-center mb-8">
                                      <img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" />
                                      <h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan</h3>
@@ -1493,24 +1467,24 @@
                                         <h3 className="text-base font-extrabold text-purple-400 flex items-center gap-2">
                                            ⚡ Janaan Laporan Analisis Eksekutif ({zonAktifPantau})
                                         </h3>
-                                        <p className="text-xs text-slate-400 mt-0.5">Sila sunting teks laporan di bawah jika ada ulasan tambahan, kemudian tekan 'Simpan Rumusan Zon'.</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">Sila sunting ulasan kualitatif di bawah jika ada dapatan tambahan, kemudian tekan 'Simpan Rumusan Zon'.</p>
                                      </div>
                                      <div className="flex gap-2">
                                         <button onClick={handleSaveRumusanToDB} disabled={isSavingRumusan} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-4 py-2 rounded-lg text-xs shadow transition-transform active:scale-95 disabled:opacity-50">
                                            {isSavingRumusan ? '💾 Menyimpan...' : '💾 Simpan Rumusan Zon'}
                                         </button>
-                                        <button onClick={() => { navigator.clipboard.writeText(editableZonText); alert('Teks laporan analisis berjaya disalin!'); }} className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-4 py-2 rounded-lg text-xs shadow transition-transform active:scale-95">
-                                           📋 Salin Teks
+                                        <button onClick={() => { navigator.clipboard.writeText(editableZonText); alert('Ulasan naratif berjaya disalin!'); }} className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-4 py-2 rounded-lg text-xs shadow transition-transform active:scale-95">
+                                           📋 Salin Ulasan
                                         </button>
                                      </div>
                                   </div>
 
-                                  <textarea rows="24" className="w-full p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono leading-relaxed text-slate-100 focus:border-purple-500 focus:outline-none" value={editableZonText} onChange={e => setEditableZonText(e.target.value)}></textarea>
+                                  <textarea rows="18" className="w-full p-4 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono leading-relaxed text-slate-100 focus:border-purple-500 focus:outline-none" value={editableZonText} onChange={e => setEditableZonText(e.target.value)}></textarea>
                                </div>
                             </div>
                          )}
 
-                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF (JADUAL HTML RASMI KPM) */}
+                         {/* MOD 4: PAPARAN CETAKAN VISUAL A4 EKSKLUSIF (TIDAK OVERFLOW & TANPA TEKS BERULANG) */}
                          {viewModePantau === 'print_visual' && (
                             <div className="space-y-6">
                                <div className="flex justify-between items-center bg-slate-950 p-4 rounded-xl border border-blue-500/30 no-print">
@@ -1523,7 +1497,7 @@
                                   </button>
                                </div>
 
-                               <div className="bg-white p-10 border rounded-xl print-area text-slate-900 shadow-2xl space-y-6">
+                               <div className="bg-white p-6 md:p-10 border rounded-xl print-area text-slate-900 shadow-2xl space-y-6 max-w-full overflow-hidden">
                                   
                                   {/* KEPALA SURAT */}
                                   <div className="text-center border-b-2 border-slate-900 pb-4">
@@ -1541,7 +1515,7 @@
 
                                   {/* JADUAL 1.0 MATRIKS ZON (KHAS UNTUK KETUA PANEL UTAMA - MOD SEMUA) */}
                                   {isKebangsaan && (
-                                     <div className="space-y-2">
+                                     <div className="space-y-2 overflow-x-auto">
                                         <h3 className="text-xs font-extrabold uppercase text-slate-800">1.0 MATRIKS PERBANDINGAN TAHAP PENCAPAAN MENGIKUT ZON</h3>
                                         <table className="w-full text-xs border-collapse border border-slate-400">
                                            <thead>
@@ -1585,7 +1559,7 @@
                                   )}
 
                                   {/* JADUAL 2.0 PURATA KOMPETENSI 6 ELEMEN */}
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 overflow-x-auto">
                                      <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '2.0' : '1.0'} ANALISIS PURATA PENGUASAAN KOMPETENSI (6 ELEMEN BARS)</h3>
                                      <table className="w-full text-xs border-collapse border border-slate-400">
                                         <thead>
@@ -1608,7 +1582,7 @@
                                   </div>
 
                                   {/* JADUAL 3.0 SME SUBJEK */}
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 overflow-x-auto">
                                      <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '3.0' : '2.0'} PRESTASI MENGIKUT BIDANG KEPAKARAN SUBJEK (SME)</h3>
                                      <table className="w-full text-xs border-collapse border border-slate-400">
                                         <thead>
@@ -1644,7 +1618,7 @@
                                   </div>
 
                                   {/* JADUAL 4.0 PPD */}
-                                  <div className="space-y-2">
+                                  <div className="space-y-2 overflow-x-auto">
                                      <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '4.0' : '3.0'} ANALISIS MATRIKS MARKAH MENGIKUT PPD</h3>
                                      <table className="w-full text-xs border-collapse border border-slate-400">
                                         <thead>
@@ -1679,18 +1653,10 @@
                                      </table>
                                   </div>
 
-                                  {/* TEKS NARATIF RUMUSAN YANG DISUNTING & DISIMPAN */}
-                                  <div className="space-y-2">
-                                     <h3 className="text-xs font-extrabold uppercase text-slate-800">{isKebangsaan ? '5.0' : '4.0'} TEKS RUMUSAN & SINTESIS EKSEKUTIF</h3>
-                                     <div className="bg-slate-50 p-4 rounded-lg border border-slate-300 whitespace-pre-line text-xs font-mono leading-relaxed text-slate-800">
-                                        {editableZonText || generateZonSummaryText()}
-                                     </div>
-                                  </div>
-
                                   {/* JADUAL SENARAI PANEL PENEMUDUGA (BAGI ZON KHUSUS) */}
                                   {!isKebangsaan && (
-                                     <div className="space-y-2">
-                                        <h3 className="text-xs font-extrabold uppercase text-slate-800">5.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON ({zonAktifPantau})</h3>
+                                     <div className="space-y-2 overflow-x-auto">
+                                        <h3 className="text-xs font-extrabold uppercase text-slate-800">4.0 SENARAI PEGAWAI PANEL PENEMUDUGA ZON ({zonAktifPantau})</h3>
                                         <table className="w-full text-xs border-collapse border border-slate-400">
                                            <thead>
                                               <tr className="bg-slate-200 border-b border-slate-400 text-left font-bold">
