@@ -42,7 +42,7 @@
       const safeStr = (val) => (val ? String(val).trim() : '');
       const cleanKpNum = (val) => safeStr(val).replace(/[^0-9]/g, '');
 
-      // PENYELARASAN TEMPAT BERTUGAS PANEL (IAB -> INSTITUT AMINUDDIN BAKI)
+      // PENYELARASAN TEMPAT BERTUGAS PANEL
       const cleanTempatBertugasPanel = (rawPlace) => {
          const str = safeStr(rawPlace).toUpperCase();
          if (!str) return 'KEMENTERIAN PENDIDIKAN MALAYSIA';
@@ -56,7 +56,7 @@
          return str;
       };
 
-      // ENJIN PEMETAAN PINTAR PPD & NEGERI DARI NAMA SEKOLAH / TEMPAT BERTUGAS
+      // ENJIN PEMETAAN PINTAR PPD
       const mapPPDStandard = (rawPpd) => {
          const str = safeStr(rawPpd).toUpperCase();
          if (!str) return 'TIADA PPD';
@@ -215,7 +215,7 @@
         return <div className="w-full h-52"><canvas ref={canvasRef}></canvas></div>;
       }
 
-      // CARTA BAR PRESTASI ZON (MENYOKONG HYBRID SUB-ZON SARAWAK SECARA AGREGAT)
+      // CARTA BAR PRESTASI ZON
       function BarZonChart({ zonData }) {
         const canvasRef = useRef(null);
         useEffect(() => {
@@ -269,25 +269,27 @@
 
         const [msg, setMsg] = useState({ type: '', text: '' });
 
-        // MODAL MUAT NAIK PUKAL CALON
+        // MODAL MUAT NAIK PUKAL
         const [showBulkModal, setShowBulkModal] = useState(false);
+        const [bulkUrl, setBulkUrl] = useState('https://docs.google.com/spreadsheets/d/e/2PACX-1vTzsJQCnvCi9aUKMe351dKWx0VTIuWqszfjR5slGosEPnjPRJJVyvz-tNjPUqHfimbPguAKP1Z6liSC/pub?output=csv');
         const [bulkText, setBulkText] = useState('');
-        const [bulkZonTarget, setBulkZonTarget] = useState('AUTO'); // 'AUTO' | 'SARAWAK (KUCHING)' | 'SARAWAK (MIRI)' | zon lain
+        const [bulkZonTarget, setBulkZonTarget] = useState('AUTO');
         const [bulkDefaultSesi, setBulkDefaultSesi] = useState('AUTO');
+        const [bulkBilikDefault, setBulkBilikDefault] = useState('BILIK 1');
         const [bulkLoading, setBulkLoading] = useState(false);
 
-        // BORANG TAMBAH SATU CALON
+        // BORANG SATU CALON
         const [formCalon, setFormCalon] = useState({
            nama_penuh: '',
            no_kp: '',
            ppd: '',
            sme_subjek: '',
            zon_temuduga: 'SARAWAK (KUCHING)',
+           bilik_temuduga: 'BILIK 1',
            sesi: 'SESI 1',
            kehadiran: 'BELUM'
         });
 
-        // PENGESAHAN LOG MASUK DENGAN KATA LALUAN RASMI Admin#2026
         const handleLoginAdmin = async (e) => {
            e.preventDefault();
            setMsg({ type: '', text: '' });
@@ -304,7 +306,6 @@
               return;
            }
 
-           // Semakan alternatif ke jadual urus_setia Supabase
            try {
               const { data: uData } = await sb.from('urus_setia').select('*');
               if (uData && uData.length > 0) {
@@ -347,9 +348,39 @@
           if (isLoggedIn) fetchData();
         }, [isLoggedIn]);
 
-        // PROSES MUAT NAIK PUKAL (COPY-PASTE DARI GOOGLE SHEETS / EXCEL)
+        // FUNGSI SEDUT DATA GOOGLE SHEETS
+        const handleFetchFromUrl = async () => {
+           if (!bulkUrl.trim()) return alert("Sila masukkan pautan Google Sheet.");
+           setBulkLoading(true);
+
+           try {
+              let csvUrl = bulkUrl.trim();
+
+              if (!csvUrl.includes('output=csv')) {
+                 const match = csvUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                 if (match && match[1]) {
+                    const sheetId = match[1];
+                    csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+                 }
+              }
+
+              const res = await fetch(csvUrl);
+              if (!res.ok) {
+                 throw new Error("Gagal menyedut fail. Sila pastikan Google Sheet diterbitkan ke web.");
+              }
+              const csvData = await res.text();
+              setBulkText(csvData);
+              alert("Data berjaya disedut daripada Google Sheet! Sila klik 'Sahkan & Masukkan Calon' di bawah.");
+           } catch (err) {
+              alert("Ralat Sedutan: " + err.message);
+           } finally {
+              setBulkLoading(false);
+           }
+        };
+
+        // PROSES MUAT NAIK PUKAL KE SUPABASE
         const handleProcessBulkUpload = async () => {
-           if (!bulkText.trim()) return alert("Sila tampalkan data dari Google Sheets / Excel dahulu.");
+           if (!bulkText.trim()) return alert("Tiada data untuk dimuat naik. Sila sedut data atau tampal teks dahulu.");
            setBulkLoading(true);
 
            try {
@@ -358,42 +389,36 @@
 
               for (let i = 0; i < lines.length; i++) {
                  const line = lines[i];
-                 // Pecahkan ikut Tab (copy paste terus dari Excel/Google Sheets) atau Koma (CSV)
                  let cols = line.includes('\t') ? line.split('\t') : line.split(',');
                  cols = cols.map(c => safeStr(c).replace(/^["']|["']$/g, ''));
 
-                 // Abaikan baris kepala (Header) jika pengguna tersalin
                  const firstColUpper = safeStr(cols[0]).toUpperCase();
                  if (firstColUpper === 'NAMA' || firstColUpper === 'BIL' || firstColUpper === 'NAMA CALON') continue;
 
-                 // Cari lajur No. KP (12 digit atau ada sengkang)
                  let noKp = '';
                  let nama = '';
                  let ppd = '';
                  let subjek = '';
                  let sesi = 'SESI 1';
+                 let bilik = bulkBilikDefault || 'BILIK 1';
                  let zon = bulkZonTarget;
 
-                 // Cari lajur yang mempunyai format No. KP
                  let kpIndex = cols.findIndex(c => cleanKpNum(c).length >= 10 && cleanKpNum(c).length <= 14);
                  if (kpIndex !== -1) {
                     noKp = cleanKpNum(cols[kpIndex]);
-                    // Nama biasanya berada sebelum No. KP atau lajur pertama
                     nama = kpIndex > 0 ? cols[0] : (cols[1] || 'CALON');
                     if (kpIndex === 0 && cols[1]) nama = cols[1];
                  } else {
-                    // Jika tiada index khusus, guna susunan lazim: Nama | No. KP | PPD | Subjek
                     nama = cols[0] || '';
                     noKp = cleanKpNum(cols[1] || '');
                  }
 
-                 if (!noKp || !nama) continue; // Langkau rekod tidak sah
+                 if (!noKp || !nama) continue;
 
-                 // Kesan PPD / Sekolah & Subjek
                  ppd = cols[2] || cols[3] || 'SARAWAK';
                  subjek = cols[3] || cols[4] || 'SME';
 
-                 // Kesan Sesi dari lajur
+                 // Kesan Sesi
                  if (bulkDefaultSesi !== 'AUTO') {
                     sesi = bulkDefaultSesi;
                  } else {
@@ -401,7 +426,11 @@
                     if (findSesi) sesi = safeStr(findSesi).toUpperCase();
                  }
 
-                 // Kesan Zon Sarawak (Kuching vs Miri) jika dipilih AUTO
+                 // Kesan Bilik jika wujud dalam lajur
+                 const findBilik = cols.find(c => safeStr(c).toUpperCase().includes('BILIK'));
+                 if (findBilik) bilik = safeStr(findBilik).toUpperCase();
+
+                 // Kesan Zon Sarawak (Kuching vs Miri)
                  if (bulkZonTarget === 'AUTO') {
                     zon = detectSarawakSubZon('SARAWAK', ppd, line);
                  } else {
@@ -414,30 +443,30 @@
                     ppd: mapPPDStandard(ppd).toUpperCase(),
                     sme_subjek: subjek.toUpperCase(),
                     zon_temuduga: zon.toUpperCase(),
+                    bilik_temuduga: bilik.toUpperCase(), // WAJIB DIISI UNTUK MENGELAKKAN NOT-NULL ERROR
                     sesi: sesi.toUpperCase(),
                     kehadiran: 'BELUM'
                  });
               }
 
               if (candidatesToInsert.length === 0) {
-                 alert("Tiada rekod calon sah dikesan. Sila semak susunan salinan data anda.");
+                 alert("Tiada rekod calon sah dikesan. Sila semak pautan atau format teks.");
                  setBulkLoading(false);
                  return;
               }
 
-              // Masukkan / Kemas kini sekaligus ke Supabase (Upsert berasaskan no_kp)
               const { error } = await sb.from('calon').upsert(candidatesToInsert, { onConflict: 'no_kp' });
 
               if (error) {
                  alert("Gagal memuat naik: " + error.message);
               } else {
-                 alert(`Berjaya mendaftarkan ${candidatesToInsert.length} orang calon secara automatik!`);
+                 alert(`Tahniah! ${candidatesToInsert.length} orang calon berjaya didaftarkan ke pangkalan data!`);
                  setShowBulkModal(false);
                  setBulkText('');
                  fetchData();
               }
            } catch (err) {
-              alert("Ralat semasa memproses data: " + err.message);
+              alert("Ralat memproses: " + err.message);
            } finally {
               setBulkLoading(false);
            }
@@ -494,7 +523,6 @@
            };
         });
 
-        // STATISTIK EKSEKUTIF KESELURUHAN (KEKALKAN 212 / 20 / 172 / 81% SEBAGAI STANDARD ASAL)[cite: 3]
         const totalCalon = calonList.length || 212;
         const totalPanel = panelList.length || 20;
         const totalEvaluated = consolidatedCalon.filter(c => c.isEvaluated).length || 172;
@@ -509,7 +537,6 @@
            .sort((a,b) => b.totalMarkah - a.totalMarkah)
            .slice(0, 10);
 
-        // MAP PRESTASI MENGIKUT ZON (PENGGABUNGAN PINTAR SARAWAK KUCHING & MIRI SECARA AGREGAT)
         const zonStatsMap = { 
            SABAH: { total: 0, evaluated: 0 }, 
            SARAWAK: { total: 0, evaluated: 0 }, 
@@ -522,7 +549,7 @@
         consolidatedCalon.forEach(c => {
            const zName = safeStr(c.zon_temuduga).toUpperCase();
            let targetKey = zName;
-           if (zName.includes('SARAWAK')) targetKey = 'SARAWAK'; // Gabung Kuching & Miri untuk laporan kebangsaan
+           if (zName.includes('SARAWAK')) targetKey = 'SARAWAK';
 
            if (zonStatsMap[targetKey]) {
               zonStatsMap[targetKey].total++;
@@ -546,7 +573,6 @@
            evi: evaluatedList.length > 0 ? (sumE/evaluatedList.length) : 3.9
         };
 
-        // SENARAI CALON DITAPIS IKUT SUB-ZON DI TAB URUS CALON / KEPUTUSAN
         const filteredCalon = consolidatedCalon.filter(c => {
            if (selectedZonFilter === 'SEMUA') return true;
            const cZon = safeStr(c.zon_temuduga).toUpperCase();
@@ -557,7 +583,7 @@
         return (
           <div className="min-h-screen flex flex-col bg-slate-950">
             
-            {/* HEADER ADMIN (ASAL PERSIS IMEJ 3) */}
+            {/* HEADER ADMIN */}
             <div className="bg-white w-full py-4 px-6 md:px-10 flex justify-between items-center shadow-md z-10 border-b-4 border-amber-500 no-print">
               <div className="flex items-center gap-4">
                  <img src="logo-kpm.png" alt="Logo KPM" className="h-12 object-contain" />
@@ -578,7 +604,7 @@
 
             <div className="p-6 md:p-10 max-w-7xl mx-auto w-full flex-grow">
               
-              {/* BORANG LOG MASUK ADMIN ASAL (MENERIMA Admin#2026) */}
+              {/* BORANG LOG MASUK */}
               {!isLoggedIn && (
                 <div className="max-w-md mx-auto bg-slate-900 border-2 border-amber-500/40 p-8 rounded-2xl shadow-2xl mt-12 relative overflow-hidden">
                    <div className="text-center mb-6">
@@ -620,7 +646,7 @@
               {isLoggedIn && (
                 <div className="space-y-8">
                    
-                   {/* TAB NAV ADMIN ASAL (7 TAB LENGKAP PADA IMEJ 3) */}
+                   {/* TAB NAV */}
                    <div className="flex flex-wrap items-center justify-center gap-2 border-b border-slate-800 pb-4 no-print">
                       <button onClick={() => setActiveTab('analitik')} className={`px-5 py-2.5 rounded-lg font-extrabold text-xs transition-all border ${activeTab === 'analitik' ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-lg' : 'bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800'}`}>
                          Analitik Eksekutif
@@ -642,13 +668,11 @@
                       </button>
                    </div>
 
-                   {/* TAB 1: PUSAT KAWALAN EKSEKUTIF SISC+ (100% PERSIS IMEJ 3 ASAL) */}
+                   {/* TAB 1: PUSAT KAWALAN EKSEKUTIF SISC+ */}
                    {activeTab === 'analitik' && (
                       <div className="space-y-6">
-                         
                          <h2 className="text-xl font-extrabold text-amber-400 uppercase tracking-wide">Pusat Kawalan Eksekutif SISC+</h2>
 
-                         {/* 4 KAD STATISTIK UTAMA (PERSIS IMEJ 3) */}
                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl">
                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">JUMLAH CALON DAFTAR</p>
@@ -668,7 +692,6 @@
                             </div>
                          </div>
 
-                         {/* BARIS CARTA 1: CARTA LULUS & RADAR KOMPETENSI (PERSIS IMEJ 3) */}
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
                                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-3 mb-4">ANALISIS KELULUSAN CALON</h3>
@@ -685,7 +708,6 @@
                             </div>
                          </div>
 
-                         {/* BARIS CARTA 2: BAR PRESTASI ZON & TOP 10 CALON (PERSIS IMEJ 3) */}
                          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
                                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-slate-800 pb-3 mb-4">PRESTASI TEMU DUGA MENGIKUT ZON</h3>
@@ -718,22 +740,22 @@
                       </div>
                    )}
 
-                   {/* TAB 2: URUS CALON (DITAMBAH BUTANG MUAT NAIK PUKAL & SUB-ZON SARAWAK KUCHING/MIRI) */}
+                   {/* TAB 2: URUS CALON */}
                    {activeTab === 'calon' && (
                       <div className="space-y-6">
                          
-                         {/* BUTANG UTAMA: MUAT NAIK PUKAL CALON GOOGLE SHEETS */}
+                         {/* BUTANG UTAMA: MUAT NAIK PUKAL */}
                          <div className="bg-slate-900 border border-amber-500/30 p-5 rounded-2xl flex flex-wrap justify-between items-center gap-4">
                             <div>
                                <h3 className="text-sm font-extrabold text-amber-400 uppercase">Pendaftaran Pukal Calon (Google Sheets / Excel)</h3>
-                               <p className="text-xs text-slate-400 mt-0.5">Salin dan tampal terus data calon Sarawak atau muat naik fail CSV secara serentak.</p>
+                               <p className="text-xs text-slate-400 mt-0.5">Sokongan pautan Google Sheet diterbitkan atau salin-tampal terus.</p>
                             </div>
                             <button onClick={() => setShowBulkModal(true)} className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-5 py-2.5 rounded-xl text-xs shadow-lg transition-transform active:scale-95 flex items-center gap-2">
                                📋 Buka Kotak Muat Naik Pukal
                             </button>
                          </div>
 
-                         {/* BORANG DAFTAR SATU CALON ASAL */}
+                         {/* BORANG DAFTAR SATU CALON */}
                          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 no-print">
                             <h3 className="text-sm font-extrabold text-slate-200 uppercase">Pendaftaran Individu (Manual)</h3>
                             <form onSubmit={async (e) => {
@@ -745,19 +767,19 @@
                                   ppd: mapPPDStandard(formCalon.ppd).toUpperCase(),
                                   sme_subjek: safeStr(formCalon.sme_subjek).toUpperCase(),
                                   zon_temuduga: safeStr(formCalon.zon_temuduga).toUpperCase(),
+                                  bilik_temuduga: safeStr(formCalon.bilik_temuduga || 'BILIK 1').toUpperCase(),
                                   sesi: safeStr(formCalon.sesi).toUpperCase(),
                                   kehadiran: formCalon.kehadiran
                                };
                                const { error } = await sb.from('calon').insert([payload]);
                                if (error) alert("Gagal: " + error.message);
                                else { alert("Calon berjaya disimpan!"); fetchData(); }
-                            }} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            }} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                <input type="text" required placeholder="NAMA PENUH" className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-slate-100 uppercase" value={formCalon.nama_penuh} onChange={e => setFormCalon({...formCalon, nama_penuh: e.target.value})} />
                                <input type="text" required placeholder="NO. KP (12 DIGIT)" className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-mono text-slate-100" value={formCalon.no_kp} onChange={e => setFormCalon({...formCalon, no_kp: e.target.value})} />
                                <input type="text" placeholder="SEKOLAH / TEMPAT BERTUGAS / PPD" className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-slate-100 uppercase" value={formCalon.ppd} onChange={e => setFormCalon({...formCalon, ppd: e.target.value})} />
                                <input type="text" placeholder="SUBJEK (SME)" className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-slate-100 uppercase" value={formCalon.sme_subjek} onChange={e => setFormCalon({...formCalon, sme_subjek: e.target.value})} />
                                
-                               {/* PILIHAN SUB-ZON TERMASUK SARAWAK KUCHING & MIRI */}
                                <select className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-amber-400 uppercase" value={formCalon.zon_temuduga} onChange={e => setFormCalon({...formCalon, zon_temuduga: e.target.value})}>
                                   <option value="SARAWAK (KUCHING)">SARAWAK (KUCHING)</option>
                                   <option value="SARAWAK (MIRI)">SARAWAK (MIRI)</option>
@@ -766,7 +788,9 @@
                                   <option value="TIMUR">ZON TIMUR</option>
                                   <option value="TENGAH">ZON TENGAH</option>
                                   <option value="SELATAN">ZON SELATAN</option>
-                               </select>
+                                </select>
+
+                               <input type="text" placeholder="BILIK TEMU DUGA" className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-slate-100 uppercase" value={formCalon.bilik_temuduga} onChange={e => setFormCalon({...formCalon, bilik_temuduga: e.target.value})} />
 
                                <select className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-emerald-400 uppercase" value={formCalon.sesi} onChange={e => setFormCalon({...formCalon, sesi: e.target.value})}>
                                   <option value="SESI 1">SESI 1</option>
@@ -777,11 +801,12 @@
                                   <option value="SESI 6">SESI 6</option>
                                   <option value="SESI KHAS">SESI KHAS</option>
                                </select>
-                               <button type="submit" className="md:col-span-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded text-xs shadow">SIMPAN CALON INDIVIDU</button>
+
+                               <button type="submit" className="md:col-span-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black py-2.5 rounded text-xs shadow">SIMPAN CALON INDIVIDU</button>
                             </form>
                          </div>
 
-                         {/* SENARAI CALON DENGAN FILTER SUB-ZON */}
+                         {/* SENARAI CALON */}
                          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
                             <div className="flex flex-wrap justify-between items-center gap-4">
                                <h3 className="text-sm font-extrabold text-slate-200 uppercase">Senarai Calon Berdaftar ({filteredCalon.length} Orang)</h3>
@@ -798,7 +823,7 @@
                                      <option value="TENGAH">TENGAH</option>
                                      <option value="SELATAN">SELATAN</option>
                                   </select>
-                               </div>
+                                </div>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -810,6 +835,7 @@
                                         <th className="p-2.5">No. KP</th>
                                         <th className="p-2.5">PPD / Tempat Bertugas</th>
                                         <th className="p-2.5">Zon / Pusat</th>
+                                        <th className="p-2.5">Bilik</th>
                                         <th className="p-2.5">Sesi</th>
                                      </tr>
                                   </thead>
@@ -821,6 +847,7 @@
                                            <td className="p-2.5 font-mono text-slate-400">{c.no_kp}</td>
                                            <td className="p-2.5 uppercase text-slate-300">{c.ppdClean}</td>
                                            <td className="p-2.5 uppercase font-bold text-amber-300">{c.zon_temuduga}</td>
+                                           <td className="p-2.5 uppercase font-mono text-slate-300">{c.bilik_temuduga || '-'}</td>
                                            <td className="p-2.5 uppercase font-bold text-emerald-400">{c.sesi || 'SESI 1'}</td>
                                         </tr>
                                      ))}
@@ -865,7 +892,7 @@
                       </div>
                    )}
 
-                   {/* TAB 4: URUS PANEL (DENGAN PENYELARASAN NAMA INSTITUT AMINUDDIN BAKI) */}
+                   {/* TAB 4: URUS PANEL */}
                    {activeTab === 'panel' && (
                       <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
                          <h3 className="text-sm font-extrabold text-amber-400 uppercase">Senarai Pegawai Panel Berdaftar Kebangsaan</h3>
@@ -935,7 +962,7 @@
                             <p className="text-slate-300"><b>Status Sambungan Database:</b> <span className="text-emerald-400 font-bold">TERHUBUNG (Supabase Cloud)</span></p>
                             <p className="text-slate-300"><b>Kata Laluan Admin Utama:</b> <span className="text-amber-400 font-bold font-mono">Admin#2026</span></p>
                             <p className="text-slate-300"><b>Mod Pengesanan Zon Sarawak:</b> <span className="text-emerald-400 font-bold">Hybrid Sub-Zon (Kuching & Miri)</span></p>
-                            <p className="text-slate-300"><b>Versi Sistem:</b> SISC+ Selection System v2.7 (Sarawak Ready)</p>
+                            <p className="text-slate-300"><b>Versi Sistem:</b> SISC+ Selection System v2.8</p>
                             <p className="text-slate-300"><b>Hak Cipta:</b> Bahagian Profesionalisme Guru (BPG), Kementerian Pendidikan Malaysia</p>
                          </div>
                       </div>
@@ -946,18 +973,42 @@
 
             </div>
 
-            {/* MODAL TETINGKAP: DAFTAR PUKAL CALON DARI GOOGLE SHEETS */}
+            {/* MODAL TETINGKAP: DAFTAR PUKAL CALON GOOGLE SHEETS / URL */}
             {showBulkModal && (
                <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
                   <div className="bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
                      <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-                        <h3 className="text-base font-extrabold text-amber-400 uppercase">📋 Muat Naik Pukal Calon (Google Sheets / Excel)</h3>
+                        <h3 className="text-base font-extrabold text-amber-400 uppercase">📋 Muat Naik Pukal Calon (Google Sheets / URL)</h3>
                         <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
                      </div>
 
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                     {/* KAEDAH 1: SEDUT TERUS MELALUI URL GOOGLE SHEET */}
+                     <div className="p-3 bg-slate-950 rounded-xl border border-blue-500/30 space-y-2">
+                        <label className="block text-blue-400 text-xs font-bold uppercase">
+                           Kaedah 1: Sedut Terus Dari Pautan Google Sheet (Paling Mudah)
+                        </label>
+                        <div className="flex gap-2">
+                           <input 
+                              type="text" 
+                              placeholder="Tampal URL Google Sheet di sini..." 
+                              className="flex-grow p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:border-blue-500 focus:outline-none" 
+                              value={bulkUrl} 
+                              onChange={e => setBulkUrl(e.target.value)} 
+                           />
+                           <button 
+                              type="button" 
+                              onClick={handleFetchFromUrl} 
+                              disabled={bulkLoading} 
+                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow whitespace-nowrap"
+                           >
+                              {bulkLoading ? 'Menyedut...' : 'Sedut Data'}
+                           </button>
+                        </div>
+                     </div>
+
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                         <div>
-                           <label className="block text-slate-400 font-bold uppercase mb-1">Tetapan Zon / Pusat:</label>
+                           <label className="block text-slate-400 font-bold uppercase mb-1">Pusat / Sub-Zon:</label>
                            <select className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300 font-bold" value={bulkZonTarget} onChange={e => setBulkZonTarget(e.target.value)}>
                               <option value="AUTO">✨ AUTO-KESAN (KUCHING vs MIRI)</option>
                               <option value="SARAWAK (KUCHING)">SARAWAK (KUCHING)</option>
@@ -981,22 +1032,30 @@
                               <option value="SESI 6">SESI 6</option>
                            </select>
                         </div>
+                        <div>
+                           <label className="block text-slate-400 font-bold uppercase mb-1">Bilik Lalai:</label>
+                           <input 
+                              type="text" 
+                              className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-slate-100 font-bold uppercase text-xs" 
+                              value={bulkBilikDefault} 
+                              onChange={e => setBulkBilikDefault(e.target.value)} 
+                              placeholder="BILIK 1" 
+                           />
+                        </div>
                      </div>
 
+                     {/* KAEDAH 2: TAMPAL TEKS DATA */}
                      <div>
                         <label className="block text-slate-300 text-xs font-bold uppercase mb-1">
-                           Tampal Data Calon (Salin dari Google Sheets / Excel terus ke sini):
+                           Data Helaian yang Disedut / Tampalan:
                         </label>
                         <textarea 
-                           rows="8" 
-                           placeholder="Contoh salinan terus dari Google Sheets:&#10;AWANGKU AHMAD BIN AWANG MOHD	840512135541	SMK LUTONG	BAHASA INGGERIS	SESI 1&#10;DAYANG NUR FATIHAH BINTI ABANG	880315135224	SMK BATU LINTANG	SAINS	SESI 2" 
+                           rows="6" 
+                           placeholder="Data akan muncul di sini secara automatik selepas menekan butang 'Sedut Data'..." 
                            className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-slate-200 focus:border-amber-500 focus:outline-none" 
                            value={bulkText} 
                            onChange={e => setBulkText(e.target.value)}
                         />
-                        <p className="text-[10px] text-slate-400 mt-1">
-                           * Sistem akan memotong ruang kosong, memformat No. KP 12 digit, dan mengasingkan pusat secara pintar mengikut PPD/sekolah secara automatik.
-                        </p>
                      </div>
 
                      <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
