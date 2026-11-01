@@ -56,12 +56,17 @@
          return str;
       };
 
-      // ENJIN PEMETAAN PINTAR PPD
+      // ENJIN PEMETAAN PINTAR PPD & TEMPAT BERTUGAS
       const mapPPDStandard = (rawPpd) => {
          const str = safeStr(rawPpd).toUpperCase();
-         if (!str || str === 'SARAWAK') return 'PPD SARAWAK';
+         if (!str || str === 'SARAWAK' || str.startsWith('DG') || str.startsWith('GRED')) return 'SARAWAK';
          
-         // Sarawak
+         // Jika sudah nama sekolah penuh, kekalkan nama sekolah
+         if (str.startsWith('SMK') || str.startsWith('SK ') || str.startsWith('SJK') || str.startsWith('KOLEJ')) {
+            return str;
+         }
+
+         // Pemetaan Daerah Sarawak
          if (str.includes('KUCHING')) return 'PPD KUCHING';
          if (str.includes('PADAWAN')) return 'PPD PADAWAN';
          if (str.includes('SAMARAHAN')) return 'PPD SAMARAHAN';
@@ -80,43 +85,6 @@
          if (str.includes('SIBU')) return 'PPD SIBU';
          if (str.includes('MUKAH')) return 'PPD MUKAH';
          if (str.includes('KAPIT')) return 'PPD KAPIT';
-
-         // Sabah & Lain-lain
-         if (str.includes('LABUAN')) return 'PPD LABUAN';
-         if (str.includes('KENINGAU') || str.includes('ST ANTHONY')) return 'PPD KENINGAU';
-         if (str.includes('PENAMPANG')) return 'PPD PENAMPANG';
-         if (str.includes('ELOPURA') || str.includes('SUNG SIEW') || str.includes('ST MICHAEL SANDAKAN') || str.includes('SANDAKAN')) return 'PPD SANDAKAN';
-         if (str.includes('GAYA') || str.includes('LOK YUK') || str.includes('KOTA KINABALU')) return 'PPD KOTA KINABALU';
-         if (str.includes('SEMPORNA')) return 'PPD SEMPORNA';
-         if (str.includes('LAHAD DATU') || str.includes('SEGANA')) return 'PPD LAHAD DATU';
-         if (str.includes('SAINT PETER') || str.includes('KUDAT')) return 'PPD KUDAT';
-         if (str.includes('PITAS') || str.includes('PINGGAN PINGGAN')) return 'PPD PITAS';
-         if (str.includes('SIPITANG')) return 'PPD SIPITANG';
-         if (str.includes('TAWAU')) return 'PPD TAWAU';
-         if (str.includes('BEAUFORT') || str.includes('ST JOHN BEAUFORT')) return 'PPD BEAUFORT';
-         if (str.includes('TENOM')) return 'PPD TENOM';
-         if (str.includes('RANAU')) return 'PPD RANAU';
-
-         if (str.includes('RAMAKRISHNA') || str.includes('TIMUR LAUT')) return 'PPD TIMUR LAUT';
-         if (str.includes('TELOI KANAN') || str.includes('BALING')) return 'PPD BALING';
-         if (str.includes('TASEK GELUGOR') || str.includes('SEBERANG PERAI UTARA')) return 'PPD SEBERANG PERAI UTARA';
-         if (str.includes('SEBERANG PERAI SELATAN')) return 'PPD SEBERANG PERAI SELATAN';
-         if (str.includes('SEBERANG PERAI TENGAH')) return 'PPD SEBERANG PERAI TENGAH';
-         if (str.includes('BARAT DAYA')) return 'PPD BARAT DAYA';
-         if (str.includes('KINTA UTARA')) return 'PPD KINTA UTARA';
-         if (str.includes('KINTA SELATAN')) return 'PPD KINTA SELATAN';
-         if (str.includes('KUALA KANGSAR')) return 'PPD KUALA KANGSAR';
-         if (str.includes('KOTA SETAR')) return 'PPD KOTA SETAR';
-         if (str.includes('KULIM') || str.includes('BANDAR BAHARU')) return 'PPD KULIM/BANDAR BAHARU';
-         if (str.includes('KUALA MUDA') || str.includes('YAN')) return 'PPD KUALA MUDA';
-         if (str.includes('PENDANG')) return 'PPD PENDANG';
-         if (str.includes('KUBANG PASU')) return 'PPD KUBANG PASU';
-         if (str.includes('LARUT') || str.includes('MATANG') || str.includes('SELAMA')) return 'PPD LARUT MATANG SELAMA';
-         if (str.includes('KERIAN')) return 'PPD KERIAN';
-         if (str.includes('PADANG TERAP')) return 'PPD PADANG TERAP';
-         if (str.includes('HILIR PERAK')) return 'PPD HILIR PERAK';
-         if (str.includes('MUALLIM')) return 'PPD MUALLIM';
-         if (str.includes('PERLIS') || str.includes('JPN PERLIS')) return 'JPN PERLIS';
 
          return str.startsWith('PPD ') ? str : `PPD ${str}`;
       };
@@ -378,7 +346,7 @@
            }
         };
 
-        // PROSES MUAT NAIK PUKAL (PENGESANAN NAMA & LAJUR DIPERBAIKI SEPENUHNYA)
+        // PROSES MUAT NAIK PUKAL (PENAPIS GRED & PENGESANAN PPD SEBENAR)
         const handleProcessBulkUpload = async () => {
            if (!bulkText.trim()) return alert("Tiada data untuk dimuat naik. Sila sedut data atau tampal teks dahulu.");
            setBulkLoading(true);
@@ -393,7 +361,6 @@
                  cols = cols.map(c => safeStr(c).replace(/^["']|["']$/g, ''));
 
                  const firstColUpper = safeStr(cols[0]).toUpperCase();
-                 // Abaikan baris tajuk / header
                  if (firstColUpper === 'NAMA' || firstColUpper === 'BIL' || firstColUpper === 'NAMA CALON' || firstColUpper === 'NO' || firstColUpper === 'ZON') continue;
 
                  let noKp = '';
@@ -418,17 +385,45 @@
                        return !val || !isNaN(val) || v === 'SARAWAK' || v === 'SABAH' || v.includes('ZON') || v.includes('SESI');
                     };
 
-                    // Format Helaian Sarawak: Kolom A = SARAWAK | Kolom B = No. KP | Kolom C = NAMA CALON | Kolom D = PPD
+                    // Format Helaian Sarawak: Kolom A = SARAWAK | Kolom B = No. KP | Kolom C = NAMA CALON
                     if (isZoneOrNumber(colBefore)) {
                        nama = colAfter;
-                       ppd = cols[kpIndex + 2] || cols[kpIndex + 3] || 'SARAWAK';
-                       subjek = cols[kpIndex + 3] || cols[kpIndex + 4] || 'SME';
                     } else {
-                       // Format biasa: Kolom A = NAMA | Kolom B = No. KP | Kolom C = PPD
                        nama = colBefore;
-                       ppd = colAfter;
-                       subjek = cols[kpIndex + 2] || 'SME';
                     }
+
+                    // 2. Cari lajur Sekolah / Tempat Bertugas / PPD sebenar (langkau lajur gred DG..)
+                    const isGradeOrMeta = (val) => {
+                       const v = val.toUpperCase();
+                       return v.startsWith('DG') || v.startsWith('GRED') || v.startsWith('PPP') || v.includes('MEMANGKU') || v.startsWith('HAKIKI') || v.startsWith('SESI');
+                    };
+
+                    // Semak lajur-lajur selepas nama
+                    for (let cIdx = kpIndex + 2; cIdx < cols.length; cIdx++) {
+                       const cellVal = safeStr(cols[cIdx]);
+                       if (!cellVal) continue;
+                       const uVal = cellVal.toUpperCase();
+
+                       // Jika jumpa lajur sekolah atau PPD
+                       if (uVal.startsWith('SMK') || uVal.startsWith('SK') || uVal.startsWith('SJK') || uVal.startsWith('PPD') || uVal.startsWith('KOLEJ') || uVal.includes('SEKOLAH')) {
+                          ppd = cellVal;
+                          break;
+                       }
+
+                       // Jika bukan gred dan belum jumpa PPD
+                       if (!ppd && !isGradeOrMeta(cellVal) && !uVal.includes('SESI') && !uVal.includes('BILIK')) {
+                          ppd = cellVal;
+                       }
+                    }
+
+                    // Jika masih belum jumpa, fallback ke daerah Sarawak daripada seluruh baris
+                    if (!ppd || isGradeOrMeta(ppd)) {
+                       const uLine = line.toUpperCase();
+                       const districtList = ['KUCHING', 'PADAWAN', 'SAMARAHAN', 'BAU', 'LUNDU', 'SERIAN', 'SRI AMAN', 'BETONG', 'SARATOK', 'MIRI', 'BINTULU', 'SUBIS', 'BARAM', 'LIMBANG', 'LAWAS', 'SIBU', 'MUKAH', 'KAPIT'];
+                       const foundDist = districtList.find(d => uLine.includes(d));
+                       ppd = foundDist ? `PPD ${foundDist}` : 'SARAWAK';
+                    }
+
                  } else {
                     nama = cols[1] && isNaN(cols[1]) ? cols[1] : cols[0];
                     noKp = cleanKpNum(cols[0]) || cleanKpNum(cols[1]);
@@ -436,7 +431,6 @@
                     subjek = cols[3] || 'SME';
                  }
 
-                 // Pastikan nama bukan 'SARAWAK' atau kosong
                  if (!noKp || !nama || nama.toUpperCase() === 'SARAWAK') continue;
 
                  // Kesan Sesi
@@ -462,7 +456,7 @@
                     nama_penuh: nama.toUpperCase(),
                     no_kp: noKp,
                     ppd: mapPPDStandard(ppd).toUpperCase(),
-                    sme_subjek: subjek.toUpperCase(),
+                    sme_subjek: subjek.toUpperCase() || 'SME',
                     zon_temuduga: zon.toUpperCase(),
                     bilik_temuduga: bilik.toUpperCase(),
                     sesi: sesi.toUpperCase(),
@@ -471,7 +465,7 @@
               }
 
               if (candidatesToInsert.length === 0) {
-                 alert("Tiada rekod calon sah dikesan. Sila pastikan format Google Sheet mengandungi Nama dan No. KP.");
+                 alert("Tiada rekod calon sah dikesan. Sila semak pautan atau teks data.");
                  setBulkLoading(false);
                  return;
               }
@@ -482,7 +476,7 @@
               if (error) {
                  alert("Gagal memuat naik: " + error.message);
               } else {
-                 alert(`Berjaya! ${candidatesToInsert.length} orang calon dikemas kini dengan NAMA SEBENAR dan PUSAT yang betul!`);
+                 alert(`Berjaya! ${candidatesToInsert.length} orang calon dikemas kini dengan tempat bertugas / PPD yang tepat!`);
                  setShowBulkModal(false);
                  setBulkText('');
                  fetchData();
@@ -777,7 +771,7 @@
                             </button>
                          </div>
 
-                         {/* BORANG DAFTAR SATU CALON */}
+                         {/* BORANG DAFTAR INDIVIDU */}
                          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 no-print">
                             <h3 className="text-sm font-extrabold text-slate-200 uppercase">Pendaftaran Individu (Manual)</h3>
                             <form onSubmit={async (e) => {
@@ -810,7 +804,7 @@
                                   <option value="TIMUR">ZON TIMUR</option>
                                   <option value="TENGAH">ZON TENGAH</option>
                                   <option value="SELATAN">ZON SELATAN</option>
-                                </select>
+                               </select>
 
                                <input type="text" placeholder="BILIK TEMU DUGA" className="p-2.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-slate-100 uppercase" value={formCalon.bilik_temuduga} onChange={e => setFormCalon({...formCalon, bilik_temuduga: e.target.value})} />
 
@@ -845,7 +839,7 @@
                                      <option value="TENGAH">TENGAH</option>
                                      <option value="SELATAN">SELATAN</option>
                                   </select>
-                                </div>
+                               </div>
                             </div>
 
                             <div className="overflow-x-auto">
@@ -984,7 +978,7 @@
                             <p className="text-slate-300"><b>Status Sambungan Database:</b> <span className="text-emerald-400 font-bold">TERHUBUNG (Supabase Cloud)</span></p>
                             <p className="text-slate-300"><b>Kata Laluan Admin Utama:</b> <span className="text-amber-400 font-bold font-mono">Admin#2026</span></p>
                             <p className="text-slate-300"><b>Mod Pengesanan Zon Sarawak:</b> <span className="text-emerald-400 font-bold">Hybrid Sub-Zon (Kuching & Miri)</span></p>
-                            <p className="text-slate-300"><b>Versi Sistem:</b> SISC+ Selection System v2.8</p>
+                            <p className="text-slate-300"><b>Versi Sistem:</b> SISC+ Selection System v2.8 (Fixed PPD Parser)</p>
                             <p className="text-slate-300"><b>Hak Cipta:</b> Bahagian Profesionalisme Guru (BPG), Kementerian Pendidikan Malaysia</p>
                          </div>
                       </div>
@@ -1004,7 +998,7 @@
                         <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
                      </div>
 
-                     {/* KAEDAH 1: SEDUT TERUS MELALUI URL GOOGLE SHEET */}
+                     {/* KAEDAH 1: SEDUT TERUS DARI URL GOOGLE SHEET */}
                      <div className="p-3 bg-slate-950 rounded-xl border border-blue-500/30 space-y-2">
                         <label className="block text-blue-400 text-xs font-bold uppercase">
                            Kaedah 1: Sedut Terus Dari Pautan Google Sheet (Paling Mudah)
@@ -1098,4 +1092,3 @@
     </script>
   </body>
 </html>
-
