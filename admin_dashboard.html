@@ -53,7 +53,6 @@
       const safeStr = (val) => (val ? String(val).trim() : '');
       const cleanKpNum = (val) => safeStr(val).replace(/[^0-9]/g, '');
 
-      // HELPER: EKSTRAK NAMA SESI UTAMA (MEMBUANG TARIKH DALAM KURUNGAN JIKA ADA)
       const cleanSesiName = (sStr) => {
          if (!sStr) return '';
          return safeStr(sStr).split('(')[0].trim().toUpperCase();
@@ -102,6 +101,7 @@
             no_kp_calon: calon.no_kp,
             nama_calon: safeStr(calon.nama_penuh).toUpperCase(),
             zon: safeStr(calon.zon_temuduga).toUpperCase(),
+            pusat: safeStr(calon.pusat_temuduga || '-').toUpperCase(),
             ppd: safeStr(calon.ppd).toUpperCase(),
             sme_subjek: safeStr(calon.sme_subjek).toUpperCase(),
             sesi: safeStr(calon.sesi).toUpperCase(),
@@ -259,8 +259,32 @@
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [pagePanel, setPagePanel] = useState(1);
 
+        // PENGURUSAN PUSAT DINAMIK (TICK / UNTICK & BILANGAN PUSAT)
+        const [hasSubCenters, setHasSubCenters] = useState(true);
+        const [numSubCenters, setNumSubCenters] = useState(2);
+        const [customCenterList, setCustomCenterList] = useState(['KUCHING', 'MIRI']);
+
+        const handleNumCentersChange = (n) => {
+          const count = Math.max(1, parseInt(n) || 1);
+          setNumSubCenters(count);
+          let newArr = [...customCenterList];
+          if (newArr.length < count) {
+            while (newArr.length < count) newArr.push(`PUSAT ${newArr.length + 1}`);
+          } else {
+            newArr = newArr.slice(0, count);
+          }
+          setCustomCenterList(newArr);
+        };
+
+        const handleCenterNameChange = (index, value) => {
+          const newArr = [...customCenterList];
+          newArr[index] = safeStr(value).toUpperCase();
+          setCustomCenterList(newArr);
+        };
+
+        // BORANG PENUGASAN PANEL
         const [penugasanForm, setPenugasanForm] = useState({ 
-          no_kp_panel: '', zon_bertugas: 'UTARA', sesi_bertugas: 'SEMUA SESI', tarikh_mula: '', tarikh_tamat: '', peranan: 'Panel Penemuduga' 
+          no_kp_panel: '', zon_bertugas: 'SARAWAK', pusat_bertugas: 'KUCHING', sesi_bertugas: 'SEMUA SESI', tarikh_mula: '', tarikh_tamat: '', peranan: 'Panel Penemuduga' 
         });
         const [searchTugas, setSearchTugas] = useState('');
         const [filterZonTugas, setFilterZonTugas] = useState('SEMUA');
@@ -270,24 +294,29 @@
         const [editModeUsKp, setEditModeUsKp] = useState(null);
         const [editUsForm, setEditUsForm] = useState({});
 
+        // BORANG PENUGASAN URUS SETIA
         const [penugasanUsForm, setPenugasanUsForm] = useState({
-          no_kp_us: '', zon_bertugas: 'UTARA', tarikh_mula: '', tarikh_tamat: ''
+          no_kp_us: '', zon_bertugas: 'SARAWAK', pusat_bertugas: 'KUCHING', tarikh_mula: '', tarikh_tamat: ''
         });
 
-        // BORANG CALON INDIVIDU ASAL
-        const [calonForm, setCalonForm] = useState({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' });
+        // BORANG CALON INDIVIDU
+        const [calonForm, setCalonForm] = useState({ 
+          nama_penuh: '', no_kp: '', zon_temuduga: 'SARAWAK', pusat_temuduga: 'KUCHING', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: 'BILIK 1', kehadiran: 'BELUM' 
+        });
         const [editModeCalonKp, setEditModeCalonKp] = useState(null);
         const [editCalonForm, setEditCalonForm] = useState({});
         const [searchCalon, setSearchCalon] = useState('');
         const [filterZonCalon, setFilterZonCalon] = useState('SEMUA');
+        const [filterPusatCalon, setFilterPusatCalon] = useState('SEMUA');
         const [filterSesiCalon, setFilterSesiCalon] = useState('SEMUA');
         const [pageCalon, setPageCalon] = useState(1);
 
-        // MODAL MUAT NAIK PUKAL CALON (TAMBAHAN KHAS URUS CALON)
+        // MODAL MUAT NAIK PUKAL CALON
         const [showBulkModal, setShowBulkModal] = useState(false);
         const [bulkUrl, setBulkUrl] = useState('https://docs.google.com/spreadsheets/d/e/2PACX-1vTzsJQCnvCi9aUKMe351dKWx0VTIuWqszfjR5slGosEPnjPRJJVyvz-tNjPUqHfimbPguAKP1Z6liSC/pub?output=csv');
         const [bulkText, setBulkText] = useState('');
-        const [bulkZonTarget, setBulkZonTarget] = useState('AUTO');
+        const [bulkZonTarget, setBulkZonTarget] = useState('SARAWAK');
+        const [bulkPusatTarget, setBulkPusatTarget] = useState('AUTO');
         const [bulkDefaultSesi, setBulkDefaultSesi] = useState('AUTO');
         const [bulkBilikDefault, setBulkBilikDefault] = useState('BILIK 1');
         const [bulkLoading, setBulkLoading] = useState(false);
@@ -314,9 +343,7 @@
              return;
           }
 
-          const { data: adminList, error } = await sb
-            .from('pentadbir_admin')
-            .select('*');
+          const { data: adminList, error } = await sb.from('pentadbir_admin').select('*');
 
           if (!error && adminList && adminList.length > 0) {
             const foundAdmin = adminList.find(a => safeStr(a.username).toLowerCase() === inputClean);
@@ -392,6 +419,7 @@
            } 
         };
 
+        // PENUGASAN PANEL (DENGAN KAWALAN PUSAT BERSYARAT)
         const handleRegisterPenugasan = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -404,9 +432,12 @@
           let sesiSimpan = penugasanForm.sesi_bertugas; 
           if(tarikhLabel) sesiSimpan += ` ${tarikhLabel}`;
 
+          const pusatVal = hasSubCenters ? safeStr(penugasanForm.pusat_bertugas).toUpperCase() : null;
+
           const payload = { 
              no_kp_panel: penugasanForm.no_kp_panel, 
-             zon_bertugas: penugasanForm.zon_bertugas, 
+             zon_bertugas: safeStr(penugasanForm.zon_bertugas).toUpperCase(), 
+             pusat_bertugas: pusatVal,
              sesi_bertugas: sesiSimpan, 
              peranan: penugasanForm.peranan 
           };
@@ -415,7 +446,7 @@
           if (error) {
              setMsg({ type: 'error', text: 'Gagal menambah penugasan: ' + error.message });
           } else {
-             setMsg({ type: 'success', text: 'Satu penugasan rasmi telah berjaya ditambahkan kepada panel!' }); 
+             setMsg({ type: 'success', text: `Penugasan Panel berjaya disimpan! ${pusatVal ? `(Pusat: ${pusatVal})` : '(Semua Pusat Dalam Zon)'}` }); 
              setPenugasanForm({ ...penugasanForm, tarikh_mula: '', tarikh_tamat: '' }); 
              fetchData(); 
           }
@@ -437,6 +468,7 @@
            else { setMsg({ type: 'success', text: 'Akaun Urus Setia didaftarkan!' }); setUsForm({ nama_penuh: '', no_kp: '', katalaluan: '' }); fetchData(); } 
         };
 
+        // PENUGASAN URUS SETIA (DENGAN KAWALAN PUSAT BERSYARAT)
         const handleRegisterPenugasanUS = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -447,9 +479,12 @@
           let tTamat = formatTarikh(penugasanUsForm.tarikh_tamat);
           let tempohGabungan = (tMula && tTamat) ? `${tMula} - ${tTamat}` : tMula;
 
+          const pusatVal = hasSubCenters ? safeStr(penugasanUsForm.pusat_bertugas).toUpperCase() : null;
+
           const payload = { 
              no_kp_us: penugasanUsForm.no_kp_us, 
-             zon_bertugas: penugasanUsForm.zon_bertugas, 
+             zon_bertugas: safeStr(penugasanUsForm.zon_bertugas).toUpperCase(), 
+             pusat_bertugas: pusatVal,
              tempoh_bertugas: tempohGabungan
           };
           
@@ -457,7 +492,7 @@
           if (error) {
              setMsg({ type: 'error', text: 'Gagal menambah penugasan urus setia: ' + error.message });
           } else {
-             setMsg({ type: 'success', text: 'Penugasan Urus Setia berjaya ditambahkan!' }); 
+             setMsg({ type: 'success', text: `Penugasan Urus Setia berjaya disimpan! ${pusatVal ? `(Pusat: ${pusatVal})` : '(Semua Pusat Dalam Zon)'}` }); 
              setPenugasanUsForm({ ...penugasanUsForm, tarikh_mula: '', tarikh_tamat: '' }); 
              fetchData(); 
           }
@@ -482,6 +517,7 @@
            } 
         };
 
+        // DAFTAR INDIVIDU CALON
         const handleRegisterCalon = async (e) => { 
           e.preventDefault(); 
           setMsg({ type: '', text: '' }); 
@@ -489,10 +525,13 @@
           if (calonForm.tarikh) formatTarikh = calonForm.tarikh.split('-').reverse().join('/');
           const sesiGabungan = formatTarikh ? `${calonForm.sesi.toUpperCase()} (${formatTarikh})` : calonForm.sesi.toUpperCase();
           
+          const pusatVal = hasSubCenters ? safeStr(calonForm.pusat_temuduga).toUpperCase() : null;
+
           const payload = { 
              nama_penuh: safeStr(calonForm.nama_penuh).toUpperCase(), 
              no_kp: safeStr(calonForm.no_kp), 
-             zon_temuduga: calonForm.zon_temuduga.toUpperCase(), 
+             zon_temuduga: safeStr(calonForm.zon_temuduga).toUpperCase(), 
+             pusat_temuduga: pusatVal,
              sesi: sesiGabungan, 
              ppd: safeStr(calonForm.ppd).toUpperCase(), 
              sme_subjek: safeStr(calonForm.sme_subjek).toUpperCase(), 
@@ -503,8 +542,8 @@
           const { error } = await sb.from('calon').insert([payload]); 
           if(error) setMsg({ type: 'error', text: error.message });
           else { 
-             setMsg({ type: 'success', text: 'Calon baru direkodkan dengan nama & sesi dalam format standard!' }); 
-             setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'UTARA', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: '', kehadiran: 'BELUM' }); 
+             setMsg({ type: 'success', text: `Calon berjaya didaftarkan! ${pusatVal ? `(Pusat: ${pusatVal})` : ''}` }); 
+             setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'SARAWAK', pusat_temuduga: customCenterList[0] || '', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: 'BILIK 1', kehadiran: 'BELUM' }); 
              fetchData(); 
           } 
         };
@@ -513,6 +552,8 @@
            const payloadFormat = {
               ...editCalonForm,
               nama_penuh: safeStr(editCalonForm.nama_penuh).toUpperCase(),
+              zon_temuduga: safeStr(editCalonForm.zon_temuduga).toUpperCase(),
+              pusat_temuduga: safeStr(editCalonForm.pusat_temuduga || '-').toUpperCase(),
               ppd: safeStr(editCalonForm.ppd).toUpperCase(),
               sme_subjek: safeStr(editCalonForm.sme_subjek).toUpperCase(),
               sesi: safeStr(editCalonForm.sesi).toUpperCase()
@@ -537,7 +578,7 @@
            fetchData(); 
         };
 
-        // FUNGSI TARIK DATA GOOGLE SHEETS
+        // SEDUT DATA GOOGLE SHEETS
         const handleFetchFromUrl = async () => {
            if (!bulkUrl.trim()) return alert("Sila masukkan pautan Google Sheet.");
            setBulkLoading(true);
@@ -567,7 +608,7 @@
            }
         };
 
-        // FUNGSI PROSES MUAT NAIK PUKAL (PENAPIS GRED & NAMA CALON TEPAT)
+        // PROSES MUAT NAIK PUKAL CALON
         const handleProcessBulkUpload = async () => {
            if (!bulkText.trim()) return alert("Tiada data untuk dimuat naik. Sila sedut data atau tampal teks dahulu.");
            setBulkLoading(true);
@@ -590,7 +631,8 @@
                  let subjek = '';
                  let sesi = 'SESI 1';
                  let bilik = bulkBilikDefault || 'BILIK 1';
-                 let zon = bulkZonTarget;
+                 let zon = safeStr(bulkZonTarget).toUpperCase();
+                 let pusat = null;
 
                  let kpIndex = cols.findIndex(c => cleanKpNum(c).length >= 10 && cleanKpNum(c).length <= 14);
 
@@ -657,15 +699,19 @@
                  const findBilik = cols.find(c => safeStr(c).toUpperCase().includes('BILIK'));
                  if (findBilik) bilik = safeStr(findBilik).toUpperCase();
 
-                 if (bulkZonTarget === 'AUTO') {
-                    const uAll = `${line} ${ppd}`.toUpperCase();
-                    if (uAll.includes('MIRI') || uAll.includes('BINTULU') || uAll.includes('SUBIS') || uAll.includes('BARAM') || uAll.includes('LIMBANG') || uAll.includes('LAWAS')) {
-                       zon = 'SARAWAK (MIRI)';
+                 if (hasSubCenters) {
+                    if (bulkPusatTarget === 'AUTO') {
+                       const uAll = `${line} ${ppd}`.toUpperCase();
+                       if (uAll.includes('MIRI') || uAll.includes('BINTULU') || uAll.includes('SUBIS') || uAll.includes('BARAM') || uAll.includes('LIMBANG') || uAll.includes('LAWAS')) {
+                          pusat = 'MIRI';
+                       } else {
+                          pusat = 'KUCHING';
+                       }
                     } else {
-                       zon = 'SARAWAK (KUCHING)';
+                       pusat = safeStr(bulkPusatTarget).toUpperCase();
                     }
                  } else {
-                    zon = bulkZonTarget;
+                    pusat = null;
                  }
 
                  candidatesToInsert.push({
@@ -674,6 +720,7 @@
                     ppd: ppd.toUpperCase(),
                     sme_subjek: subjek.toUpperCase() || 'SME',
                     zon_temuduga: zon.toUpperCase(),
+                    pusat_temuduga: pusat ? pusat.toUpperCase() : null,
                     bilik_temuduga: bilik.toUpperCase(),
                     sesi: sesi.toUpperCase(),
                     kehadiran: 'BELUM'
@@ -712,10 +759,7 @@
              return;
           }
 
-          const { error } = await sb
-            .from('pentadbir_admin')
-            .update({ katalaluan: passForm.newPass.trim() })
-            .eq('username', currentAdmin.username);
+          const { error } = await sb.from('pentadbir_admin').update({ katalaluan: passForm.newPass.trim() }).eq('username', currentAdmin.username);
 
           if (error) {
              setMsg({ type: 'error', text: 'Gagal menukar kata laluan: ' + error.message });
@@ -772,6 +816,14 @@
         const displayedPanels = filteredPanels.slice((pagePanel - 1) * ITEMS_PER_PAGE, pagePanel * ITEMS_PER_PAGE);
 
         const availableZonCalonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga).toUpperCase()))].filter(Boolean).sort();
+        const availablePusatCalonList = [...new Set(calonList.map(c => safeStr(c.pusat_temuduga || '-').toUpperCase()))].filter(Boolean).sort();
+
+        // SEMUA PUSAT YANG DIKENAL PASTI DARI INPUT DINAMIK & PANGKALAN DATA
+        const allKnownPusat = [...new Set([
+          ...customCenterList,
+          ...calonList.map(c => safeStr(c.pusat_temuduga).toUpperCase()),
+          ...penugasanList.map(t => safeStr(t.pusat_bertugas).toUpperCase()),
+        ])].filter(Boolean).sort();
         
         const availableSesiCalonList = [...new Set(
            calonList
@@ -783,9 +835,10 @@
         
         const filteredCalons = calonList.filter(c => { 
            const matchZon = filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon; 
+           const matchPusat = filterPusatCalon === 'SEMUA' || safeStr(c.pusat_temuduga || '-').toUpperCase() === filterPusatCalon;
            const matchSesi = filterSesiCalon === 'SEMUA' || cleanSesiName(c.sesi) === cleanSesiName(filterSesiCalon); 
            const matchSearch = safeStr(c.nama_penuh).toUpperCase().includes(searchCalon.toUpperCase()) || safeStr(c.no_kp).includes(searchCalon); 
-           return matchZon && matchSesi && matchSearch; 
+           return matchZon && matchPusat && matchSesi && matchSearch; 
         });
         const totalPagesCalon = Math.ceil(filteredCalons.length / ITEMS_PER_PAGE) || 1;
         const displayedCalons = filteredCalons.slice((pageCalon - 1) * ITEMS_PER_PAGE, pageCalon * ITEMS_PER_PAGE);
@@ -800,14 +853,15 @@
         }).sort((a,b) => b.jumlah_markah - a.jumlah_markah);
 
         const handleDownloadExcel = () => {
-          let csvContent = "BIL,NAMA CALON,NO. KAD PENGENALAN,SUBJEK,PPD,ZON,MARKAH MUKTAMAD (%)\n";
+          let csvContent = "BIL,NAMA CALON,NO. KAD PENGENALAN,SUBJEK,PPD,ZON,PUSAT,MARKAH MUKTAMAD (%)\n";
           filteredLaporanList.forEach((res, index) => {
              const nama = safeStr(res.nama_calon).replace(/"/g, '""');
              const no_kp = safeStr(res.no_kp_calon);
              const subjek = safeStr(res.sme_subjek).replace(/"/g, '""');
              const ppd = safeStr(res.ppd).replace(/"/g, '""');
              const zon = safeStr(res.zon);
-             const row = [index + 1, `"${nama}"`, `="${no_kp}"`, `"${subjek}"`, `"${ppd}"`, `"${zon}"`, res.jumlah_markah];
+             const pusat = safeStr(res.pusat || '-');
+             const row = [index + 1, `"${nama}"`, `="${no_kp}"`, `"${subjek}"`, `"${ppd}"`, `"${zon}"`, `"${pusat}"`, res.jumlah_markah];
              csvContent += row.join(",") + "\n";
           });
           const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -819,7 +873,7 @@
 
         useEffect(() => { setPageTugas(1); }, [searchTugas, filterZonTugas]);
         useEffect(() => { setPagePanel(1); }, [searchPanel, filterZonPanel]);
-        useEffect(() => { setPageCalon(1); }, [searchCalon, filterZonCalon, filterSesiCalon]);
+        useEffect(() => { setPageCalon(1); }, [searchCalon, filterZonCalon, filterPusatCalon, filterSesiCalon]);
 
         const TabButton = ({ id, label }) => ( 
            <button onClick={() => { setActiveTab(id); setMsg({type:'',text:''}); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === id ? 'bg-amber-500 text-slate-950 shadow-md scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'}`}> 
@@ -1001,7 +1055,7 @@
                                           <span className="flex items-center justify-center min-w-[24px] h-6 rounded-full bg-slate-800 text-xs font-bold text-slate-400">{idx+1}</span>
                                           <div>
                                              <p className="text-sm font-bold text-slate-200 truncate w-32 md:w-40" title={safeStr(res.nama_calon)}>{safeStr(res.nama_calon)}</p>
-                                             <p className="text-xs text-amber-500 uppercase">{safeStr(res.zon)}</p>
+                                             <p className="text-xs text-amber-500 uppercase">{safeStr(res.zon)} {res.pusat && res.pusat !== '-' ? `- ${res.pusat}` : ''}</p>
                                           </div>
                                        </div>
                                        <div className="text-lg font-extrabold text-emerald-400 bg-emerald-900/30 px-3 py-1 rounded">{res.jumlah_markah}%</div>
@@ -1017,49 +1071,122 @@
                     {activeTab === 'urus_calon' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         
-                        {/* BUTANG MODAL MUAT NAIK PUKAL CALON (TAMBAHAN KHAS URUS CALON) */}
+                        {/* PANEL DAFTAR PUKAL CALON */}
                         <div className="bg-slate-900 border border-amber-500/40 p-5 rounded-xl flex flex-wrap justify-between items-center gap-4">
                            <div>
                               <h3 className="text-sm font-extrabold text-amber-400 uppercase">Pendaftaran Pukal Calon (Google Sheets / Excel)</h3>
-                              <p className="text-xs text-slate-400 mt-0.5">Sedut pautan Google Sheet secara automatik atau salin-tampal data calon tanpa sebarang ralat.</p>
+                              <p className="text-xs text-slate-400 mt-0.5">Sedut data calon daripada pautan Google Sheet secara tepat.</p>
                            </div>
                            <button onClick={() => setShowBulkModal(true)} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2.5 rounded-lg text-xs shadow-lg transition-transform active:scale-95 flex items-center gap-2">
                               📋 Buka Kotak Muat Naik Pukal
                            </button>
                         </div>
 
-                        {/* BORANG TAMBAH CALON SECARA MANUAL ASAL */}
-                        <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow">
-                           <h2 className="text-xl font-bold text-emerald-400 mb-4 border-b border-slate-800 pb-2">+ Tambah Calon Baharu Secara Manual</h2>
+                        {/* BORANG TAMBAH CALON SECARA MANUAL */}
+                        <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow space-y-4">
+                           <div className="flex flex-wrap justify-between items-center border-b border-slate-800 pb-2">
+                              <h2 className="text-xl font-bold text-emerald-400">+ Tambah Calon Baharu Secara Manual</h2>
+                              
+                              {/* KAWALAN TICK/UNTICK ADA PUSAT */}
+                              <label className="flex items-center gap-2 text-xs font-bold text-amber-300 cursor-pointer bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                                 <input 
+                                    type="checkbox" 
+                                    checked={hasSubCenters} 
+                                    onChange={e => setHasSubCenters(e.target.checked)} 
+                                    className="w-4 h-4 accent-amber-500 rounded" 
+                                 />
+                                 <span>Zon Ini Mempunyai Pecahan Pusat Temu Duga</span>
+                              </label>
+                           </div>
+
+                           {/* JIKA TICK ADA PUSAT: BILANGAN & NAMA PUSAT DINAMIK */}
+                           {hasSubCenters && (
+                              <div className="p-4 bg-slate-950 border border-amber-500/30 rounded-xl space-y-3">
+                                 <div className="flex items-center gap-4">
+                                    <span className="text-xs font-bold text-slate-300 uppercase">Bilangan Pusat Temu Duga Bagi Zon Ini:</span>
+                                    <input 
+                                       type="number" 
+                                       min="1" 
+                                       max="10" 
+                                       value={numSubCenters} 
+                                       onChange={e => handleNumCentersChange(e.target.value)} 
+                                       className="w-20 p-2 bg-slate-900 border border-amber-500/50 rounded font-black text-amber-400 text-center text-sm" 
+                                    />
+                                    <span className="text-[11px] text-slate-500 italic">*Sistem menyediakan lajur nama pusat di bawah secara automatik</span>
+                                 </div>
+
+                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800">
+                                    {customCenterList.map((cName, idx) => (
+                                       <div key={idx}>
+                                          <label className="block text-[10px] font-bold text-emerald-400 uppercase mb-1">Nama Pusat {idx + 1}:</label>
+                                          <input 
+                                             type="text" 
+                                             value={cName} 
+                                             onChange={e => handleCenterNameChange(idx, e.target.value)} 
+                                             placeholder={`PUSAT ${idx + 1}`} 
+                                             className="w-full p-2 bg-slate-900 border border-slate-700 rounded text-xs font-extrabold text-slate-100 uppercase focus:border-emerald-500 focus:outline-none" 
+                                          />
+                                       </div>
+                                    ))}
+                                 </div>
+                              </div>
+                           )}
+
                            <form onSubmit={handleRegisterCalon} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                               <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2 uppercase font-bold" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
                               <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-mono" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
-                              <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value})}>
-                                 <option value="UTARA">ZON UTARA</option><option value="TIMUR">ZON TIMUR</option><option value="TENGAH">ZON TENGAH</option><option value="SELATAN">ZON SELATAN</option><option value="SABAH">ZON SABAH</option><option value="SARAWAK">ZON SARAWAK</option>
-                              </select>
+                              
+                              <div>
+                                 <input type="text" required list="list-zon-reg" placeholder="ZON (CTH: SARAWAK)" className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400 uppercase" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value.toUpperCase()})} />
+                                 <datalist id="list-zon-reg">
+                                    <option value="SARAWAK" />
+                                    <option value="SABAH" />
+                                    <option value="UTARA" />
+                                    <option value="TIMUR" />
+                                    <option value="TENGAH" />
+                                    <option value="SELATAN" />
+                                 </datalist>
+                              </div>
+
+                              {/* JIKA TICK: PAPARKAN PILIHAN PUSAT */}
+                              {hasSubCenters && (
+                                 <div>
+                                    <select required className="w-full p-3 bg-slate-950 border border-emerald-500/50 rounded text-sm font-extrabold text-emerald-400 uppercase" value={calonForm.pusat_temuduga} onChange={e => setCalonForm({...calonForm, pusat_temuduga: e.target.value.toUpperCase()})}>
+                                       {customCenterList.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                 </div>
+                              )}
+
                               <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-bold" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value})}>
                                  <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
                               </select>
+
                               <input type="date" required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.tarikh} onChange={e => setCalonForm({...calonForm, tarikh: e.target.value})} />
                               <input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} />
-                              <input type="text" placeholder="SME Subjek (Cth: BM, SC)" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase" value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} />
+                              <input type="text" placeholder="SME Subjek (Cth: BM, SC)" className={`p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase ${hasSubCenters ? 'col-span-1' : 'col-span-2'}`} value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} />
                               <button type="submit" className="md:col-span-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold rounded p-3 text-sm shadow">DAFTAR CALON</button>
                            </form>
                         </div>
                         
-                        {/* PANGKALAN DATA CALON ASAL */}
+                        {/* PANGKALAN DATA CALON */}
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[500px]">
                           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                             <div>
                                <h2 className="text-lg font-bold text-amber-400">Pangkalan Data Calon</h2>
                                <p className="text-xs text-slate-400 mt-1">Jumlah Keseluruhan: {calonList.length} Calon</p>
                             </div>
-                            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                               <input type="text" placeholder="🔍 Cari Nama atau KP..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchCalon} onChange={(e) => setSearchCalon(e.target.value)} />
-                               <select className="w-full md:w-36 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonCalon} onChange={(e) => {setFilterZonCalon(e.target.value); setFilterSesiCalon('SEMUA');}}>
+                            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                               <input type="text" placeholder="🔍 Cari Nama / KP..." className="w-full md:w-44 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-xs focus:border-amber-500 focus:outline-none" value={searchCalon} onChange={(e) => setSearchCalon(e.target.value)} />
+                               
+                               <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-xs font-bold focus:border-amber-500 focus:outline-none" value={filterZonCalon} onChange={(e) => {setFilterZonCalon(e.target.value); setFilterPusatCalon('SEMUA'); setFilterSesiCalon('SEMUA');}}>
                                   <option value="SEMUA">Semua Zon</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}
                                </select>
-                               <select className="w-full md:w-40 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none disabled:opacity-50" value={filterSesiCalon} disabled={filterZonCalon === 'SEMUA'} onChange={(e) => setFilterSesiCalon(e.target.value)}>
+
+                               <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-emerald-400 text-xs font-bold focus:border-amber-500 focus:outline-none" value={filterPusatCalon} onChange={(e) => setFilterPusatCalon(e.target.value)}>
+                                  <option value="SEMUA">Semua Pusat</option>{availablePusatCalonList.map(p => <option key={p} value={p}>{p}</option>)}
+                               </select>
+
+                               <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-xs font-bold focus:border-amber-500 focus:outline-none disabled:opacity-50" value={filterSesiCalon} disabled={filterZonCalon === 'SEMUA'} onChange={(e) => setFilterSesiCalon(e.target.value)}>
                                   <option value="SEMUA">Semua Sesi</option>{availableSesiCalonList.map(s => <option key={s} value={s}>{s}</option>)}
                                </select>
                             </div>
@@ -1069,24 +1196,26 @@
                              <div className="flex flex-col items-center justify-center p-16 border-2 border-dashed border-slate-800 rounded-xl bg-slate-900/50">
                                 <span className="text-5xl text-slate-700 mb-4">🗂️</span>
                                 <h3 className="text-xl font-bold text-slate-400 mb-2">Paparan Data Disembunyikan</h3>
-                                <p className="text-sm text-slate-500 text-center max-w-md">Sila buat pilihan Zon/Sesi, atau gunakan Kotak Carian untuk melihat rekod calon.</p>
+                                <p className="text-sm text-slate-500 text-center max-w-md">Sila buat pilihan Zon/Pusat/Sesi, atau gunakan Kotak Carian untuk melihat rekod calon.</p>
                              </div>
                           ) : (
                              <div className="overflow-x-auto min-h-[300px]">
                                <table className="w-full text-left text-sm border-collapse relative">
                                   <thead className="bg-slate-950 shadow">
                                      <tr className="text-amber-400 uppercase text-xs border-b border-slate-800">
-                                        <th className="p-3">Nama Calon</th><th className="p-3">No. KP</th><th className="p-3">Zon & Sesi</th><th className="p-3">PPD</th><th className="p-3 text-center">Kehadiran</th><th className="p-3 text-center">Tindakan</th>
+                                        <th className="p-3">Nama Calon</th><th className="p-3">No. KP</th><th className="p-3">Zon</th><th className="p-3">Pusat</th><th className="p-3">Sesi</th><th className="p-3">PPD</th><th className="p-3 text-center">Kehadiran</th><th className="p-3 text-center">Tindakan</th>
                                      </tr>
                                   </thead>
                                   <tbody>
                                      {displayedCalons.length === 0 ? (
-                                        <tr><td colSpan="6" className="text-center p-8 text-slate-500 italic">Tiada padanan calon ditemui.</td></tr>
+                                        <tr><td colSpan="8" className="text-center p-8 text-slate-500 italic">Tiada padanan calon ditemui.</td></tr>
                                      ) : displayedCalons.map(c => editModeCalonKp === c.no_kp ? (
                                         <tr key={c.no_kp} className="bg-slate-800">
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600 uppercase font-bold" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td>
-                                           <td className="p-2 flex gap-1"><select className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value})}><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option></select><input type="text" className="w-1/2 p-2 bg-slate-900 rounded text-xs text-white uppercase" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value.toUpperCase()})} /></td>
+                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-amber-300 uppercase font-bold" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value.toUpperCase()})} /></td>
+                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-emerald-300 uppercase font-bold" value={editCalonForm.pusat_temuduga || ''} onChange={e => setEditCalonForm({...editCalonForm, pusat_temuduga: e.target.value.toUpperCase()})} /></td>
+                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white uppercase" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600 uppercase" value={editCalonForm.ppd} onChange={e => setEditCalonForm({...editCalonForm, ppd: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2 text-center text-xs text-slate-400">Mod Edit</td>
                                            <td className="p-2 flex gap-1 justify-center"><button onClick={() => handleUpdateCalon(c.no_kp)} className="bg-emerald-500 text-slate-900 px-2 py-1 rounded font-bold text-xs">Simpan</button><button onClick={() => setEditModeCalonKp(null)} className="bg-slate-600 text-white px-2 py-1 rounded font-bold text-xs">Batal</button></td>
@@ -1095,7 +1224,9 @@
                                         <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
                                            <td className="p-3 font-bold uppercase">{safeStr(c.nama_penuh)}</td>
                                            <td className="p-3 font-mono text-slate-300">{safeStr(c.no_kp)}</td>
-                                           <td className="p-3 text-amber-300 font-bold uppercase">{safeStr(c.zon_temuduga)} <span className="text-slate-400 font-normal block text-xs mt-0.5">{safeStr(c.sesi)}</span></td>
+                                           <td className="p-3 text-amber-300 font-bold uppercase">{safeStr(c.zon_temuduga)}</td>
+                                           <td className="p-3 text-emerald-400 font-black uppercase">{safeStr(c.pusat_temuduga || '-')}</td>
+                                           <td className="p-3 text-slate-300 uppercase text-xs">{safeStr(c.sesi)}</td>
                                            <td className="p-3 uppercase">{safeStr(c.ppd)}</td>
                                            <td className="p-3 text-center"><button onClick={() => handleKehadiranToggle(c.no_kp, c.kehadiran)} className={`px-3 py-1 rounded text-xs font-bold w-24 transition-colors border ${c.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : c.kehadiran === 'TIDAK HADIR' ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>{c.kehadiran || 'BELUM'}</button></td>
                                            <td className="p-3 text-center"><button onClick={() => { setEditModeCalonKp(c.no_kp); setEditCalonForm({...c}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeleteCalon(c.no_kp)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
@@ -1118,7 +1249,7 @@
                       </div>
                     )}
 
-                    {/* TAB 3: LAPORAN KEPUTUSAN (PEMBUANGAN PERKATAAN TERSELARASKAN) */}
+                    {/* TAB 3: LAPORAN KEPUTUSAN */}
                     {activeTab === 'laporan' && (
                        <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                           <div className="bg-slate-900 border-2 border-emerald-500/50 p-6 rounded-xl shadow-2xl flex flex-col lg:flex-row justify-between items-center no-print gap-6">
@@ -1129,12 +1260,12 @@
                              <div className="flex flex-wrap items-center justify-end gap-3 w-full lg:w-auto">
                                 <select className="w-full md:w-auto p-3 border border-slate-700 rounded-lg text-sm font-bold bg-slate-950 text-emerald-400 focus:border-emerald-500 focus:outline-none" value={laporanZon} onChange={e => setLaporanZon(e.target.value)}>
                                    <option value="KESELURUHAN">CETAK KESELURUHAN</option>
+                                   <option value="SARAWAK">ZON SARAWAK</option>
+                                   <option value="SABAH">ZON SABAH</option>
                                    <option value="UTARA">ZON UTARA</option>
                                    <option value="TIMUR">ZON TIMUR</option>
                                    <option value="TENGAH">ZON TENGAH</option>
                                    <option value="SELATAN">ZON SELATAN</option>
-                                   <option value="SABAH">ZON SABAH</option>
-                                   <option value="SARAWAK">ZON SARAWAK</option>
                                 </select>
 
                                 <div className="relative w-full md:w-28">
@@ -1170,6 +1301,7 @@
                                       <th className="p-3 border-r border-slate-400">SUBJEK</th>
                                       <th className="p-3 border-r border-slate-400">PPD</th>
                                       <th className="p-3 border-r border-slate-400">ZON</th>
+                                      <th className="p-3 border-r border-slate-400">PUSAT</th>
                                       <th className="p-3 text-center w-28">MARKAH MUKTAMAD</th>
                                    </tr>
                                 </thead>
@@ -1182,11 +1314,12 @@
                                          <td className="p-2 border-r border-slate-400 text-center uppercase">{res.sme_subjek || '-'}</td>
                                          <td className="p-2 border-r border-slate-400 text-center uppercase">{res.ppd || '-'}</td>
                                          <td className="p-2 border-r border-slate-400 text-center uppercase">{safeStr(res.zon)}</td>
+                                         <td className="p-2 border-r border-slate-400 text-center uppercase font-bold text-emerald-800">{safeStr(res.pusat || '-')}</td>
                                          <td className="p-2 text-center font-extrabold text-base text-blue-900">{res.jumlah_markah}%</td>
                                       </tr>
                                    ))}
                                    {filteredLaporanList.length === 0 && (
-                                      <tr><td colSpan="7" className="p-8 text-center italic text-slate-500 font-semibold">Tiada calon di kawasan pilihan yang melepasi had markah {minScore}% yang ditetapkan.</td></tr>
+                                      <tr><td colSpan="8" className="p-8 text-center italic text-slate-500 font-semibold">Tiada calon di kawasan pilihan yang melepasi had markah {minScore}% yang ditetapkan.</td></tr>
                                    )}
                                 </tbody>
                              </table>
@@ -1227,6 +1360,7 @@
                                    <tbody>
                                       <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td><td className="p-2.5 uppercase font-bold">{safeStr(selectedCalon.nama_penuh).toUpperCase()}</td></tr>
                                       <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">NO KAD PENGENALAN</td><td className="p-2.5 font-mono font-bold">{selectedCalon.no_kp}</td></tr>
+                                      <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">ZON & PUSAT</td><td className="p-2.5 uppercase font-bold text-blue-900">{safeStr(selectedCalon.zon_temuduga)} (PUSAT: {safeStr(selectedCalon.pusat_temuduga || '-')})</td></tr>
                                       <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD & SUBJEK</td><td className="p-2.5 uppercase">{safeStr(selectedCalon.ppd).toUpperCase() || '-'} ({safeStr(selectedCalon.sme_subjek).toUpperCase() || '-'})</td></tr>
                                    </tbody>
                                 </table>
@@ -1267,7 +1401,7 @@
                        </div>
                     )}
 
-                    {/* TAB 5: URUS PANEL (100% ASAL) */}
+                    {/* TAB 5: URUS PANEL */}
                     {activeTab === 'panel' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1292,13 +1426,35 @@
                                 <option value="">-- Sila Pilih Profil Panel --</option>
                                 {panelList.map(p => <option key={p.no_kp} value={p.no_kp}>{safeStr(p.nama_penuh).toUpperCase()} ({p.no_kp})</option>)}
                               </select>
+                              
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                   <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Zon Bertugas</label>
-                                  <select className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.zon_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, zon_bertugas: e.target.value})}>
-                                    <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON</option>
-                                  </select>
+                                  <input type="text" required list="list-zon-panel" placeholder="ZON (CTH: SARAWAK)" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-amber-300 font-bold text-sm uppercase" value={penugasanForm.zon_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, zon_bertugas: e.target.value.toUpperCase()})} />
+                                  <datalist id="list-zon-panel">
+                                     <option value="SARAWAK" />
+                                     <option value="SABAH" />
+                                     <option value="UTARA" />
+                                     <option value="TIMUR" />
+                                     <option value="TENGAH" />
+                                     <option value="SELATAN" />
+                                  </datalist>
                                 </div>
+
+                                {hasSubCenters ? (
+                                   <div>
+                                     <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pusat Bertugas</label>
+                                     <select className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-emerald-300 font-bold text-sm uppercase" value={penugasanForm.pusat_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, pusat_bertugas: e.target.value.toUpperCase()})}>
+                                        {customCenterList.map(c => <option key={c} value={c}>{c}</option>)}
+                                     </select>
+                                   </div>
+                                ) : (
+                                   <div>
+                                     <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Pusat Bertugas</label>
+                                     <input type="text" disabled value="KESELURUHAN ZON (TIADA PUSAT)" className="w-full p-3 border border-slate-800 rounded bg-slate-950/60 text-slate-500 text-xs italic" />
+                                   </div>
+                                )}
+
                                 <div>
                                   <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pilihan Sesi</label>
                                   <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold text-amber-400" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})}>
@@ -1311,26 +1467,33 @@
                                     <option value="SESI KHAS">SESI KHAS</option>
                                   </select>
                                 </div>
+
                                 <div>
-                                  <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Mula Bertugas</label>
+                                  <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tahap Akses / Peranan</label>
+                                  <select className="w-full p-3 border border-emerald-500/50 rounded bg-slate-950 text-emerald-300 text-sm font-bold" value={penugasanForm.peranan} onChange={(e) => setPenugasanForm({...penugasanForm, peranan: e.target.value})}>
+                                    <option value="Panel Penemuduga">Panel Penemuduga (Penilai Biasa)</option>
+                                    <option value="Ketua Zon Panel Penemuduga">Ketua Zon Panel Penemuduga</option>
+                                    <option value="Ketua Panel Utama">Ketua Panel Utama</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Mula</label>
                                   <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_mula} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_mula: e.target.value})} />
                                 </div>
+
                                 <div>
-                                  <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Tamat Bertugas</label>
+                                  <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Tamat</label>
                                   <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_tamat} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_tamat: e.target.value})} />
                                 </div>
                               </div>
-                              <label className="block text-xs text-slate-400 font-bold uppercase mt-2">Tetapkan Tahap Akses / Peranan</label>
-                              <select className="w-full p-3 border border-emerald-500/50 rounded bg-slate-950 text-emerald-300 text-sm font-bold" value={penugasanForm.peranan} onChange={(e) => setPenugasanForm({...penugasanForm, peranan: e.target.value})}>
-                                <option value="Panel Penemuduga">Panel Penemuduga (Penilai Biasa)</option>
-                                <option value="Ketua Zon Panel Penemuduga">Ketua Zon Panel Penemuduga</option>
-                                <option value="Ketua Panel Utama">Ketua Panel Utama</option>
-                              </select>
+
                               <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Tambah Penugasan Panel</button>
                             </form>
                           </div>
                         </div>
 
+                        {/* RINGKASAN PENUGASAN AKTIF PANEL */}
                         <div className="bg-slate-900 border border-emerald-500/20 p-6 rounded-xl shadow-lg mt-8">
                           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                             <div>
@@ -1340,8 +1503,8 @@
                             <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                                <input type="text" placeholder="🔍 Cari Nama Panel..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-emerald-500 focus:outline-none" value={searchTugas} onChange={(e) => setSearchTugas(e.target.value)} />
                                <select className="w-full md:w-48 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-emerald-500 focus:outline-none" value={filterZonTugas} onChange={(e) => setFilterZonTugas(e.target.value)}>
-                                  <option value="SEMUA">Kesemua Zon</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON</option>
-                                </select>
+                                  <option value="SEMUA">Kesemua Zon</option><option value="SARAWAK">SARAWAK</option><option value="SABAH">SABAH</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option>
+                               </select>
                             </div>
                           </div>
                           
@@ -1350,23 +1513,25 @@
                                <thead className="bg-slate-950 shadow">
                                   <tr className="text-emerald-400 uppercase text-xs border-b border-slate-800">
                                      <th className="p-3">Nama Pegawai (Panel)</th>
-                                     <th className="p-3">Zon & Tarikh Tugasan</th>
+                                     <th className="p-3">Zon & Pusat</th>
+                                     <th className="p-3">Sesi Bertugas</th>
                                      <th className="p-3">Tahap Peranan</th>
                                      <th className="p-3 text-center">Tindakan</th>
                                   </tr>
                                </thead>
                                <tbody>
                                   {displayedPenugasan.length === 0 ? (
-                                     <tr><td colSpan="4" className="text-center p-8 text-slate-500 italic">Tiada rekod penugasan dijumpai berdasarkan carian.</td></tr>
+                                     <tr><td colSpan="5" className="text-center p-8 text-slate-500 italic">Tiada rekod penugasan dijumpai berdasarkan carian.</td></tr>
                                   ) : displayedPenugasan.map(tugas => { 
                                      const pDetail = panelList.find(p => p.no_kp === tugas.no_kp_panel); 
                                      return (
                                         <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                                            <td className="p-3 font-bold uppercase">{pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel)}</td>
                                            <td className="p-3 font-mono text-slate-300 text-xs">
-                                              <span className="font-bold text-sm text-emerald-300">{safeStr(tugas.zon_bertugas).toUpperCase()}</span><br/>
-                                              {safeStr(tugas.sesi_bertugas).toUpperCase()}
+                                              <span className="font-bold text-sm text-amber-300">{safeStr(tugas.zon_bertugas).toUpperCase()}</span><br/>
+                                              <span className="font-extrabold text-xs text-emerald-400">{tugas.pusat_bertugas ? `PUSAT: ${safeStr(tugas.pusat_bertugas).toUpperCase()}` : 'SEMUA PUSAT'}</span>
                                            </td>
+                                           <td className="p-3 text-slate-300 text-xs font-mono">{safeStr(tugas.sesi_bertugas).toUpperCase()}</td>
                                            <td className="p-3 text-white font-semibold">{safeStr(tugas.peranan)}</td>
                                            <td className="p-3 text-center">
                                               <button onClick={() => handleDeletePenugasan(tugas.id)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Batal Tugas</button>
@@ -1389,6 +1554,7 @@
                           )}
                         </div>
 
+                        {/* PANGKALAN DATA PROFIL PANEL */}
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg mt-8">
                           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                             <div>
@@ -1398,7 +1564,7 @@
                             <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                                <input type="text" placeholder="🔍 Cari Nama atau KP..." className="w-full md:w-56 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm focus:border-amber-500 focus:outline-none" value={searchPanel} onChange={(e) => setSearchPanel(e.target.value)} />
                                <select className="w-full md:w-48 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-sm font-bold focus:border-amber-500 focus:outline-none" value={filterZonPanel} onChange={(e) => setFilterZonPanel(e.target.value)}>
-                                  <option value="SEMUA">Kesemua Zon</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option>
+                                  <option value="SEMUA">Kesemua Zon</option><option value="SARAWAK">SARAWAK</option><option value="SABAH">SABAH</option><option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option>
                                </select>
                             </div>
                           </div>
@@ -1447,7 +1613,7 @@
                       </div>
                     )}
 
-                    {/* TAB 6: URUS SETIA (100% ASAL) */}
+                    {/* TAB 6: URUS SETIA */}
                     {activeTab === 'urus_setia' && (
                        <div className="no-print space-y-8">
                           
@@ -1472,10 +1638,34 @@
                                       {urusSetiaList.map(u => <option key={u.no_kp} value={u.no_kp}>{safeStr(u.nama_penuh).toUpperCase()} ({u.no_kp})</option>)}
                                    </select>
                                    
-                                   <label className="block text-xs text-slate-400 font-bold uppercase">Zon Bertugas</label>
-                                   <select className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanUsForm.zon_bertugas} onChange={(e) => setPenugasanUsForm({...penugasanUsForm, zon_bertugas: e.target.value})}>
-                                      <option value="UTARA">UTARA</option><option value="TIMUR">TIMUR</option><option value="TENGAH">TENGAH</option><option value="SELATAN">SELATAN</option><option value="SABAH">SABAH</option><option value="SARAWAK">SARAWAK</option><option value="SEMUA ZON">SEMUA ZON</option>
-                                   </select>
+                                   <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                         <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Zon Bertugas</label>
+                                         <input type="text" required list="list-zon-us" placeholder="ZON" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-amber-300 font-bold text-sm uppercase" value={penugasanUsForm.zon_bertugas} onChange={(e) => setPenugasanUsForm({...penugasanUsForm, zon_bertugas: e.target.value.toUpperCase()})} />
+                                         <datalist id="list-zon-us">
+                                            <option value="SARAWAK" />
+                                            <option value="SABAH" />
+                                            <option value="UTARA" />
+                                            <option value="TIMUR" />
+                                            <option value="TENGAH" />
+                                            <option value="SELATAN" />
+                                         </datalist>
+                                      </div>
+
+                                      {hasSubCenters ? (
+                                         <div>
+                                            <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pusat Bertugas</label>
+                                            <select className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-emerald-300 font-bold text-sm uppercase" value={penugasanUsForm.pusat_bertugas} onChange={(e) => setPenugasanUsForm({...penugasanUsForm, pusat_bertugas: e.target.value.toUpperCase()})}>
+                                               {customCenterList.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                         </div>
+                                      ) : (
+                                         <div>
+                                            <label className="block text-xs text-slate-500 font-bold uppercase mb-1">Pusat Bertugas</label>
+                                            <input type="text" disabled value="KESELURUHAN ZON (TIADA PUSAT)" className="w-full p-3 border border-slate-800 rounded bg-slate-950/60 text-slate-500 text-xs italic" />
+                                         </div>
+                                      )}
+                                   </div>
 
                                    <div className="grid grid-cols-2 gap-4">
                                       <div>
@@ -1501,7 +1691,7 @@
                                    <thead className="bg-slate-950 shadow">
                                       <tr className="text-indigo-400 uppercase text-xs border-b border-slate-800">
                                          <th className="p-3">Nama Pegawai (Urus Setia)</th>
-                                         <th className="p-3">Zon Bertugas</th>
+                                         <th className="p-3">Zon & Pusat</th>
                                          <th className="p-3">Tempoh Tarikh</th>
                                          <th className="p-3 text-center">Tindakan</th>
                                       </tr>
@@ -1514,7 +1704,10 @@
                                          return (
                                             <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                                                <td className="p-3 font-bold uppercase">{uDetail ? safeStr(uDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_us)}</td>
-                                               <td className="p-3 font-bold text-amber-300 uppercase">{safeStr(tugas.zon_bertugas).toUpperCase()}</td>
+                                               <td className="p-3 font-bold text-amber-300 uppercase">
+                                                  {safeStr(tugas.zon_bertugas).toUpperCase()} <br/>
+                                                  <span className="text-emerald-400 font-extrabold text-xs">{tugas.pusat_bertugas ? `PUSAT: ${safeStr(tugas.pusat_bertugas).toUpperCase()}` : 'SEMUA PUSAT'}</span>
+                                               </td>
                                                <td className="p-3 font-mono text-slate-300 text-xs">{safeStr(tugas.tempoh_bertugas)}</td>
                                                <td className="p-3 text-center">
                                                   <button onClick={() => handleDeletePenugasanUS(tugas.id)} className="text-red-400 font-bold text-xs hover:underline">Batal Tugas</button>
@@ -1559,7 +1752,7 @@
                        </div>
                     )}
                     
-                    {/* TAB 7: TETAPAN TUKAR KATA LALUAN ADMIN (100% ASAL) */}
+                    {/* TAB 7: TETAPAN TUKAR KATA LALUAN ADMIN */}
                     {activeTab === 'tetapan' && (
                        <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-xl mx-auto shadow-2xl space-y-6">
                           <div>
@@ -1594,7 +1787,7 @@
                </>
             )}
 
-            {/* MODAL TETINGKAP: DAFTAR PUKAL CALON DARI GOOGLE SHEETS (HANYA DIBUKA JIKA DIKLIK) */}
+            {/* MODAL TETINGKAP: DAFTAR PUKAL CALON DARI GOOGLE SHEETS */}
             {showBulkModal && (
                <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
                   <div className="bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
@@ -1626,24 +1819,38 @@
                         </div>
                      </div>
 
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                     <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                         <div>
-                           <label className="block text-slate-400 font-bold uppercase mb-1">Zon / Pusat Calon:</label>
-                           <select className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300 font-bold" value={bulkZonTarget} onChange={e => setBulkZonTarget(e.target.value)}>
-                              <option value="AUTO">✨ AUTO-KESAN (KUCHING vs MIRI)</option>
-                              <option value="SARAWAK (KUCHING)">SARAWAK (KUCHING)</option>
-                              <option value="SARAWAK (MIRI)">SARAWAK (MIRI)</option>
-                              <option value="SABAH">SABAH</option>
-                              <option value="UTARA">UTARA</option>
-                              <option value="TIMUR">TIMUR</option>
-                              <option value="TENGAH">TENGAH</option>
-                              <option value="SELATAN">SELATAN</option>
+                           <label className="block text-slate-400 font-bold uppercase mb-1">Zon Calon:</label>
+                           <input 
+                              type="text" 
+                              list="list-zon-bulk" 
+                              className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300 font-bold uppercase" 
+                              value={bulkZonTarget} 
+                              onChange={e => setBulkZonTarget(e.target.value.toUpperCase())} 
+                           />
+                           <datalist id="list-zon-bulk">
+                              <option value="SARAWAK" />
+                              <option value="SABAH" />
+                              <option value="UTARA" />
+                              <option value="TIMUR" />
+                              <option value="TENGAH" />
+                              <option value="SELATAN" />
+                           </datalist>
+                        </div>
+
+                        <div>
+                           <label className="block text-slate-400 font-bold uppercase mb-1">Pusat Calon:</label>
+                           <select className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-emerald-300 font-bold uppercase" value={bulkPusatTarget} onChange={e => setBulkPusatTarget(e.target.value)}>
+                              <option value="AUTO">✨ AUTO (KUCHING / MIRI)</option>
+                              {customCenterList.map(c => <option key={c} value={c}>{c}</option>)}
                            </select>
                         </div>
+
                         <div>
                            <label className="block text-slate-400 font-bold uppercase mb-1">Tetapan Sesi:</label>
-                           <select className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-emerald-300 font-bold" value={bulkDefaultSesi} onChange={e => setBulkDefaultSesi(e.target.value)}>
-                              <option value="AUTO">✨ AUTO-KESAN DARI LAJUR</option>
+                           <select className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-slate-200 font-bold" value={bulkDefaultSesi} onChange={e => setBulkDefaultSesi(e.target.value)}>
+                              <option value="AUTO">✨ AUTO DARI LAJUR</option>
                               <option value="SESI 1">SESI 1</option>
                               <option value="SESI 2">SESI 2</option>
                               <option value="SESI 3">SESI 3</option>
@@ -1652,13 +1859,14 @@
                               <option value="SESI 6">SESI 6</option>
                            </select>
                         </div>
+
                         <div>
                            <label className="block text-slate-400 font-bold uppercase mb-1">Bilik Lalai:</label>
                            <input 
                               type="text" 
                               className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-slate-100 font-bold uppercase text-xs" 
                               value={bulkBilikDefault} 
-                              onChange={e => setBulkBilikDefault(e.target.value)} 
+                              onChange={e => setBulkBilikDefault(e.target.value.toUpperCase())} 
                               placeholder="BILIK 1" 
                            />
                         </div>
