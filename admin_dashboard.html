@@ -59,7 +59,7 @@
       // ENJIN PEMETAAN PINTAR PPD
       const mapPPDStandard = (rawPpd) => {
          const str = safeStr(rawPpd).toUpperCase();
-         if (!str) return 'TIADA PPD';
+         if (!str || str === 'SARAWAK') return 'PPD SARAWAK';
          
          // Sarawak
          if (str.includes('KUCHING')) return 'PPD KUCHING';
@@ -121,9 +121,9 @@
          return str.startsWith('PPD ') ? str : `PPD ${str}`;
       };
 
-      // FUNGSI PENGESANAN PINTAR PUSAT SARAWAK (KUCHING ATAU MIRI)
-      const detectSarawakSubZon = (rawZon, rawPpd, rawPusat) => {
-         const combined = `${safeStr(rawZon)} ${safeStr(rawPpd)} ${safeStr(rawPusat)}`.toUpperCase();
+      // PENGESANAN PINTAR SUB-ZON SARAWAK (KUCHING ATAU MIRI)
+      const detectSarawakSubZon = (rawZon, rawPpd, rawLine) => {
+         const combined = `${safeStr(rawZon)} ${safeStr(rawPpd)} ${safeStr(rawLine)}`.toUpperCase();
          if (combined.includes('MIRI') || combined.includes('BINTULU') || combined.includes('SUBIS') || 
              combined.includes('BARAM') || combined.includes('LIMBANG') || combined.includes('LAWAS')) {
             return 'SARAWAK (MIRI)';
@@ -370,7 +370,7 @@
               }
               const csvData = await res.text();
               setBulkText(csvData);
-              alert("Data berjaya disedut daripada Google Sheet! Sila klik 'Sahkan & Masukkan Calon' di bawah.");
+              alert("Data berjaya disedut daripada Google Sheet! Sila klik butang 'Sahkan & Masukkan Calon' di bawah.");
            } catch (err) {
               alert("Ralat Sedutan: " + err.message);
            } finally {
@@ -378,7 +378,7 @@
            }
         };
 
-        // PROSES MUAT NAIK PUKAL KE SUPABASE
+        // PROSES MUAT NAIK PUKAL (PENGESANAN NAMA & LAJUR DIPERBAIKI SEPENUHNYA)
         const handleProcessBulkUpload = async () => {
            if (!bulkText.trim()) return alert("Tiada data untuk dimuat naik. Sila sedut data atau tampal teks dahulu.");
            setBulkLoading(true);
@@ -393,7 +393,8 @@
                  cols = cols.map(c => safeStr(c).replace(/^["']|["']$/g, ''));
 
                  const firstColUpper = safeStr(cols[0]).toUpperCase();
-                 if (firstColUpper === 'NAMA' || firstColUpper === 'BIL' || firstColUpper === 'NAMA CALON') continue;
+                 // Abaikan baris tajuk / header
+                 if (firstColUpper === 'NAMA' || firstColUpper === 'BIL' || firstColUpper === 'NAMA CALON' || firstColUpper === 'NO' || firstColUpper === 'ZON') continue;
 
                  let noKp = '';
                  let nama = '';
@@ -403,20 +404,40 @@
                  let bilik = bulkBilikDefault || 'BILIK 1';
                  let zon = bulkZonTarget;
 
+                 // 1. Cari indeks lajur No. KP (12 digit nombor)
                  let kpIndex = cols.findIndex(c => cleanKpNum(c).length >= 10 && cleanKpNum(c).length <= 14);
+
                  if (kpIndex !== -1) {
                     noKp = cleanKpNum(cols[kpIndex]);
-                    nama = kpIndex > 0 ? cols[0] : (cols[1] || 'CALON');
-                    if (kpIndex === 0 && cols[1]) nama = cols[1];
+
+                    const colBefore = kpIndex > 0 ? safeStr(cols[kpIndex - 1]) : '';
+                    const colAfter = (kpIndex + 1 < cols.length) ? safeStr(cols[kpIndex + 1]) : '';
+
+                    const isZoneOrNumber = (val) => {
+                       const v = val.toUpperCase();
+                       return !val || !isNaN(val) || v === 'SARAWAK' || v === 'SABAH' || v.includes('ZON') || v.includes('SESI');
+                    };
+
+                    // Format Helaian Sarawak: Kolom A = SARAWAK | Kolom B = No. KP | Kolom C = NAMA CALON | Kolom D = PPD
+                    if (isZoneOrNumber(colBefore)) {
+                       nama = colAfter;
+                       ppd = cols[kpIndex + 2] || cols[kpIndex + 3] || 'SARAWAK';
+                       subjek = cols[kpIndex + 3] || cols[kpIndex + 4] || 'SME';
+                    } else {
+                       // Format biasa: Kolom A = NAMA | Kolom B = No. KP | Kolom C = PPD
+                       nama = colBefore;
+                       ppd = colAfter;
+                       subjek = cols[kpIndex + 2] || 'SME';
+                    }
                  } else {
-                    nama = cols[0] || '';
-                    noKp = cleanKpNum(cols[1] || '');
+                    nama = cols[1] && isNaN(cols[1]) ? cols[1] : cols[0];
+                    noKp = cleanKpNum(cols[0]) || cleanKpNum(cols[1]);
+                    ppd = cols[2] || 'SARAWAK';
+                    subjek = cols[3] || 'SME';
                  }
 
-                 if (!noKp || !nama) continue;
-
-                 ppd = cols[2] || cols[3] || 'SARAWAK';
-                 subjek = cols[3] || cols[4] || 'SME';
+                 // Pastikan nama bukan 'SARAWAK' atau kosong
+                 if (!noKp || !nama || nama.toUpperCase() === 'SARAWAK') continue;
 
                  // Kesan Sesi
                  if (bulkDefaultSesi !== 'AUTO') {
@@ -443,24 +464,25 @@
                     ppd: mapPPDStandard(ppd).toUpperCase(),
                     sme_subjek: subjek.toUpperCase(),
                     zon_temuduga: zon.toUpperCase(),
-                    bilik_temuduga: bilik.toUpperCase(), // WAJIB DIISI UNTUK MENGELAKKAN NOT-NULL ERROR
+                    bilik_temuduga: bilik.toUpperCase(),
                     sesi: sesi.toUpperCase(),
                     kehadiran: 'BELUM'
                  });
               }
 
               if (candidatesToInsert.length === 0) {
-                 alert("Tiada rekod calon sah dikesan. Sila semak pautan atau format teks.");
+                 alert("Tiada rekod calon sah dikesan. Sila pastikan format Google Sheet mengandungi Nama dan No. KP.");
                  setBulkLoading(false);
                  return;
               }
 
+              // Masukkan atau Kemas Kini sekaligus ke Supabase
               const { error } = await sb.from('calon').upsert(candidatesToInsert, { onConflict: 'no_kp' });
 
               if (error) {
                  alert("Gagal memuat naik: " + error.message);
               } else {
-                 alert(`Tahniah! ${candidatesToInsert.length} orang calon berjaya didaftarkan ke pangkalan data!`);
+                 alert(`Berjaya! ${candidatesToInsert.length} orang calon dikemas kini dengan NAMA SEBENAR dan PUSAT yang betul!`);
                  setShowBulkModal(false);
                  setBulkText('');
                  fetchData();
@@ -1054,7 +1076,7 @@
                            placeholder="Data akan muncul di sini secara automatik selepas menekan butang 'Sedut Data'..." 
                            className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-slate-200 focus:border-amber-500 focus:outline-none" 
                            value={bulkText} 
-                           onChange={e => setBulkText(e.target.value)}
+                           onChange={e => setBulkText(e.target.value)} 
                         />
                      </div>
 
