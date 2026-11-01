@@ -129,8 +129,10 @@
         const [idInput, setIdInput] = useState('');
         const [passInput, setPassInput] = useState('');
 
-        const [selectedZon, setSelectedZon] = useState('SABAH');
-        const [selectedPusat, setSelectedPusat] = useState(''); // DIBAIKI: Sokongan Pusat Bertugas
+        // SENARAI PENUGASAN & PENUGASAN YANG DIPILIH DARI KAD
+        const [penugasanUSList, setPenugasanUSList] = useState([]);
+        const [selectedTugas, setSelectedTugas] = useState(null);
+
         const [activeTab, setActiveTab] = useState('daftar'); 
         
         const [calonList, setCalonList] = useState([]);
@@ -168,10 +170,8 @@
           if (cleanId.toLowerCase() === 'urusetia' && cleanPass === 'bpg2026') {
              const bpgObj = { nama_penuh: 'URUS SETIA BPG', id: 'urusetia', zon: 'SEMUA' };
              setCurrentUrusSetia(bpgObj);
-             setSelectedZon('SEMUA');
-             setSelectedPusat('');
              setIsLoggedIn(true);
-             fetchData();
+             fetchDataAndAssignments(bpgObj, true);
              return;
           }
 
@@ -199,35 +199,12 @@
           }
 
           setCurrentUrusSetia(matchedUser);
-          
-          let uZon = safeStr(matchedUser.zon || matchedUser.kata_laluan || matchedUser.katalaluan).toUpperCase();
-          if (uZon.includes('SABAH')) setSelectedZon('SABAH');
-          else if (uZon.includes('UTARA')) setSelectedZon('UTARA');
-          else if (uZon.includes('TIMUR')) setSelectedZon('TIMUR');
-          else if (uZon.includes('TENGAH')) setSelectedZon('TENGAH');
-          else if (uZon.includes('SELATAN')) setSelectedZon('SELATAN');
-          else if (uZon.includes('SARAWAK')) setSelectedZon('SARAWAK');
-          else setSelectedZon('SEMUA');
-
-          // DIBAIKI: Semak rekod penugasan urus setia untuk mengesan pusat spesifik (contoh: KUCHING atau MIRI)
-          const { data: usTugas } = await sb.from('penugasan_urus_setia').select('*');
-          if (usTugas && usTugas.length > 0) {
-             const myUsTugas = usTugas.find(t => safeStr(t.no_kp_us) === cleanId || safeStr(t.no_kp_us) === safeStr(matchedUser.no_kp));
-             if (myUsTugas && myUsTugas.pusat_bertugas) {
-                setSelectedPusat(safeStr(myUsTugas.pusat_bertugas).toUpperCase());
-                if (myUsTugas.zon_bertugas) setSelectedZon(safeStr(myUsTugas.zon_bertugas).toUpperCase());
-             } else {
-                setSelectedPusat('');
-             }
-          } else {
-             setSelectedPusat('');
-          }
-
           setIsLoggedIn(true);
-          fetchData();
+          fetchDataAndAssignments(matchedUser, false);
         };
 
-        const fetchData = async () => {
+        // MUAT TURUN PENUGASAN DAN DATA SISTEM
+        const fetchDataAndAssignments = async (uUser, isSuper) => {
           const { data: cData } = await sb.from('calon').select('*').order('nama_penuh', { ascending: true });
           if (cData) setCalonList(cData);
 
@@ -239,11 +216,32 @@
 
           const { data: rData } = await sb.from('penilaian_skor').select('*');
           if (rData) setPenilaianList(rData);
-        };
 
-        useEffect(() => {
-          if (isLoggedIn) fetchData();
-        }, [isLoggedIn, selectedZon, selectedPusat]);
+          const { data: usTugasData } = await sb.from('penugasan_urus_setia').select('*');
+
+          if (isSuper) {
+             // Jika BPG Utama, benarkan akses semua penugasan
+             setPenugasanUSList(usTugasData || [{ id: 999, zon_bertugas: 'SEMUA', pusat_bertugas: null, tempoh_bertugas: 'SEMUA TEMPOH' }]);
+          } else {
+             const cleanKp = safeStr(uUser.no_kp || uUser.id).replace(/[^0-9]/g, '');
+             const myTugas = (usTugasData || []).filter(t => 
+                safeStr(t.no_kp_us).replace(/[^0-9]/g, '') === cleanKp || safeStr(t.no_kp_us) === safeStr(uUser.no_kp) || safeStr(t.no_kp_us) === safeStr(uUser.id)
+             );
+
+             if (myTugas.length > 0) {
+                setPenugasanUSList(myTugas);
+             } else {
+                // Jika tiada rekod penugasan bertulis, jana berasaskan zon profilnya
+                let defaultZon = safeStr(uUser.zon).toUpperCase() || 'SARAWAK';
+                setPenugasanUSList([{
+                   id: 1,
+                   zon_bertugas: defaultZon,
+                   pusat_bertugas: null,
+                   tempoh_bertugas: 'SESI SEMASA'
+                }]);
+             }
+          }
+        };
 
         const handleSaveCalon = async (e) => {
            e.preventDefault();
@@ -253,13 +251,16 @@
               return alert("Sila lengkapkan Nama Penuh dan No. KP calon.");
            }
 
+           const activeZon = selectedTugas ? selectedTugas.zon_bertugas : 'SARAWAK';
+           const activePusat = selectedTugas && selectedTugas.pusat_bertugas ? selectedTugas.pusat_bertugas : null;
+
            const payload = {
               nama_penuh: safeStr(formCalon.nama_penuh).toUpperCase(),
               no_kp: safeStr(formCalon.no_kp),
               ppd: safeStr(formCalon.ppd).toUpperCase(),
               sme_subjek: safeStr(formCalon.sme_subjek).toUpperCase(),
-              zon_temuduga: selectedZon === 'SEMUA' ? 'SABAH' : selectedZon,
-              pusat_temuduga: selectedPusat ? selectedPusat : null, // DIBAIKI: Simpan pusat urus setia secara automatik
+              zon_temuduga: activeZon === 'SEMUA' ? 'SARAWAK' : activeZon,
+              pusat_temuduga: activePusat,
               sesi: safeStr(formCalon.sesi).toUpperCase(),
               kehadiran: formCalon.kehadiran
            };
@@ -279,7 +280,9 @@
               setMsg({ type: 'success', text: `Calon ${payload.nama_penuh} berjaya disimpan!` });
               setFormCalon({ nama_penuh: '', no_kp: '', ppd: '', sme_subjek: '', sesi: 'SESI 1', kehadiran: 'BELUM' });
               setEditingCalonKp(null);
-              fetchData();
+              // Muat semula calon
+              const { data: cData } = await sb.from('calon').select('*').order('nama_penuh', { ascending: true });
+              if (cData) setCalonList(cData);
            }
         };
 
@@ -301,27 +304,31 @@
            if (error) alert('Gagal memadam: ' + error.message);
            else {
               alert('Calon berjaya dipadam.');
-              fetchData();
+              const { data: cData } = await sb.from('calon').select('*').order('nama_penuh', { ascending: true });
+              if (cData) setCalonList(cData);
            }
         };
 
-        // DIBAIKI: LOGIK PENAPISAN CALON ZON & PUSAT SEPADAN
+        // TAPISAN CALON BERDASARKAN KAD TUGASAN YANG DIPILIH
         const filteredCalon = calonList.filter(c => {
+           if (!selectedTugas) return false;
+           const tZon = safeStr(selectedTugas.zon_bertugas).toUpperCase();
+           const tPusat = safeStr(selectedTugas.pusat_bertugas).toUpperCase();
            const cZon = safeStr(c.zon_temuduga).toUpperCase();
            const cPusat = safeStr(c.pusat_temuduga).toUpperCase();
 
-           // 1. Semakan Zon
-           const padanZon = selectedZon === 'SEMUA' || cZon === selectedZon || cZon.includes(selectedZon);
+           // Semakan Zon
+           const padanZon = tZon === 'SEMUA' || cZon === tZon || cZon.includes(tZon);
            if (!padanZon) return false;
 
-           // 2. Semakan Pusat jika Urus Setia ditugaskan di pusat khusus (contoh: KUCHING atau MIRI)
-           if (selectedPusat && selectedPusat !== '' && selectedPusat !== 'UTAMA' && selectedPusat !== '-') {
-              const padanPusatTepat = cPusat === selectedPusat;
-              const padanPusatDalamZon = cZon.includes(selectedPusat); // Sokong format teks lama 'SARAWAK (KUCHING)'
+           // Semakan Pusat jika ada
+           if (tPusat && tPusat !== '' && tPusat !== 'UTAMA' && tPusat !== '-') {
+              const padanPusatTepat = cPusat === tPusat;
+              const padanPusatDalamZon = cZon.includes(tPusat);
               if (!padanPusatTepat && !padanPusatDalamZon) return false;
            }
 
-           // 3. Semakan Sesi
+           // Semakan Sesi
            if (filterSesi === 'SEMUA') return true;
            return safeStr(c.sesi).toUpperCase().includes(filterSesi);
         });
@@ -389,17 +396,20 @@
            };
         });
 
-        // DIBAIKI: Semakan Panel mengikut Pusat sekiranya urus setia bertugas di pusat tertentu
         const panelZonList = () => {
            let mapComplete = {};
            penugasanList.forEach(t => {
+              if (!selectedTugas) return;
               const tZon = safeStr(t.zon_bertugas).toUpperCase();
               const tPusat = safeStr(t.pusat_bertugas).toUpperCase();
-              const padanZon = selectedZon === 'SEMUA' || tZon === selectedZon || tZon.includes(selectedZon);
+              const selZon = safeStr(selectedTugas.zon_bertugas).toUpperCase();
+              const selPusat = safeStr(selectedTugas.pusat_bertugas).toUpperCase();
+
+              const padanZon = selZon === 'SEMUA' || tZon === selZon || tZon.includes(selZon);
               
               if (padanZon) {
-                 if (selectedPusat && selectedPusat !== '' && selectedPusat !== 'UTAMA' && selectedPusat !== '-') {
-                    if (tPusat !== selectedPusat && !tZon.includes(selectedPusat)) return;
+                 if (selPusat && selPusat !== '' && selPusat !== 'UTAMA' && selPusat !== '-') {
+                    if (tPusat !== selPusat && !tZon.includes(selPusat)) return;
                  }
                  const kp = safeStr(t.no_kp_panel);
                  if (kp) mapComplete[kp] = safeStr(t.peranan).toUpperCase();
@@ -438,17 +448,19 @@
           const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
           const link = document.createElement("a");
           link.setAttribute("href", URL.createObjectURL(blob));
-          link.setAttribute("download", `Senarai_Calon_SISC_Zon_${selectedZon}${selectedPusat ? '_' + selectedPusat : ''}.csv`);
+          link.setAttribute("download", `Senarai_Calon_SISC_${selectedTugas?.zon_bertugas}_${selectedTugas?.pusat_bertugas || 'UTAMA'}.csv`);
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
-        // DATA UNTUK BORANG RUMUSAN INDIVIDU
         const calonIndividuList = consolidatedCalon.filter(c => {
            if (selectedIndividuSesi === 'SEMUA') return true;
            return safeStr(c.sesi).toUpperCase().includes(selectedIndividuSesi);
         });
 
         const selectedCalonIndividu = calonIndividuList.find(c => safeStr(c.no_kp) === selectedIndividuKp) || calonIndividuList[0] || null;
+
+        const currentZonLabel = selectedTugas ? selectedTugas.zon_bertugas : 'SARAWAK';
+        const currentPusatLabel = selectedTugas && selectedTugas.pusat_bertugas ? selectedTugas.pusat_bertugas : '';
 
         return (
           <div className="min-h-screen flex flex-col">
@@ -466,11 +478,13 @@
                  <div className="flex items-center gap-4">
                     <div className="text-right">
                        <span className="text-xs font-black text-slate-800 uppercase block">{safeStr(currentUrusSetia?.nama_penuh).toUpperCase()}</span>
-                       <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded border border-emerald-300 inline-block mt-0.5">
-                          📍 ZON {selectedZon} {selectedPusat ? `(PUSAT: ${selectedPusat})` : ''}
-                       </span>
+                       {selectedTugas && (
+                          <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded border border-emerald-300 inline-block mt-0.5">
+                             📍 ZON {currentZonLabel} {currentPusatLabel ? `(PUSAT: ${currentPusatLabel})` : ''}
+                          </span>
+                       )}
                     </div>
-                    <button onClick={() => setIsLoggedIn(false)} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-xs transition-colors border border-red-200">
+                    <button onClick={() => { setIsLoggedIn(false); setSelectedTugas(null); }} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-xs transition-colors border border-red-200">
                        Log Keluar
                     </button>
                  </div>
@@ -479,7 +493,7 @@
 
             <div className="p-6 md:p-10 max-w-7xl mx-auto w-full flex-grow">
               
-              {/* LOG MASUK URUS SETIA */}
+              {/* SKRIN 1: LOG MASUK URUS SETIA */}
               {!isLoggedIn && (
                 <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 p-8 rounded-2xl shadow-2xl mt-12">
                    <div className="text-center mb-6">
@@ -512,10 +526,85 @@
                 </div>
               )}
 
-              {/* DASHBOARD URUS SETIA ZON */}
-              {isLoggedIn && (
+              {/* SKRIN 2: LOBI KAD PENUGASAN LOKASI URUS SETIA (SAMA SEPERTI MODUL PANEL) */}
+              {isLoggedIn && !selectedTugas && (
+                <div className="space-y-6">
+                   <div className="text-center max-w-2xl mx-auto">
+                      <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 font-extrabold text-xs rounded-full border border-emerald-500/40 uppercase tracking-widest inline-block mb-2">
+                         PILIHAN PUSAT TUGASAN RASMI
+                      </span>
+                      <h1 className="text-2xl md:text-3xl font-black text-emerald-400 uppercase tracking-wide">
+                         SELAMAT DATANG, {safeStr(currentUrusSetia?.nama_penuh).toUpperCase()}
+                      </h1>
+                      <p className="text-slate-400 text-sm mt-1">Sila pilih Kad Pusat / Zon bertugas anda di bawah untuk memulakan semakan kehadiran dan pendaftaran calon.</p>
+                   </div>
+
+                   {penugasanUSList.length === 0 ? (
+                      <div className="p-12 text-center bg-slate-900 border border-slate-800 rounded-2xl max-w-xl mx-auto mt-8 shadow-2xl">
+                         <span className="text-5xl text-slate-600">📂</span>
+                         <h3 className="text-lg font-bold text-slate-300 mt-3">Tiada Rekod Penugasan Aktif</h3>
+                         <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Profil anda belum diagihkan penugasan zon atau pusat. Sila hubungi Pentadbir Sistem Utama (Admin).</p>
+                      </div>
+                   ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto mt-8">
+                         {penugasanUSList.map(tugas => (
+                            <div key={tugas.id} className="bg-slate-900 border-2 border-slate-800 hover:border-emerald-500 rounded-2xl shadow-2xl flex flex-col justify-between overflow-hidden transition-all duration-300 hover:-translate-y-1">
+                               
+                               <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-5 border-b border-slate-800">
+                                  <div className="flex justify-between items-center mb-2">
+                                     <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 font-extrabold text-xs rounded-full border border-emerald-500/40 uppercase tracking-wider">
+                                        📍 ZON {safeStr(tugas.zon_bertugas).toUpperCase()}
+                                     </span>
+                                     <span className="text-[11px] text-slate-500 font-mono">ID #{tugas.id}</span>
+                                  </div>
+                                  <h3 className="text-xl font-black text-white mt-2 leading-snug uppercase">
+                                     {tugas.pusat_bertugas ? `PUSAT: ${safeStr(tugas.pusat_bertugas).toUpperCase()}` : 'KESELURUHAN ZON'}
+                                  </h3>
+                               </div>
+
+                               <div className="p-5 flex-grow flex flex-col justify-center items-center text-center">
+                                  <div className="w-full py-2.5 px-4 bg-slate-950/80 border border-slate-800 rounded-xl mb-2">
+                                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">TEMPOH PENUGASAN</p>
+                                     <p className="text-xs font-mono font-bold text-amber-300 uppercase mt-0.5">{safeStr(tugas.tempoh_bertugas) || 'SESI AKTIF'}</p>
+                                  </div>
+                               </div>
+
+                               <div className="p-5 pt-0">
+                                  <button onClick={() => setSelectedTugas(tugas)} className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-black rounded-xl text-sm shadow-lg transition-transform active:scale-95 flex items-center justify-center gap-2 uppercase tracking-wide">
+                                     <span>MASUK PUSAT BERTUGAS</span>
+                                     <span>➔</span>
+                                  </button>
+                               </div>
+
+                            </div>
+                         ))}
+                      </div>
+                   )}
+                </div>
+              )}
+
+              {/* SKRIN 3: DASHBOARD OPERASI URUS SETIA BAGI PUSAT / ZON TERPILIH */}
+              {isLoggedIn && selectedTugas && (
                 <div className="space-y-6">
                    
+                   {/* BAR KAWALAN LOKASI BERTUGAS */}
+                   <div className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4 shadow no-print">
+                      <div className="flex items-center gap-3">
+                         <button onClick={() => { setSelectedTugas(null); }} className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-lg border border-slate-700 flex items-center gap-1.5 transition-colors">
+                            <span>⬅️</span> <span>Tukar Pusat</span>
+                         </button>
+                         <div>
+                            <span className="text-xs text-slate-400 uppercase font-bold">Pusat Urus Setia Aktif:</span>
+                            <h2 className="text-sm font-extrabold text-emerald-400 uppercase">
+                               ZON {currentZonLabel} {currentPusatLabel ? `— PUSAT: ${currentPusatLabel}` : '— SEMUA PUSAT'}
+                            </h2>
+                         </div>
+                      </div>
+                      <div className="text-xs text-slate-400 font-bold bg-slate-950 px-4 py-2 rounded-lg border border-slate-800">
+                         Jumlah Calon Berdaftar: <span className="text-emerald-400 text-sm font-extrabold ml-1">{filteredCalon.length} Orang</span>
+                      </div>
+                   </div>
+
                    {msg.text && (
                       <div className={`p-4 rounded-xl text-sm font-bold text-center shadow-md animate-pulse no-print ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
                          {msg.text}
@@ -538,21 +627,6 @@
                             🖨️ Cetak Individu (Borang Muktamad)
                          </button>
                       </div>
-
-                      {currentUrusSetia?.zon === 'SEMUA' && (
-                         <div className="flex items-center gap-2 bg-slate-900 p-2 rounded-xl border border-slate-800">
-                            <span className="text-xs text-slate-400 font-bold uppercase">Pilih Zon:</span>
-                            <select className="p-1.5 bg-slate-950 border border-slate-700 rounded text-xs font-bold text-amber-400" value={selectedZon} onChange={e => setSelectedZon(e.target.value)}>
-                               <option value="SEMUA">KESEMUA ZON</option>
-                               <option value="UTARA">ZON UTARA</option>
-                               <option value="TIMUR">ZON TIMUR</option>
-                               <option value="TENGAH">ZON TENGAH</option>
-                               <option value="SELATAN">ZON SELATAN</option>
-                               <option value="SABAH">ZON SABAH</option>
-                               <option value="SARAWAK">ZON SARAWAK</option>
-                            </select>
-                         </div>
-                      )}
                    </div>
 
                    {/* TAB 1: PENDAFTARAN & CETAKAN CALON ZON */}
@@ -563,7 +637,7 @@
                          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-4 no-print">
                             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                                <h3 className="text-sm font-extrabold text-emerald-400 uppercase">
-                                  {editingCalonKp ? '✏️ Kemas Kini Maklumat Calon' : `➕ Pendaftaran Calon Baharu (${selectedZon}${selectedPusat ? ` - Pusat: ${selectedPusat}` : ''})`}
+                                  {editingCalonKp ? '✏️ Kemas Kini Maklumat Calon' : `➕ Pendaftaran Calon Baharu (Zon ${currentZonLabel}${currentPusatLabel ? ` - Pusat: ${currentPusatLabel}` : ''})`}
                                </h3>
                                {editingCalonKp && (
                                   <button onClick={() => { setEditingCalonKp(null); setFormCalon({ nama_penuh: '', no_kp: '', ppd: '', sme_subjek: '', sesi: 'SESI 1', kehadiran: 'BELUM' }); }} className="text-xs font-bold text-red-400 hover:underline">
@@ -585,7 +659,7 @@
 
                                <div>
                                   <label className="block text-[11px] font-bold text-slate-400 uppercase mb-1">Pejabat Pendidikan Daerah (PPD)</label>
-                                  <input type="text" placeholder="Contoh: PPD SIPITANG" className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-bold text-slate-100 uppercase focus:border-emerald-500 focus:outline-none" value={formCalon.ppd} onChange={e => setFormCalon({...formCalon, ppd: e.target.value})} />
+                                  <input type="text" placeholder="Contoh: PPD KUCHING" className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-lg text-xs font-bold text-slate-100 uppercase focus:border-emerald-500 focus:outline-none" value={formCalon.ppd} onChange={e => setFormCalon({...formCalon, ppd: e.target.value})} />
                                </div>
 
                                <div>
@@ -613,7 +687,7 @@
                                      <option value="HADIR">HADIR</option>
                                      <option value="TIDAK HADIR">TIDAK HADIR</option>
                                   </select>
-                                </div>
+                               </div>
 
                                <div className="md:col-span-3 flex justify-end gap-2 pt-2">
                                   <button type="submit" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black px-6 py-2.5 rounded-lg text-xs shadow transition-transform active:scale-95">
@@ -626,7 +700,9 @@
                          {/* BAR KAWALAN CETAKAN & TAPISAN */}
                          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 no-print">
                             <div>
-                               <h3 className="text-base font-extrabold text-slate-200 uppercase">Senarai Calon Terdaftar Zon {selectedZon} {selectedPusat ? `(Pusat: ${selectedPusat})` : ''}</h3>
+                               <h3 className="text-base font-extrabold text-slate-200 uppercase">
+                                  Senarai Calon Terdaftar Zon {currentZonLabel} {currentPusatLabel ? `(Pusat: ${currentPusatLabel})` : ''}
+                                </h3>
                                <p className="text-xs text-slate-400 mt-0.5">Jumlah Calon: <b className="text-emerald-400">{consolidatedCalon.length} Orang</b></p>
                             </div>
 
@@ -657,7 +733,7 @@
                                <h3 className="text-xs font-bold uppercase tracking-wider">Kementerian Pendidikan Malaysia</h3>
                                <h4 className="text-[11px] font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
                                <h2 className="text-base font-black uppercase mt-2 text-slate-900 border-b-2 border-slate-900 pb-1 inline-block">
-                                  SENARAI DAFTAR CALON SELEKSI PEGAWAI SISC+ (ZON {selectedZon}{selectedPusat ? ` - PUSAT: ${selectedPusat}` : ''})
+                                  SENARAI DAFTAR CALON SELEKSI PEGAWAI SISC+ (ZON {currentZonLabel}{currentPusatLabel ? ` - PUSAT: ${currentPusatLabel}` : ''})
                                </h2>
                                <p className="text-xs font-bold text-slate-700 mt-1">Sesi: {filterSesi} | Tarikh Janaan: {new Date().toLocaleDateString('en-GB')}</p>
                             </div>
@@ -712,7 +788,9 @@
                       <div className="space-y-6">
                          <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex justify-between items-center no-print">
                             <div>
-                               <h3 className="text-base font-extrabold text-amber-400 uppercase">Senarai Pegawai Panel Penemuduga Zon {selectedZon} {selectedPusat ? `(Pusat: ${selectedPusat})` : ''}</h3>
+                               <h3 className="text-base font-extrabold text-amber-400 uppercase">
+                                  Senarai Pegawai Panel Penemuduga Zon {currentZonLabel} {currentPusatLabel ? `(Pusat: ${currentPusatLabel})` : ''}
+                               </h3>
                                <p className="text-xs text-slate-400 mt-0.5">Jumlah Panel Bertugas: <b className="text-white">{panelZonList().length} Orang</b></p>
                             </div>
                             <button onClick={() => window.print()} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold px-4 py-2.5 rounded-lg text-xs shadow transition-transform active:scale-95">🖨️ Cetak Senarai Panel A4</button>
@@ -724,7 +802,7 @@
                                <h3 className="text-xs font-bold uppercase tracking-wider">Kementerian Pendidikan Malaysia</h3>
                                <h4 className="text-[11px] font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
                                <h2 className="text-base font-black uppercase mt-2 text-slate-900 border-b-2 border-slate-900 pb-1 inline-block">
-                                  SENARAI PEGAWAI PANEL PENEMUDUGA (ZON {selectedZon}{selectedPusat ? ` - PUSAT: ${selectedPusat}` : ''})
+                                  SENARAI PEGAWAI PANEL PENEMUDUGA (ZON {currentZonLabel}{currentPusatLabel ? ` - PUSAT: ${currentPusatLabel}` : ''})
                                </h2>
                             </div>
 
@@ -751,7 +829,7 @@
                                      </tr>
                                   ))}
                                   {panelZonList().length === 0 && (
-                                     <tr><td colSpan="6" className="p-6 text-center italic text-slate-500">Tiada rekod penugasan panel dijumpai bagi zon ini.</td></tr>
+                                     <tr><td colSpan="6" className="p-6 text-center italic text-slate-500">Tiada rekod penugasan panel dijumpai bagi zon/pusat ini.</td></tr>
                                   )}
                                </tbody>
                             </table>
@@ -764,7 +842,9 @@
                       <div className="space-y-6">
                          <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 no-print">
                             <div>
-                               <h3 className="text-base font-extrabold text-blue-400 uppercase">Laporan Keputusan Rasmi Zon {selectedZon} {selectedPusat ? `(Pusat: ${selectedPusat})` : ''}</h3>
+                               <h3 className="text-base font-extrabold text-blue-400 uppercase">
+                                  Laporan Keputusan Rasmi Zon {currentZonLabel} {currentPusatLabel ? `(Pusat: ${currentPusatLabel})` : ''}
+                               </h3>
                                <p className="text-xs text-slate-400 mt-0.5">Penapisan kelulusan mengikut penanda aras peratusan minimum.</p>
                             </div>
 
@@ -783,7 +863,7 @@
                                <h3 className="text-xs font-bold uppercase tracking-wider">Kementerian Pendidikan Malaysia</h3>
                                <h4 className="text-[11px] font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
                                <h2 className="text-base font-black uppercase mt-2 text-slate-900 border-b-2 border-slate-900 pb-1 inline-block">
-                                  SENARAI KEPUTUSAN MUKTAMAD CALON SELEKSI SISC+ (ZON {selectedZon}{selectedPusat ? ` - PUSAT: ${selectedPusat}` : ''})
+                                  SENARAI KEPUTUSAN MUKTAMAD CALON SELEKSI SISC+ (ZON {currentZonLabel}{currentPusatLabel ? ` - PUSAT: ${currentPusatLabel}` : ''})
                                </h2>
                                <p className="text-xs font-bold text-slate-700 mt-1">Tahap Kelulusan Minimum: {minScore}% dan ke atas</p>
                             </div>
@@ -813,7 +893,7 @@
                                      </tr>
                                   ))}
                                   {consolidatedCalon.filter(c => c.totalMarkah >= minScore).length === 0 && (
-                                     <tr><td colSpan="7" className="p-6 text-center italic text-slate-500">Tiada calon di Zon {selectedZon} yang melepasi had markah {minScore}%.</td></tr>
+                                     <tr><td colSpan="7" className="p-6 text-center italic text-slate-500">Tiada calon di Zon {currentZonLabel} yang melepasi had markah {minScore}%.</td></tr>
                                   )}
                                </tbody>
                             </table>
@@ -823,7 +903,7 @@
                                <div>
                                   <p className="font-bold text-slate-500 uppercase text-[10px] mb-1">Disediakan Oleh:</p>
                                   <p className="font-bold uppercase text-sm">{currentUrusSetia?.nama_penuh || 'PEGAWAI URUS SETIA ZON'}</p>
-                                  <p className="uppercase text-[11px] text-slate-600">URUS SETIA SELEKSI PEGAWAI SISC+ (ZON {selectedZon}{selectedPusat ? ` - PUSAT: ${selectedPusat}` : ''})</p>
+                                  <p className="uppercase text-[11px] text-slate-600">URUS SETIA SELEKSI PEGAWAI SISC+ (ZON {currentZonLabel}{currentPusatLabel ? ` - PUSAT: ${currentPusatLabel}` : ''})</p>
                                </div>
                                <div className="text-right">
                                   <p className="font-bold text-slate-500 uppercase text-[10px] mb-1">Disahkan Oleh:</p>
@@ -846,7 +926,7 @@
                             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
                                <div>
                                   <h3 className="text-base font-extrabold text-amber-400 uppercase">Cetakan Rumusan Skor Individu Muktamad</h3>
-                                  <p className="text-xs text-slate-400 mt-0.5">Pilih Sesi dan Nama Calon bagi Zon {selectedZon} {selectedPusat ? `(Pusat: ${selectedPusat})` : ''} untuk menjana Borang Muktamad A4.</p>
+                                  <p className="text-xs text-slate-400 mt-0.5">Pilih Sesi dan Nama Calon bagi Zon {currentZonLabel} {currentPusatLabel ? `(Pusat: ${currentPusatLabel})` : ''} untuk menjana Borang Muktamad A4.</p>
                                </div>
                                <button onClick={() => window.print()} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-2.5 rounded-lg text-xs shadow transition-transform active:scale-95 flex items-center gap-2">
                                   <span>🖨️ Cetak Borang Muktamad</span>
@@ -855,9 +935,9 @@
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                <div>
-                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">1. Zon Bertugas</label>
-                                  <input type="text" readOnly className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-bold text-emerald-400 uppercase" value={`ZON ${selectedZon}${selectedPusat ? ` (PUSAT: ${selectedPusat})` : ''}`} />
-                               </div>
+                                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">1. Lokasi Bertugas</label>
+                                  <input type="text" readOnly className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-lg text-xs font-bold text-emerald-400 uppercase" value={`ZON ${currentZonLabel}${currentPusatLabel ? ` (PUSAT: ${currentPusatLabel})` : ''}`} />
+                                </div>
 
                                <div>
                                   <label className="block text-xs font-bold text-slate-400 uppercase mb-1">2. Pilih Sesi</label>
@@ -1001,13 +1081,13 @@
                                      <div className="pt-4 border-t border-slate-300">
                                         <p className="font-bold text-slate-500 uppercase text-[10px]">DICETAK OLEH:</p>
                                         <p className="font-extrabold uppercase text-xs">{safeStr(currentUrusSetia?.nama_penuh).toUpperCase() || 'URUS SETIA ZON'}</p>
-                                        <p className="text-[10px] text-slate-600 font-semibold">URUS SETIA TEMU DUGA SISC+ (ZON {selectedZon}{selectedPusat ? ` - PUSAT: ${selectedPusat}` : ''})</p>
+                                        <p className="text-[10px] text-slate-600 font-semibold">URUS SETIA TEMU DUGA SISC+ (ZON {currentZonLabel}{currentPusatLabel ? ` - PUSAT: ${currentPusatLabel}` : ''})</p>
                                         <p className="text-[10px] text-slate-500 font-bold mt-1">Tarikh Cetakan: {new Date().toLocaleDateString('en-GB')}</p>
                                      </div>
                                   </div>
                                </div>
 
-                               {/* CATATAN kaki cetakan */}
+                               {/* CATATAN KAKI */}
                                <div className="text-[10px] text-slate-500 italic border-t border-slate-300 pt-2 text-center">
                                   * Dokumen rumusan muktamad ini dijana secara automatik oleh Sistem Pengurusan Temu Duga SISC+ dan tidak memerlukan tandatangan fizikal.
                                </div>
