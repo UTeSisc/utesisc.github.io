@@ -21,6 +21,7 @@
         .no-print { display: none !important; }
         body { background: white !important; color: black !important; font-family: 'Arial', sans-serif; }
         .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; width: 100% !important; margin: 0 !important; }
+        .print-page-break { page-break-after: always; }
         @page { size: A4 portrait; margin: 10mm; }
       }
       .flip-card { perspective: 1000px; }
@@ -913,13 +914,18 @@
                                     <span>📊</span> PAPARAN DATA TAMBAHAN EKSEKUTIF
                                  </h2>
                                  <p className="text-xs text-slate-400 mt-0.5">
-                                    Klik nombor <span className="text-amber-400 font-bold underline">Selesai Dinilai</span> untuk perincian calon, atau klik nama negeri untuk paparan bertingkat daerah & subjek[cite: 8].
+                                    Klik nombor <span className="text-amber-400 font-bold underline">Selesai Dinilai</span> untuk perincian calon, atau klik nama negeri untuk paparan bertingkat daerah & subjek.
                                  </p>
                               </div>
-                              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                                 <button onClick={() => setDataTambahanTab('zon')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'zon' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Zon</button>
-                                 <button onClick={() => setDataTambahanTab('negeri')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'negeri' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Negeri</button>
-                                 <button onClick={() => setDataTambahanTab('subjek')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'subjek' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Subjek</button>
+                              <div className="flex flex-wrap items-center gap-2">
+                                 <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                                    <button onClick={() => setDataTambahanTab('zon')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'zon' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Zon</button>
+                                    <button onClick={() => setDataTambahanTab('negeri')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'negeri' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Negeri</button>
+                                    <button onClick={() => setDataTambahanTab('subjek')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'subjek' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Subjek</button>
+                                 </div>
+                                 <button onClick={() => window.print()} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold rounded-xl text-xs shadow flex items-center gap-1.5 transition-all">
+                                    <span>🖨️</span> <span>Cetak Jadual Analisis A4</span>
+                                 </button>
                               </div>
                            </div>
 
@@ -1804,7 +1810,12 @@
                            <h3 className="text-base font-extrabold text-amber-400 uppercase">{modalDetailTitle}</h3>
                            <p className="text-xs text-slate-400 mt-0.5">Jumlah Calon: {modalDetailList.length} Orang</p>
                         </div>
-                        <button onClick={() => setShowDetailModal(false)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold text-sm">✕ Tutup</button>
+                        <div className="flex items-center gap-2">
+                           <button onClick={() => window.print()} className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow flex items-center gap-1">
+                              <span>🖨️</span> <span>Cetak Senarai Ini</span>
+                           </button>
+                           <button onClick={() => setShowDetailModal(false)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold text-xs">✕ Tutup</button>
+                        </div>
                      </div>
                      <div className="overflow-x-auto max-h-[450px] overflow-y-auto pr-1">
                         <table className="w-full text-left text-xs border-collapse">
