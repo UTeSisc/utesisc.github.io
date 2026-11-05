@@ -301,6 +301,21 @@
         const [customCenterList, setCustomCenterList] = useState(['KUCHING', 'MIRI']);
 
         const [dataTambahanTab, setDataTambahanTab] = useState('zon');
+        // STATE UNTUK DRILL-DOWN NEGERI -> DAERAH -> SUBJEK
+        const [selectedNegeriExpand, setSelectedNegeriExpand] = useState(null);
+        const [selectedDaerahExpand, setSelectedDaerahExpand] = useState(null);
+
+        // STATE UNTUK MODAL POPUP CALON SELESAI DINILAI
+        const [modalDetailTitle, setModalDetailTitle] = useState('');
+        const [modalDetailList, setModalDetailList] = useState([]);
+        const [showDetailModal, setShowDetailModal] = useState(false);
+
+        // FUNGSI BUKA POPUP PERINCIAN CALON APABILA TEKAN NOMBOR SELESAI DINILAI
+        const handleOpenCalonDetail = (tajuk, senaraiCalon) => {
+          setModalDetailTitle(tajuk);
+          setModalDetailList(senaraiCalon);
+          setShowDetailModal(true);
+        };
 
         const handleNumCentersChange = (n) => {
           const count = Math.max(1, parseInt(n) || 1);
@@ -1176,14 +1191,16 @@
                            </div>
                         </div>
 
-                        {/* PAPARAN DATA TAMBAHAN EKSEKUTIF */}
+                       {/* PAPARAN DATA TAMBAHAN EKSEKUTIF INTERAKTIF */}
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 mt-8">
                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 gap-4">
                               <div>
                                  <h2 className="text-lg font-black text-amber-400 uppercase tracking-wide flex items-center gap-2">
                                     <span>📊</span> PAPARAN DATA TAMBAHAN EKSEKUTIF
                                  </h2>
-                                 <p className="text-xs text-slate-400 mt-0.5">Analisis taburan dan pencapaian calon mengikut pecahan Zon, Negeri, dan Subjek (SME).</p>
+                                 <p className="text-xs text-slate-400 mt-0.5">
+                                    Klik nombor <span className="text-amber-400 font-bold underline">Selesai Dinilai</span> untuk perincian calon, atau klik nama negeri untuk paparan bertingkat daerah & subjek.
+                                 </p>
                               </div>
                               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
                                  <button onClick={() => setDataTambahanTab('zon')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'zon' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>
@@ -1196,6 +1213,211 @@
                                     Ikut Subjek
                                  </button>
                               </div>
+                           </div>
+
+                           {/* 1. IKUT ZON DENGAN KLIK NOMBOR POPUP */}
+                           {dataTambahanTab === 'zon' && (
+                              <div className="overflow-x-auto">
+                                 <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
+                                          <th className="p-3.5">ZON</th>
+                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
+                                          <th className="p-3.5 text-center">SELESAI DINILAI (KLIK NOMBOR)</th>
+                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (&ge;75%)</th>
+                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
+                                          <th className="p-3.5 text-center">PERATUS SELESAI</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
+                                       {dataIkutZon.map((row, idx) => {
+                                          const calonZonSelesai = consolidatedResults.filter(r => r.zon === row.zon);
+                                          return (
+                                             <tr key={idx} className="hover:bg-slate-800/40">
+                                                <td className="p-3.5 font-bold text-slate-200 uppercase">ZON {row.zon}</td>
+                                                <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
+                                                <td className="p-3.5 text-center font-mono">
+                                                   <button 
+                                                      onClick={() => handleOpenCalonDetail(`Senarai Calon Dinilai (Zon ${row.zon})`, calonZonSelesai)}
+                                                      className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 rounded-lg font-black transition-all cursor-pointer"
+                                                      title="Klik untuk melihat nama dan butiran calon"
+                                                   >
+                                                      {row.totalDinilai} Orang 🔍
+                                                   </button>
+                                                </td>
+                                                <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
+                                                <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
+                                                <td className="p-3.5 text-center font-mono font-bold text-amber-400">{row.peratusSelesai}%</td>
+                                             </tr>
+                                          );
+                                       })}
+                                    </tbody>
+                                 </table>
+                              </div>
+                           )}
+
+                           {/* 2. IKUT NEGERI: DRILL DOWN (NEGERI -> DAERAH/PPD -> PECAHAN SUBJEK) */}
+                           {dataTambahanTab === 'negeri' && (
+                              <div className="space-y-4">
+                                 <p className="text-xs text-amber-400 font-bold italic">
+                                    💡 Petunjuk: Klik nama negeri untuk melihat daerah/PPD. Klik nama daerah untuk melihat pecahan subjek calon.
+                                 </p>
+
+                                 <div className="space-y-3">
+                                    {dataIkutNegeri.map((negRow, idx) => {
+                                       const isNegeriOpen = selectedNegeriExpand === negRow.negeri;
+                                       const calonNegeriSelesai = consolidatedResults.filter(r => r.negeri === negRow.negeri);
+                                       
+                                       // Senarai PPD dalam negeri ini
+                                       const listPpdNegeri = [...new Set(calonList.filter(c => mapNegeriFromData(c) === negRow.negeri).map(c => safeStr(c.ppd).toUpperCase()))].filter(Boolean).sort();
+
+                                       return (
+                                          <div key={idx} className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden transition-all">
+                                             {/* BARIS NEGERI UTAMA */}
+                                             <div className="p-4 flex flex-wrap justify-between items-center gap-3 cursor-pointer hover:bg-slate-900/60" onClick={() => { setSelectedNegeriExpand(isNegeriOpen ? null : negRow.negeri); setSelectedDaerahExpand(null); }}>
+                                                <div className="flex items-center gap-3">
+                                                   <span className="text-sm font-black text-slate-100 uppercase">{isNegeriOpen ? '▼' : '►'} {negRow.negeri}</span>
+                                                   <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono font-bold">
+                                                      {listPpdNegeri.length} Daerah/PPD
+                                                   </span>
+                                                </div>
+                                                <div className="flex items-center gap-4 text-xs font-semibold">
+                                                   <span className="text-slate-400 font-mono">Daftar: <b className="text-white">{negRow.totalDaftar}</b></span>
+                                                   <button 
+                                                      onClick={(e) => { e.stopPropagation(); handleOpenCalonDetail(`Senarai Calon Dinilai (${negRow.negeri})`, calonNegeriSelesai); }}
+                                                      className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 rounded font-black font-mono transition-all"
+                                                   >
+                                                      Dinilai: {negRow.totalDinilai} 🔍
+                                                   </button>
+                                                   <span className="text-emerald-400 font-mono">Layak: <b>{negRow.layak}</b></span>
+                                                   <span className="text-rose-400 font-mono">Gagal: <b>{negRow.belumLayak}</b></span>
+                                                   <span className="text-amber-400 font-mono font-bold">{negRow.peratusSelesai}%</span>
+                                                </div>
+                                             </div>
+
+                                             {/* TINGKAT 2: SENARAI DAERAH / PPD */}
+                                             {isNegeriOpen && (
+                                                <div className="p-4 bg-slate-900/80 border-t border-slate-800 space-y-3">
+                                                   <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">
+                                                      SENARAI DAERAH (PPD) DI {negRow.negeri}:
+                                                   </h4>
+                                                   
+                                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                      {listPpdNegeri.map((ppdName, pIdx) => {
+                                                         const isDaerahOpen = selectedDaerahExpand === ppdName;
+                                                         const calonPpdAll = calonList.filter(c => safeStr(c.ppd).toUpperCase() === ppdName && mapNegeriFromData(c) === negRow.negeri);
+                                                         const calonPpdDinilai = consolidatedResults.filter(r => safeStr(r.ppd).toUpperCase() === ppdName);
+                                                         
+                                                         // Pecahan Subjek dalam PPD ini
+                                                         const subjekMapInPpd = {};
+                                                         calonPpdAll.forEach(c => {
+                                                            const sub = safeStr(c.sme_subjek).toUpperCase() || 'SME';
+                                                            if (!subjekMapInPpd[sub]) subjekMapInPpd[sub] = { daftar: 0, dinilai: 0, layak: 0 };
+                                                            subjekMapInPpd[sub].daftar++;
+                                                            const foundEval = calonPpdDinilai.find(r => r.no_kp_calon === c.no_kp);
+                                                            if (foundEval) {
+                                                               subjekMapInPpd[sub].dinilai++;
+                                                               if (foundEval.status_lulus) subjekMapInPpd[sub].layak++;
+                                                            }
+                                                         });
+
+                                                         return (
+                                                            <div key={pIdx} className="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
+                                                               <div className="flex justify-between items-center cursor-pointer hover:text-amber-400" onClick={() => setSelectedDaerahExpand(isDaerahOpen ? null : ppdName)}>
+                                                                  <span className="text-xs font-bold uppercase text-slate-200">
+                                                                     {isDaerahOpen ? '▼' : '►'} {ppdName}
+                                                                  </span>
+                                                                  <div className="flex items-center gap-2">
+                                                                     <span className="text-[10px] font-mono text-slate-400">Total: {calonPpdAll.length}</span>
+                                                                     <button 
+                                                                        onClick={(e) => { e.stopPropagation(); handleOpenCalonDetail(`Senarai Calon Dinilai (${ppdName})`, calonPpdDinilai); }}
+                                                                        className="px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 rounded text-[10px] font-black font-mono transition-all"
+                                                                     >
+                                                                        {calonPpdDinilai.length} Dinilai 🔍
+                                                                     </button>
+                                                                  </div>
+                                                               </div>
+
+                                                               {/* TINGKAT 3: PECAHAN SUBJEK BAGI DAERAH TERSEBUT */}
+                                                               {isDaerahOpen && (
+                                                                  <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                                                                     <p className="text-[10px] font-bold text-amber-400 uppercase">Pecahan Calon Ikut Subjek:</p>
+                                                                     <div className="space-y-1">
+                                                                        {Object.keys(subjekMapInPpd).map((sName, sIdx) => {
+                                                                           const sData = subjekMapInPpd[sName];
+                                                                           const calonSubjekDinilai = calonPpdDinilai.filter(r => (safeStr(r.sme_subjek).toUpperCase() || 'SME') === sName);
+                                                                           return (
+                                                                              <div key={sIdx} className="flex justify-between items-center text-[11px] bg-slate-900/90 px-2.5 py-1.5 rounded border border-slate-800">
+                                                                                 <span className="font-semibold text-slate-300 uppercase">• {sName}</span>
+                                                                                 <div className="flex items-center gap-2 font-mono text-[10px]">
+                                                                                    <span className="text-slate-400">Daftar: <b className="text-white">{sData.daftar}</b></span>
+                                                                                    <button 
+                                                                                       onClick={() => handleOpenCalonDetail(`Calon ${sName} - ${ppdName}`, calonSubjekDinilai)}
+                                                                                       className="text-amber-400 hover:underline font-bold"
+                                                                                    >
+                                                                                       Dinilai: {sData.dinilai} 🔍
+                                                                                    </button>
+                                                                                    <span className="text-emerald-400 font-bold">({sData.layak} Layak)</span>
+                                                                                 </div>
+                                                                              </div>
+                                                                           );
+                                                                        })}
+                                                                     </div>
+                                                                  </div>
+                                                               )}
+                                                            </div>
+                                                         );
+                                                      })}
+                                                   </div>
+                                                </div>
+                                             )}
+                                          </div>
+                                       );
+                                    })}
+                                 </div>
+                              </div>
+                           )}
+
+                           {/* 3. IKUT SUBJEK DENGAN KLIK NOMBOR POPUP */}
+                           {dataTambahanTab === 'subjek' && (
+                              <div className="overflow-x-auto">
+                                 <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
+                                          <th className="p-3.5">SUBJEK / BIDANG KEPAKARAN (SME)</th>
+                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
+                                          <th className="p-3.5 text-center">SELESAI DINILAI (KLIK NOMBOR)</th>
+                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (&ge;75%)</th>
+                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
+                                          <th className="p-3.5 text-center">KADAR KELULUSAN</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
+                                       {dataIkutSubjek.map((row, idx) => {
+                                          const calonSubjekSelesai = consolidatedResults.filter(r => r.sme_subjek === row.subjek);
+                                          return (
+                                             <tr key={idx} className="hover:bg-slate-800/40">
+                                                <td className="p-3.5 font-bold text-slate-200 uppercase">{row.subjek}</td>
+                                                <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
+                                                <td className="p-3.5 text-center font-mono">
+                                                   <button 
+                                                      onClick={() => handleOpenCalonDetail(`Senarai Calon Dinilai (Subjek: ${row.subjek})`, calonSubjekSelesai)}
+                                                      className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 rounded-lg font-black transition-all cursor-pointer"
+                                                   >
+                                                      {row.totalDinilai} Orang 🔍
+                                                   </button>
+                                                </td>
+                                                <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
+                                                <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
+                                                <td className="p-3.5 text-center font-mono font-bold text-emerald-400">{row.peratusLayak}%</td>
+                                             </tr>
+                                          );
+                                       })}
+                                    </tbody>
+                                 </table>
+                              </div>
+                           )}
+                        </div>
                            </div>
 
                            {/* 1. IKUT ZON */}
@@ -2114,7 +2336,63 @@
                   </div>
                </div>
             )}
+{/* TETINGKAP TIMBUL (MODAL) BUTIRAN SETIAP CALON SELESAI DINILAI */}
+            {showDetailModal && (
+               <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 max-w-4xl w-full shadow-2xl space-y-4 animate-[fadeIn_0.3s_ease-in-out]">
+                     <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <div>
+                           <h3 className="text-base font-extrabold text-amber-400 uppercase">{modalDetailTitle}</h3>
+                           <p className="text-xs text-slate-400 mt-0.5">Jumlah Calon: {modalDetailList.length} Orang</p>
+                        </div>
+                        <button onClick={() => setShowDetailModal(false)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold text-sm">✕ Tutup</button>
+                     </div>
 
+                     <div className="overflow-x-auto max-h-[450px] overflow-y-auto pr-1">
+                        <table className="w-full text-left text-xs border-collapse">
+                           <thead className="bg-slate-950 sticky top-0 shadow z-10">
+                              <tr className="text-amber-400 uppercase border-b border-slate-800">
+                                 <th className="p-3">#</th>
+                                 <th className="p-3">Nama Penuh Calon</th>
+                                 <th className="p-3">No. KP</th>
+                                 <th className="p-3">PPD / Daerah</th>
+                                 <th className="p-3">Subjek</th>
+                                 <th className="p-3 text-center">Markah</th>
+                                 <th className="p-3 text-center">Status</th>
+                                 <th className="p-3">Panel Penilai</th>
+                              </tr>
+                           </thead>
+                           <tbody className="divide-y divide-slate-800/60 font-semibold">
+                              {modalDetailList.length === 0 ? (
+                                 <tr><td colSpan="8" className="text-center p-8 text-slate-500 italic">Tiada calon yang telah dinilai dalam kategori ini.</td></tr>
+                              ) : modalDetailList.map((c, idx) => (
+                                 <tr key={idx} className="hover:bg-slate-800/40">
+                                    <td className="p-3 font-mono text-slate-500">{idx + 1}</td>
+                                    <td className="p-3 font-bold uppercase text-slate-200">{c.nama_calon}</td>
+                                    <td className="p-3 font-mono text-slate-400">{c.no_kp_calon}</td>
+                                    <td className="p-3 uppercase">{c.ppd}</td>
+                                    <td className="p-3 uppercase text-amber-300">{c.sme_subjek}</td>
+                                    <td className="p-3 text-center font-black text-sm text-emerald-400">{c.jumlah_markah}%</td>
+                                    <td className="p-3 text-center">
+                                       <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${c.status_lulus ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border border-rose-500/40'}`}>
+                                          {c.status_lulus ? 'LAYAK' : 'BELUM LAYAK'}
+                                       </span>
+                                    </td>
+                                    <td className="p-3 text-slate-400 text-[11px] truncate max-w-[150px]" title={c.panel_list}>{c.panel_list || '-'}</td>
+                                 </tr>
+                              ))}
+                           </tbody>
+                        </table>
+                     </div>
+
+                     <div className="flex justify-end pt-2 border-t border-slate-800">
+                        <button onClick={() => setShowDetailModal(false)} className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs">
+                           Selesai
+                        </button>
+                     </div>
+                  </div>
+               </div>
+            )}
           </div>
         );
       }
