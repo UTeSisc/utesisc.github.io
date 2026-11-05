@@ -28,12 +28,10 @@
       .flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
       .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.75rem; }
       .flip-card-back { transform: rotateY(180deg); }
-      
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: #0f172a; }
       ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #475569; }
-      
       input[type=number]::-webkit-inner-spin-button, 
       input[type=number]::-webkit-outer-spin-button { 
          -webkit-appearance: none; margin: 0; 
@@ -53,6 +51,39 @@
       const safeStr = (val) => (val ? String(val).trim() : '');
       const cleanKpNum = (val) => safeStr(val).replace(/[^0-9]/g, '');
 
+      const getParentZon = (str) => {
+        if (!str) return '';
+        return safeStr(str).split('(')[0].trim().toUpperCase();
+      };
+
+      const getPusatFromZonString = (str) => {
+        if (!str || !str.includes('(')) return '';
+        return safeStr(str).split('(')[1].replace(')', '').trim().toUpperCase();
+      };
+
+      const mapNegeriFromData = (calon) => {
+        const strPpd = safeStr(calon.ppd).toUpperCase();
+        const strZon = getParentZon(calon.zon_temuduga);
+
+        if (strPpd.includes('KUCHING') || strPpd.includes('MIRI') || strPpd.includes('SIBU') || strPpd.includes('BINTULU') || strPpd.includes('SUBIS') || strPpd.includes('SAMARAHAN') || strPpd.includes('PADAWAN') || strPpd.includes('BETONG') || strPpd.includes('SARATOK') || strPpd.includes('SRI AMAN') || strPpd.includes('LIMBANG') || strPpd.includes('LAWAS') || strZon === 'SARAWAK') return 'SARAWAK';
+        if (strPpd.includes('KOTA KINABALU') || strPpd.includes('SANDAKAN') || strPpd.includes('TAWAU') || strPpd.includes('KENINGAU') || strPpd.includes('LAHAD DATU') || strPpd.includes('PENAMPANG') || strPpd.includes('KUDAT') || strZon === 'SABAH') return 'SABAH';
+        if (strPpd.includes('LABUAN')) return 'W.P. LABUAN';
+        if (strPpd.includes('KINTA') || strPpd.includes('KANGSAR') || strPpd.includes('LARUT') || strPpd.includes('KERIAN') || strPpd.includes('HILIR PERAK') || strPpd.includes('MUALLIM')) return 'PERAK';
+        if (strPpd.includes('KOTA SETAR') || strPpd.includes('KULIM') || strPpd.includes('KUALA MUDA') || strPpd.includes('BALING') || strPpd.includes('KUBANG PASU') || strPpd.includes('PENDANG')) return 'KEDAH';
+        if (strPpd.includes('SEBERANG PERAI') || strPpd.includes('TIMUR LAUT') || strPpd.includes('BARAT DAYA')) return 'PULAU PINANG';
+        if (strPpd.includes('PERLIS') || strZon === 'PERLIS') return 'PERLIS';
+        if (strPpd.includes('JOHOR') || strPpd.includes('BATU PAHAT') || strPpd.includes('MUAR') || strPpd.includes('KLUANG') || strZon === 'SELATAN') return 'JOHOR';
+        if (strPpd.includes('MELAKA')) return 'MELAKA';
+        if (strPpd.includes('SEREMBAN') || strPpd.includes('PORT DICKSON') || strPpd.includes('JEMPOL')) return 'NEGERI SEMBILAN';
+        if (strPpd.includes('KUALA LUMPUR') || strPpd.includes('BANGSAR') || strPpd.includes('SENTUL') || strPpd.includes('KERAMAT')) return 'W.P. KUALA LUMPUR';
+        if (strPpd.includes('SELANGOR') || strPpd.includes('PETALING') || strPpd.includes('KLANG') || strPpd.includes('HULU LANGAT') || strZon === 'TENGAH') return 'SELANGOR';
+        if (strPpd.includes('PAHANG') || strPpd.includes('KUANTAN') || strPpd.includes('TEMERLOH')) return 'PAHANG';
+        if (strPpd.includes('TERENGGANU') || strPpd.includes('KUALA TERENGGANU')) return 'TERENGGANU';
+        if (strPpd.includes('KELANTAN') || strPpd.includes('KOTA BHARU')) return 'KELANTAN';
+        
+        return strZon || 'LAIN-LAIN';
+      };
+
       const cleanSesiName = (sStr) => {
          if (!sStr) return '';
          return safeStr(sStr).split('(')[0].trim().toUpperCase();
@@ -61,7 +92,6 @@
       const consolidateCalonResults = (calonList, resultsList) => {
         return calonList.map(calon => {
           const calonRes = resultsList.filter(r => safeStr(r.no_kp_calon) === safeStr(calon.no_kp));
-          
           if (calonRes.length === 0) return null;
 
           let sums = { bimb:0, inst:0, strat:0, data:0, inter:0, evi:0 };
@@ -96,14 +126,18 @@
           const m6 = (avgEvi / 5) * 10;
 
           const totalMuktamad = Number((m1 + m2 + m3 + m4 + m5 + m6).toFixed(1));
+          const indukZon = getParentZon(calon.zon_temuduga);
+          const pus = safeStr(calon.pusat_temuduga) || getPusatFromZonString(calon.zon_temuduga) || '-';
 
           return {
             no_kp_calon: calon.no_kp,
             nama_calon: safeStr(calon.nama_penuh).toUpperCase(),
-            zon: safeStr(calon.zon_temuduga).toUpperCase(),
-            pusat: safeStr(calon.pusat_temuduga || '-').toUpperCase(),
+            zon: indukZon,
+            raw_zon: safeStr(calon.zon_temuduga).toUpperCase(),
+            negeri: mapNegeriFromData(calon),
+            pusat: pus.toUpperCase(),
             ppd: safeStr(calon.ppd).toUpperCase(),
-            sme_subjek: safeStr(calon.sme_subjek).toUpperCase(),
+            sme_subjek: safeStr(calon.sme_subjek).toUpperCase() || 'SME',
             sesi: safeStr(calon.sesi).toUpperCase(),
             skor_bimbingan: avgBimb,
             skor_instruksional: avgInst,
@@ -217,15 +251,18 @@
           if (!canvasRef.current) return;
           const ctx = canvasRef.current.getContext('2d');
           if (chartRef.current) chartRef.current.destroy();
-          const zons = [...new Set(calonList.map(c => safeStr(c.zon_temuduga).toUpperCase()))].filter(Boolean).sort();
+
+          const zons = [...new Set(calonList.map(c => getParentZon(c.zon_temuduga)))].filter(Boolean).sort();
+
           const selesaiData = zons.map(z => { 
-             const calonZon = calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === z); 
+             const calonZon = calonList.filter(c => getParentZon(c.zon_temuduga) === z); 
              return calonZon.filter(c => resultsList.some(r => safeStr(r.no_kp_calon) === safeStr(c.no_kp))).length; 
           });
           const belumData = zons.map((z, idx) => { 
-             const totalZon = calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === z).length; 
+             const totalZon = calonList.filter(c => getParentZon(c.zon_temuduga) === z).length; 
              return totalZon - selesaiData[idx]; 
           });
+
           chartRef.current = new Chart(ctx, {
             type: 'bar',
             data: { labels: zons, datasets: [ { label: 'Selesai Dinilai', data: selesaiData, backgroundColor: '#D4AF37' }, { label: 'Belum Dinilai', data: belumData, backgroundColor: '#334155' } ] },
@@ -259,10 +296,11 @@
         const [filterZonPanel, setFilterZonPanel] = useState('SEMUA');
         const [pagePanel, setPagePanel] = useState(1);
 
-        // PENGURUSAN PUSAT DINAMIK (TICK / UNTICK & BILANGAN PUSAT)
         const [hasSubCenters, setHasSubCenters] = useState(true);
         const [numSubCenters, setNumSubCenters] = useState(2);
         const [customCenterList, setCustomCenterList] = useState(['KUCHING', 'MIRI']);
+
+        const [dataTambahanTab, setDataTambahanTab] = useState('zon');
 
         const handleNumCentersChange = (n) => {
           const count = Math.max(1, parseInt(n) || 1);
@@ -282,7 +320,6 @@
           setCustomCenterList(newArr);
         };
 
-        // BORANG PENUGASAN PANEL
         const [penugasanForm, setPenugasanForm] = useState({ 
           no_kp_panel: '', zon_bertugas: 'SARAWAK', pusat_bertugas: 'KUCHING', sesi_bertugas: 'SEMUA SESI', tarikh_mula: '', tarikh_tamat: '', peranan: 'Panel Penemuduga' 
         });
@@ -294,12 +331,10 @@
         const [editModeUsKp, setEditModeUsKp] = useState(null);
         const [editUsForm, setEditUsForm] = useState({});
 
-        // BORANG PENUGASAN URUS SETIA
         const [penugasanUsForm, setPenugasanUsForm] = useState({
           no_kp_us: '', zon_bertugas: 'SARAWAK', pusat_bertugas: 'KUCHING', tarikh_mula: '', tarikh_tamat: ''
         });
 
-        // BORANG CALON INDIVIDU
         const [calonForm, setCalonForm] = useState({ 
           nama_penuh: '', no_kp: '', zon_temuduga: 'SARAWAK', pusat_temuduga: 'KUCHING', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: 'BILIK 1', kehadiran: 'BELUM' 
         });
@@ -311,7 +346,6 @@
         const [filterSesiCalon, setFilterSesiCalon] = useState('SEMUA');
         const [pageCalon, setPageCalon] = useState(1);
 
-        // MODAL MUAT NAIK PUKAL CALON
         const [showBulkModal, setShowBulkModal] = useState(false);
         const [bulkUrl, setBulkUrl] = useState('https://docs.google.com/spreadsheets/d/e/2PACX-1vTzsJQCnvCi9aUKMe351dKWx0VTIuWqszfjR5slGosEPnjPRJJVyvz-tNjPUqHfimbPguAKP1Z6liSC/pub?output=csv');
         const [bulkText, setBulkText] = useState('');
@@ -383,6 +417,45 @@
            if (d6) setPenugasanUSList(d6);
         };
 
+        const handleAutoFixSarawakData = async () => {
+           if (!window.confirm("Sistem akan mengasingkan zon 'SARAWAK' dan menetapkan pusat 'KUCHING' atau 'MIRI' secara automatik untuk semua calon Sarawak yang masih kosong. Teruskan?")) return;
+           
+           setMsg({ type: '', text: '' });
+           let updateCount = 0;
+
+           for (const c of calonList) {
+              const uZon = safeStr(c.zon_temuduga).toUpperCase();
+              const uPusat = safeStr(c.pusat_temuduga).toUpperCase();
+              const uPpd = safeStr(c.ppd).toUpperCase();
+
+              let needsUpdate = false;
+              let newZon = uZon;
+              let newPusat = uPusat;
+
+              if (uZon.includes('SARAWAK')) {
+                 newZon = 'SARAWAK';
+                 if (!uPusat || uPusat === '-' || uPusat === 'UTAMA') {
+                    if (uZon.includes('MIRI') || uPpd.includes('MIRI') || uPpd.includes('SUBIS') || uPpd.includes('BINTULU') || uPpd.includes('BARAM') || uPpd.includes('LIMBANG') || uPpd.includes('LAWAS')) {
+                       newPusat = 'MIRI';
+                    } else {
+                       newPusat = 'KUCHING';
+                    }
+                    needsUpdate = true;
+                 } else if (uZon !== 'SARAWAK') {
+                    needsUpdate = true;
+                 }
+              }
+
+              if (needsUpdate) {
+                 await sb.from('calon').update({ zon_temuduga: newZon, pusat_temuduga: newPusat }).eq('no_kp', c.no_kp);
+                 updateCount++;
+              }
+           }
+
+           alert(`Berjaya menyelaraskan ${updateCount} orang calon Sarawak!`);
+           fetchData();
+        };
+
         const consolidatedResults = consolidateCalonResults(calonList, resultsList);
 
         const handleRegisterPanel = async (e) => { 
@@ -419,7 +492,6 @@
            } 
         };
 
-        // PENUGASAN PANEL (DENGAN KAWALAN PUSAT BERSYARAT)
         const handleRegisterPenugasan = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -468,7 +540,6 @@
            else { setMsg({ type: 'success', text: 'Akaun Urus Setia didaftarkan!' }); setUsForm({ nama_penuh: '', no_kp: '', katalaluan: '' }); fetchData(); } 
         };
 
-        // PENUGASAN URUS SETIA (DENGAN KAWALAN PUSAT BERSYARAT)
         const handleRegisterPenugasanUS = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
@@ -517,7 +588,6 @@
            } 
         };
 
-        // DAFTAR INDIVIDU CALON
         const handleRegisterCalon = async (e) => { 
           e.preventDefault(); 
           setMsg({ type: '', text: '' }); 
@@ -552,7 +622,7 @@
            const payloadFormat = {
               ...editCalonForm,
               nama_penuh: safeStr(editCalonForm.nama_penuh).toUpperCase(),
-              zon_temuduga: safeStr(editCalonForm.zon_temuduga).toUpperCase(),
+              zon_temuduga: getParentZon(editCalonForm.zon_temuduga),
               pusat_temuduga: safeStr(editCalonForm.pusat_temuduga || '-').toUpperCase(),
               ppd: safeStr(editCalonForm.ppd).toUpperCase(),
               sme_subjek: safeStr(editCalonForm.sme_subjek).toUpperCase(),
@@ -578,7 +648,6 @@
            fetchData(); 
         };
 
-        // SEDUT DATA GOOGLE SHEETS
         const handleFetchFromUrl = async () => {
            if (!bulkUrl.trim()) return alert("Sila masukkan pautan Google Sheet.");
            setBulkLoading(true);
@@ -608,7 +677,6 @@
            }
         };
 
-        // PROSES MUAT NAIK PUKAL CALON
         const handleProcessBulkUpload = async () => {
            if (!bulkText.trim()) return alert("Tiada data untuk dimuat naik. Sila sedut data atau tampal teks dahulu.");
            setBulkLoading(true);
@@ -719,7 +787,7 @@
                     no_kp: noKp,
                     ppd: ppd.toUpperCase(),
                     sme_subjek: subjek.toUpperCase() || 'SME',
-                    zon_temuduga: zon.toUpperCase(),
+                    zon_temuduga: getParentZon(zon),
                     pusat_temuduga: pusat ? pusat.toUpperCase() : null,
                     bilik_temuduga: bilik.toUpperCase(),
                     sesi: sesi.toUpperCase(),
@@ -800,7 +868,7 @@
         const filteredPenugasan = penugasanList.filter(tugas => { 
            const pDetail = panelList.find(p => safeStr(p.no_kp) === safeStr(tugas.no_kp_panel)); 
            const namaPanel = pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel).toUpperCase(); 
-           const matchZon = filterZonTugas === 'SEMUA' || safeStr(tugas.zon_bertugas).toUpperCase() === filterZonTugas; 
+           const matchZon = filterZonTugas === 'SEMUA' || getParentZon(tugas.zon_bertugas) === filterZonTugas; 
            const matchSearch = namaPanel.includes(searchTugas.toUpperCase()) || safeStr(tugas.no_kp_panel).includes(searchTugas); 
            return matchZon && matchSearch; 
         });
@@ -808,17 +876,16 @@
         const displayedPenugasan = filteredPenugasan.slice((pageTugas - 1) * ITEMS_PER_PAGE, pageTugas * ITEMS_PER_PAGE);
 
         const filteredPanels = panelList.filter(p => { 
-           const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => safeStr(t.no_kp_panel) === safeStr(p.no_kp) && safeStr(t.zon_bertugas).toUpperCase() === filterZonPanel); 
+           const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => safeStr(t.no_kp_panel) === safeStr(p.no_kp) && getParentZon(t.zon_bertugas) === filterZonPanel); 
            const matchSearch = safeStr(p.nama_penuh).toUpperCase().includes(searchPanel.toUpperCase()) || safeStr(p.no_kp).includes(searchPanel); 
            return matchZon && matchSearch; 
         });
         const totalPagesPanel = Math.ceil(filteredPanels.length / ITEMS_PER_PAGE) || 1;
         const displayedPanels = filteredPanels.slice((pagePanel - 1) * ITEMS_PER_PAGE, pagePanel * ITEMS_PER_PAGE);
 
-        const availableZonCalonList = [...new Set(calonList.map(c => safeStr(c.zon_temuduga).toUpperCase()))].filter(Boolean).sort();
-        const availablePusatCalonList = [...new Set(calonList.map(c => safeStr(c.pusat_temuduga || '-').toUpperCase()))].filter(Boolean).sort();
+        const availableZonCalonList = [...new Set(calonList.map(c => getParentZon(c.zon_temuduga)))].filter(Boolean).sort();
+        const availablePusatCalonList = [...new Set(calonList.map(c => safeStr(c.pusat_temuduga) || getPusatFromZonString(c.zon_temuduga) || '-'))].filter(Boolean).sort();
 
-        // SEMUA PUSAT YANG DIKENAL PASTI DARI INPUT DINAMIK & PANGKALAN DATA
         const allKnownPusat = [...new Set([
           ...customCenterList,
           ...calonList.map(c => safeStr(c.pusat_temuduga).toUpperCase()),
@@ -827,15 +894,18 @@
         
         const availableSesiCalonList = [...new Set(
            calonList
-             .filter(c => filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon)
+             .filter(c => filterZonCalon === 'SEMUA' || getParentZon(c.zon_temuduga) === filterZonCalon)
              .map(c => cleanSesiName(c.sesi))
         )].filter(Boolean).sort();
         
         const showCalonData = searchCalon.trim() !== '' || filterZonCalon !== 'SEMUA';
         
         const filteredCalons = calonList.filter(c => { 
-           const matchZon = filterZonCalon === 'SEMUA' || safeStr(c.zon_temuduga).toUpperCase() === filterZonCalon; 
-           const matchPusat = filterPusatCalon === 'SEMUA' || safeStr(c.pusat_temuduga || '-').toUpperCase() === filterPusatCalon;
+           const cIndukZon = getParentZon(c.zon_temuduga);
+           const cPusat = safeStr(c.pusat_temuduga).toUpperCase() || getPusatFromZonString(c.zon_temuduga) || '-';
+
+           const matchZon = filterZonCalon === 'SEMUA' || cIndukZon === filterZonCalon; 
+           const matchPusat = filterPusatCalon === 'SEMUA' || cPusat === filterPusatCalon;
            const matchSesi = filterSesiCalon === 'SEMUA' || cleanSesiName(c.sesi) === cleanSesiName(filterSesiCalon); 
            const matchSearch = safeStr(c.nama_penuh).toUpperCase().includes(searchCalon.toUpperCase()) || safeStr(c.no_kp).includes(searchCalon); 
            return matchZon && matchPusat && matchSesi && matchSearch; 
@@ -843,12 +913,13 @@
         const totalPagesCalon = Math.ceil(filteredCalons.length / ITEMS_PER_PAGE) || 1;
         const displayedCalons = filteredCalons.slice((pageCalon - 1) * ITEMS_PER_PAGE, pageCalon * ITEMS_PER_PAGE);
 
-        const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon).map(c => cleanSesiName(c.sesi)))].filter(Boolean).sort() : [];
-        const cetakCalonFiltered = cetakSesi ? calonList.filter(c => safeStr(c.zon_temuduga).toUpperCase() === cetakZon && cleanSesiName(c.sesi) === cleanSesiName(cetakSesi)) : [];
+        const cetakSesiList = cetakZon ? [...new Set(calonList.filter(c => getParentZon(c.zon_temuduga) === cetakZon).map(c => cleanSesiName(c.sesi)))].filter(Boolean).sort() : [];
+        const cetakCalonFiltered = cetakSesi ? calonList.filter(c => getParentZon(c.zon_temuduga) === cetakZon && cleanSesiName(c.sesi) === cleanSesiName(cetakSesi)) : [];
 
         const filteredLaporanList = consolidatedResults.filter(r => {
            const melepasiMarkah = r.jumlah_markah >= minScore;
-           const padanZon = laporanZon === 'KESELURUHAN' || safeStr(r.zon).toUpperCase() === laporanZon;
+           const targetZon = laporanZon.replace('ZON ', '').trim();
+           const padanZon = laporanZon === 'KESELURUHAN' || r.zon === targetZon || r.raw_zon.includes(targetZon);
            return melepasiMarkah && padanZon;
         }).sort((a,b) => b.jumlah_markah - a.jumlah_markah);
 
@@ -871,6 +942,50 @@
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
+        const dataIkutZon = availableZonCalonList.map(z => {
+           const calons = calonList.filter(c => getParentZon(c.zon_temuduga) === z);
+           const dinilai = consolidatedResults.filter(r => r.zon === z);
+           const layak = dinilai.filter(r => r.status_lulus).length;
+           return {
+              zon: z,
+              totalDaftar: calons.length,
+              totalDinilai: dinilai.length,
+              layak,
+              belumLayak: dinilai.length - layak,
+              peratusSelesai: calons.length > 0 ? Math.round((dinilai.length / calons.length) * 100) : 0
+           };
+        });
+
+        const allNegeriList = [...new Set(calonList.map(c => mapNegeriFromData(c)))].filter(Boolean).sort();
+        const dataIkutNegeri = allNegeriList.map(neg => {
+           const calons = calonList.filter(c => mapNegeriFromData(c) === neg);
+           const dinilai = consolidatedResults.filter(r => r.negeri === neg);
+           const layak = dinilai.filter(r => r.status_lulus).length;
+           return {
+              negeri: neg,
+              totalDaftar: calons.length,
+              totalDinilai: dinilai.length,
+              layak,
+              belumLayak: dinilai.length - layak,
+              peratusSelesai: calons.length > 0 ? Math.round((dinilai.length / calons.length) * 100) : 0
+           };
+        });
+
+        const allSubjekList = [...new Set(calonList.map(c => safeStr(c.sme_subjek).toUpperCase() || 'SME'))].filter(Boolean).sort();
+        const dataIkutSubjek = allSubjekList.map(sub => {
+           const calons = calonList.filter(c => (safeStr(c.sme_subjek).toUpperCase() || 'SME') === sub);
+           const dinilai = consolidatedResults.filter(r => r.sme_subjek === sub);
+           const layak = dinilai.filter(r => r.status_lulus).length;
+           return {
+              subjek: sub,
+              totalDaftar: calons.length,
+              totalDinilai: dinilai.length,
+              layak,
+              belumLayak: dinilai.length - layak,
+              peratusLayak: dinilai.length > 0 ? Math.round((layak / dinilai.length) * 100) : 0
+           };
+        });
+
         useEffect(() => { setPageTugas(1); }, [searchTugas, filterZonTugas]);
         useEffect(() => { setPagePanel(1); }, [searchPanel, filterZonPanel]);
         useEffect(() => { setPageCalon(1); }, [searchCalon, filterZonCalon, filterPusatCalon, filterSesiCalon]);
@@ -884,7 +999,6 @@
         return (
           <div className="min-h-screen flex flex-col">
             
-            {/* HEADER ATAS */}
             <div className="bg-white w-full py-4 px-6 md:px-10 flex justify-between items-center shadow-md z-10 border-b-4 border-amber-500 no-print">
                <div className="flex items-center gap-4">
                   <img src="logo-kpm.png" alt="Logo KPM" className="h-12 object-contain" />
@@ -903,7 +1017,6 @@
                </div>
             </div>
 
-            {/* SKRIN 1: BORANG LOG MASUK ADMIN */}
             {!isLoggedIn ? (
                <div className="flex-grow flex items-center justify-center p-6">
                   <div className="max-w-md w-full bg-slate-900 border-2 border-amber-500/40 p-8 rounded-3xl shadow-[0_0_50px_rgba(245,158,11,0.15)] space-y-6">
@@ -943,7 +1056,6 @@
                   </div>
                </div>
             ) : (
-               /* SKRIN 2: DASHBOARD UTAMA ADMIN */
                <>
                   <div className="w-full flex flex-col no-print bg-slate-900 border-b border-slate-800 py-2">
                     <div className="max-w-7xl mx-auto w-full px-6 flex flex-wrap gap-2 justify-center items-center">
@@ -965,7 +1077,6 @@
                        </div> 
                     )}
 
-                    {/* TAB 1: PAPAN PEMUKA */}
                     {activeTab === 'dashboard' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         <h1 className="text-2xl font-extrabold text-amber-400 tracking-wide">Pusat Kawalan Eksekutif SISC+</h1>
@@ -978,9 +1089,9 @@
                                    <p className="text-5xl font-extrabold text-amber-400 mt-2">{calonList.length}</p>
                                 </div>
                                 <div className="flip-card-back bg-slate-800 border border-amber-500/50 p-4 rounded-xl shadow-lg flex flex-col justify-center">
-                                   <p className="text-amber-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Bilangan Calon (Zon)</p>
+                                   <p className="text-amber-400 text-xs font-bold uppercase mb-2 border-b border-slate-600 pb-1">Bilangan Calon (Zon Induk)</p>
                                    <div className="overflow-y-auto max-h-[80px] pr-1">
-                                      {availableZonCalonList.map(z => (<div key={z} className="flex justify-between text-sm text-slate-200 mb-1"><span>{z}</span><span className="font-bold">{calonList.filter(c=>safeStr(c.zon_temuduga).toUpperCase()===z).length}</span></div>))}
+                                      {availableZonCalonList.map(z => (<div key={z} className="flex justify-between text-sm text-slate-200 mb-1"><span>{z}</span><span className="font-bold">{calonList.filter(c=>getParentZon(c.zon_temuduga)===z).length}</span></div>))}
                                    </div>
                                 </div>
                              </div>
@@ -1064,30 +1175,145 @@
                               </ul>
                            </div>
                         </div>
+
+                        {/* PAPARAN DATA TAMBAHAN EKSEKUTIF */}
+                        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 mt-8">
+                           <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 gap-4">
+                              <div>
+                                 <h2 className="text-lg font-black text-amber-400 uppercase tracking-wide flex items-center gap-2">
+                                    <span>📊</span> PAPARAN DATA TAMBAHAN EKSEKUTIF
+                                 </h2>
+                                 <p className="text-xs text-slate-400 mt-0.5">Analisis taburan dan pencapaian calon mengikut pecahan Zon, Negeri, dan Subjek (SME).</p>
+                              </div>
+                              <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                                 <button onClick={() => setDataTambahanTab('zon')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'zon' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>
+                                    Ikut Zon
+                                 </button>
+                                 <button onClick={() => setDataTambahanTab('negeri')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'negeri' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>
+                                    Ikut Negeri
+                                 </button>
+                                 <button onClick={() => setDataTambahanTab('subjek')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'subjek' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>
+                                    Ikut Subjek
+                                 </button>
+                              </div>
+                           </div>
+
+                           {/* 1. IKUT ZON */}
+                           {dataTambahanTab === 'zon' && (
+                              <div className="overflow-x-auto">
+                                 <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
+                                          <th className="p-3.5">ZON</th>
+                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
+                                          <th className="p-3.5 text-center">SELESAI DINILAI</th>
+                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (≥75%)</th>
+                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
+                                          <th className="p-3.5 text-center">PERATUS SELESAI</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
+                                       {dataIkutZon.map((row, idx) => (
+                                          <tr key={idx} className="hover:bg-slate-800/40">
+                                             <td className="p-3.5 font-bold text-slate-200 uppercase">ZON {row.zon}</td>
+                                             <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
+                                             <td className="p-3.5 text-center font-mono text-amber-300">{row.totalDinilai}</td>
+                                             <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
+                                             <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
+                                             <td className="p-3.5 text-center font-mono font-bold text-amber-400">{row.peratusSelesai}%</td>
+                                          </tr>
+                                       ))}
+                                    </tbody>
+                                 </table>
+                              </div>
+                           )}
+
+                           {/* 2. IKUT NEGERI */}
+                           {dataTambahanTab === 'negeri' && (
+                              <div className="overflow-x-auto">
+                                 <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
+                                          <th className="p-3.5">NEGERI</th>
+                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
+                                          <th className="p-3.5 text-center">SELESAI DINILAI</th>
+                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (≥75%)</th>
+                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
+                                          <th className="p-3.5 text-center">PERATUS SELESAI</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
+                                       {dataIkutNegeri.map((row, idx) => (
+                                          <tr key={idx} className="hover:bg-slate-800/40">
+                                             <td className="p-3.5 font-bold text-slate-200 uppercase">{row.negeri}</td>
+                                             <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
+                                             <td className="p-3.5 text-center font-mono text-amber-300">{row.totalDinilai}</td>
+                                             <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
+                                             <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
+                                             <td className="p-3.5 text-center font-mono font-bold text-amber-400">{row.peratusSelesai}%</td>
+                                          </tr>
+                                       ))}
+                                    </tbody>
+                                 </table>
+                              </div>
+                           )}
+
+                           {/* 3. IKUT SUBJEK */}
+                           {dataTambahanTab === 'subjek' && (
+                              <div className="overflow-x-auto">
+                                 <table className="w-full text-left text-xs border-collapse">
+                                    <thead>
+                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
+                                          <th className="p-3.5">SUBJEK / BIDANG KEPAKARAN (SME)</th>
+                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
+                                          <th className="p-3.5 text-center">SELESAI DINILAI</th>
+                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (≥75%)</th>
+                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
+                                          <th className="p-3.5 text-center">KADAR KELULUSAN</th>
+                                       </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
+                                       {dataIkutSubjek.map((row, idx) => (
+                                          <tr key={idx} className="hover:bg-slate-800/40">
+                                             <td className="p-3.5 font-bold text-slate-200 uppercase">{row.subjek}</td>
+                                             <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
+                                             <td className="p-3.5 text-center font-mono text-amber-300">{row.totalDinilai}</td>
+                                             <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
+                                             <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
+                                             <td className="p-3.5 text-center font-mono font-bold text-emerald-400">{row.peratusLayak}%</td>
+                                          </tr>
+                                       ))}
+                                    </tbody>
+                                 </table>
+                              </div>
+                           )}
+                        </div>
+
                       </div>
                     )}
 
-                    {/* TAB 2: URUS CALON */}
                     {activeTab === 'urus_calon' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         
-                        {/* PANEL DAFTAR PUKAL CALON */}
                         <div className="bg-slate-900 border border-amber-500/40 p-5 rounded-xl flex flex-wrap justify-between items-center gap-4">
                            <div>
                               <h3 className="text-sm font-extrabold text-amber-400 uppercase">Pendaftaran Pukal Calon (Google Sheets / Excel)</h3>
                               <p className="text-xs text-slate-400 mt-0.5">Sedut data calon daripada pautan Google Sheet secara tepat.</p>
                            </div>
-                           <button onClick={() => setShowBulkModal(true)} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2.5 rounded-lg text-xs shadow-lg transition-transform active:scale-95 flex items-center gap-2">
-                              📋 Buka Kotak Muat Naik Pukal
-                           </button>
+                           <div className="flex gap-2">
+                              <button onClick={handleAutoFixSarawakData} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2.5 rounded-lg text-xs shadow-lg transition-transform active:scale-95 flex items-center gap-2">
+                                 🧹 Selaraskan Zon & Pusat Sarawak
+                              </button>
+                              <button onClick={() => setShowBulkModal(true)} className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-5 py-2.5 rounded-lg text-xs shadow-lg transition-transform active:scale-95 flex items-center gap-2">
+                                 📋 Buka Kotak Muat Naik Pukal
+                              </button>
+                           </div>
                         </div>
 
-                        {/* BORANG TAMBAH CALON SECARA MANUAL */}
                         <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow space-y-4">
                            <div className="flex flex-wrap justify-between items-center border-b border-slate-800 pb-2">
                               <h2 className="text-xl font-bold text-emerald-400">+ Tambah Calon Baharu Secara Manual</h2>
                               
-                              {/* KAWALAN TICK/UNTICK ADA PUSAT */}
                               <label className="flex items-center gap-2 text-xs font-bold text-amber-300 cursor-pointer bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
                                  <input 
                                     type="checkbox" 
@@ -1099,7 +1325,6 @@
                               </label>
                            </div>
 
-                           {/* JIKA TICK ADA PUSAT: BILANGAN & NAMA PUSAT DINAMIK */}
                            {hasSubCenters && (
                               <div className="p-4 bg-slate-950 border border-amber-500/30 rounded-xl space-y-3">
                                  <div className="flex items-center gap-4">
@@ -1148,7 +1373,6 @@
                                  </datalist>
                               </div>
 
-                              {/* JIKA TICK: PAPARKAN PILIHAN PUSAT */}
                               {hasSubCenters && (
                                  <div>
                                     <select required className="w-full p-3 bg-slate-950 border border-emerald-500/50 rounded text-sm font-extrabold text-emerald-400 uppercase" value={calonForm.pusat_temuduga} onChange={e => setCalonForm({...calonForm, pusat_temuduga: e.target.value.toUpperCase()})}>
@@ -1168,7 +1392,6 @@
                            </form>
                         </div>
                         
-                        {/* PANGKALAN DATA CALON */}
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg min-h-[500px]">
                           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                             <div>
@@ -1209,7 +1432,11 @@
                                   <tbody>
                                      {displayedCalons.length === 0 ? (
                                         <tr><td colSpan="8" className="text-center p-8 text-slate-500 italic">Tiada padanan calon ditemui.</td></tr>
-                                     ) : displayedCalons.map(c => editModeCalonKp === c.no_kp ? (
+                                     ) : displayedCalons.map(c => {
+                                        const cPusatDisplay = safeStr(c.pusat_temuduga) || getPusatFromZonString(c.zon_temuduga) || '-';
+                                        const cIndukDisplay = getParentZon(c.zon_temuduga);
+
+                                        return editModeCalonKp === c.no_kp ? (
                                         <tr key={c.no_kp} className="bg-slate-800">
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600 uppercase font-bold" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td>
@@ -1224,14 +1451,15 @@
                                         <tr key={c.no_kp} className="border-b border-slate-800 hover:bg-slate-800/50">
                                            <td className="p-3 font-bold uppercase">{safeStr(c.nama_penuh)}</td>
                                            <td className="p-3 font-mono text-slate-300">{safeStr(c.no_kp)}</td>
-                                           <td className="p-3 text-amber-300 font-bold uppercase">{safeStr(c.zon_temuduga)}</td>
-                                           <td className="p-3 text-emerald-400 font-black uppercase">{safeStr(c.pusat_temuduga || '-')}</td>
+                                           <td className="p-3 text-amber-300 font-bold uppercase">{cIndukDisplay}</td>
+                                           <td className="p-3 text-emerald-400 font-black uppercase">{cPusatDisplay}</td>
                                            <td className="p-3 text-slate-300 uppercase text-xs">{safeStr(c.sesi)}</td>
                                            <td className="p-3 uppercase">{safeStr(c.ppd)}</td>
                                            <td className="p-3 text-center"><button onClick={() => handleKehadiranToggle(c.no_kp, c.kehadiran)} className={`px-3 py-1 rounded text-xs font-bold w-24 transition-colors border ${c.kehadiran === 'HADIR' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : c.kehadiran === 'TIDAK HADIR' ? 'bg-red-500/20 text-red-400 border-red-500/50' : 'bg-slate-700/50 text-slate-300 border-slate-600'}`}>{c.kehadiran || 'BELUM'}</button></td>
                                            <td className="p-3 text-center"><button onClick={() => { setEditModeCalonKp(c.no_kp); setEditCalonForm({...c}); }} className="text-blue-400 font-bold text-xs mx-1 hover:underline">Edit</button> | <button onClick={() => handleDeleteCalon(c.no_kp)} className="text-red-400 font-bold text-xs mx-1 hover:underline">Padam</button></td>
                                         </tr>
-                                     ))}
+                                     );
+                                  })}
                                   </tbody>
                                </table>
                              </div>
@@ -1249,7 +1477,6 @@
                       </div>
                     )}
 
-                    {/* TAB 3: LAPORAN KEPUTUSAN */}
                     {activeTab === 'laporan' && (
                        <div className="space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                           <div className="bg-slate-900 border-2 border-emerald-500/50 p-6 rounded-xl shadow-2xl flex flex-col lg:flex-row justify-between items-center no-print gap-6">
@@ -1287,7 +1514,7 @@
                                 <h4 className="text-xs font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
                                 
                                 <h2 className="text-lg font-extrabold uppercase mt-3 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">
-                                   SENARAI KEPUTUSAN CALON SISC+ {laporanZon !== 'KESELURUHAN' ? `(ZON ${laporanZon})` : '(KESELURUHAN)'}
+                                   SENARAI KEPUTUSAN CALON SISC+ {laporanZon !== 'KESELURUHAN' ? `(ZON ${laporanZon.replace('ZON ', '')})` : '(KESELURUHAN)'}
                                 </h2>
                                 <p className="mt-2 font-bold text-slate-700">Tahap Kelulusan Minimum: {minScore}% dan ke atas</p>
                              </div>
@@ -1331,7 +1558,6 @@
                        </div>
                     )}
 
-                    {/* TAB 4: CETAK INDIVIDU MUKTAMAD MULTI-PANEL */}
                     {activeTab === 'cetak' && (
                        <div>
                           <div className="bg-slate-900 border-2 border-amber-500/50 p-6 rounded-xl shadow-2xl mb-8 flex justify-between items-center no-print">
@@ -1360,7 +1586,7 @@
                                    <tbody>
                                       <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400 w-1/4">NAMA CALON</td><td className="p-2.5 uppercase font-bold">{safeStr(selectedCalon.nama_penuh).toUpperCase()}</td></tr>
                                       <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">NO KAD PENGENALAN</td><td className="p-2.5 font-mono font-bold">{selectedCalon.no_kp}</td></tr>
-                                      <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">ZON & PUSAT</td><td className="p-2.5 uppercase font-bold text-blue-900">{safeStr(selectedCalon.zon_temuduga)} (PUSAT: {safeStr(selectedCalon.pusat_temuduga || '-')})</td></tr>
+                                      <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">ZON & PUSAT</td><td className="p-2.5 uppercase font-bold text-blue-900">{getParentZon(selectedCalon.zon_temuduga)} (PUSAT: {safeStr(selectedCalon.pusat_temuduga) || getPusatFromZonString(selectedCalon.zon_temuduga) || '-'})</td></tr>
                                       <tr className="border-b border-slate-400"><td className="p-2.5 bg-slate-100 border-r border-slate-400">PPD & SUBJEK</td><td className="p-2.5 uppercase">{safeStr(selectedCalon.ppd).toUpperCase() || '-'} ({safeStr(selectedCalon.sme_subjek).toUpperCase() || '-'})</td></tr>
                                    </tbody>
                                 </table>
@@ -1401,7 +1627,6 @@
                        </div>
                     )}
 
-                    {/* TAB 5: URUS PANEL */}
                     {activeTab === 'panel' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1493,7 +1718,6 @@
                           </div>
                         </div>
 
-                        {/* RINGKASAN PENUGASAN AKTIF PANEL */}
                         <div className="bg-slate-900 border border-emerald-500/20 p-6 rounded-xl shadow-lg mt-8">
                           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                             <div>
@@ -1528,8 +1752,8 @@
                                         <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                                            <td className="p-3 font-bold uppercase">{pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel)}</td>
                                            <td className="p-3 font-mono text-slate-300 text-xs">
-                                              <span className="font-bold text-sm text-amber-300">{safeStr(tugas.zon_bertugas).toUpperCase()}</span><br/>
-                                              <span className="font-extrabold text-xs text-emerald-400">{tugas.pusat_bertugas ? `PUSAT: ${safeStr(tugas.pusat_bertugas).toUpperCase()}` : 'SEMUA PUSAT'}</span>
+                                              <span className="font-bold text-sm text-amber-300">{getParentZon(tugas.zon_bertugas)}</span><br/>
+                                              <span className="font-extrabold text-xs text-emerald-400">{tugas.pusat_bertugas ? `PUSAT: ${safeStr(tugas.pusat_bertugas).toUpperCase()}` : (getPusatFromZonString(tugas.zon_bertugas) ? `PUSAT: ${getPusatFromZonString(tugas.zon_bertugas)}` : 'SEMUA PUSAT')}</span>
                                            </td>
                                            <td className="p-3 text-slate-300 text-xs font-mono">{safeStr(tugas.sesi_bertugas).toUpperCase()}</td>
                                            <td className="p-3 text-white font-semibold">{safeStr(tugas.peranan)}</td>
@@ -1554,7 +1778,6 @@
                           )}
                         </div>
 
-                        {/* PANGKALAN DATA PROFIL PANEL */}
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg mt-8">
                           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-slate-800 pb-4">
                             <div>
@@ -1613,7 +1836,6 @@
                       </div>
                     )}
 
-                    {/* TAB 6: URUS SETIA */}
                     {activeTab === 'urus_setia' && (
                        <div className="no-print space-y-8">
                           
@@ -1705,8 +1927,8 @@
                                             <tr key={tugas.id} className="border-b border-slate-800 hover:bg-slate-800/50">
                                                <td className="p-3 font-bold uppercase">{uDetail ? safeStr(uDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_us)}</td>
                                                <td className="p-3 font-bold text-amber-300 uppercase">
-                                                  {safeStr(tugas.zon_bertugas).toUpperCase()} <br/>
-                                                  <span className="text-emerald-400 font-extrabold text-xs">{tugas.pusat_bertugas ? `PUSAT: ${safeStr(tugas.pusat_bertugas).toUpperCase()}` : 'SEMUA PUSAT'}</span>
+                                                  {getParentZon(tugas.zon_bertugas)} <br/>
+                                                  <span className="text-emerald-400 font-extrabold text-xs">{tugas.pusat_bertugas ? `PUSAT: ${safeStr(tugas.pusat_bertugas).toUpperCase()}` : (getPusatFromZonString(tugas.zon_bertugas) ? `PUSAT: ${getPusatFromZonString(tugas.zon_bertugas)}` : 'SEMUA PUSAT')}</span>
                                                </td>
                                                <td className="p-3 font-mono text-slate-300 text-xs">{safeStr(tugas.tempoh_bertugas)}</td>
                                                <td className="p-3 text-center">
@@ -1752,7 +1974,6 @@
                        </div>
                     )}
                     
-                    {/* TAB 7: TETAPAN TUKAR KATA LALUAN ADMIN */}
                     {activeTab === 'tetapan' && (
                        <div className="bg-slate-900 border border-slate-800 p-8 rounded-xl max-w-xl mx-auto shadow-2xl space-y-6">
                           <div>
@@ -1787,7 +2008,6 @@
                </>
             )}
 
-            {/* MODAL TETINGKAP: DAFTAR PUKAL CALON DARI GOOGLE SHEETS */}
             {showBulkModal && (
                <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
                   <div className="bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
