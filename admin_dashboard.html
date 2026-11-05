@@ -28,10 +28,12 @@
       .flip-card:hover .flip-card-inner { transform: rotateY(180deg); }
       .flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 0.75rem; }
       .flip-card-back { transform: rotateY(180deg); }
+      
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: #0f172a; }
       ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
       ::-webkit-scrollbar-thumb:hover { background: #475569; }
+      
       input[type=number]::-webkit-inner-spin-button, 
       input[type=number]::-webkit-outer-spin-button { 
          -webkit-appearance: none; margin: 0; 
@@ -51,16 +53,19 @@
       const safeStr = (val) => (val ? String(val).trim() : '');
       const cleanKpNum = (val) => safeStr(val).replace(/[^0-9]/g, '');
 
+      // HELPER: EKSTRAK ZON INDUK (cth: 'SARAWAK (KUCHING)' -> 'SARAWAK')
       const getParentZon = (str) => {
         if (!str) return '';
         return safeStr(str).split('(')[0].trim().toUpperCase();
       };
 
+      // HELPER: EKSTRAK PUSAT JIKA ADA (cth: 'SARAWAK (KUCHING)' -> 'KUCHING')
       const getPusatFromZonString = (str) => {
         if (!str || !str.includes('(')) return '';
         return safeStr(str).split('(')[1].replace(')', '').trim().toUpperCase();
       };
 
+      // HELPER: PENENTUAN NEGERI BERDASARKAN PPD / ZON
       const mapNegeriFromData = (calon) => {
         const strPpd = safeStr(calon.ppd).toUpperCase();
         const strZon = getParentZon(calon.zon_temuduga);
@@ -244,6 +249,7 @@
         );
       }
 
+      // STACKED BAR MENGGABUNGKAN KUCHING DAN MIRI KE DALAM SATU BAR SARAWAK
       function StackedBarZon({ calonList, resultsList }) {
         const canvasRef = useRef(null);
         const chartRef = useRef(null);
@@ -271,14 +277,11 @@
           return () => { if (chartRef.current) chartRef.current.destroy(); };
         }, [calonList, resultsList]);
         return <div className="w-full h-64"><canvas ref={canvasRef}></canvas></div>;
-      }
-
-      function AdminApp() {
+      }function AdminApp() {
         const [isLoggedIn, setIsLoggedIn] = useState(false);
         const [currentAdmin, setCurrentAdmin] = useState(null);
         const [usernameInput, setUsernameInput] = useState('');
         const [passwordInput, setPasswordInput] = useState('');
-
         const [activeTab, setActiveTab] = useState('dashboard');
         
         const [calonList, setCalonList] = useState([]);
@@ -300,17 +303,16 @@
         const [numSubCenters, setNumSubCenters] = useState(2);
         const [customCenterList, setCustomCenterList] = useState(['KUCHING', 'MIRI']);
 
+        // STATE INTERAKTIF PAPARAN DATA TAMBAHAN
         const [dataTambahanTab, setDataTambahanTab] = useState('zon');
-        // STATE UNTUK DRILL-DOWN NEGERI -> DAERAH -> SUBJEK
         const [selectedNegeriExpand, setSelectedNegeriExpand] = useState(null);
         const [selectedDaerahExpand, setSelectedDaerahExpand] = useState(null);
 
-        // STATE UNTUK MODAL POPUP CALON SELESAI DINILAI
+        // STATE MODAL POPUP CALON SELESAI DINILAI
         const [modalDetailTitle, setModalDetailTitle] = useState('');
         const [modalDetailList, setModalDetailList] = useState([]);
         const [showDetailModal, setShowDetailModal] = useState(false);
 
-        // FUNGSI BUKA POPUP PERINCIAN CALON APABILA TEKAN NOMBOR SELESAI DINILAI
         const handleOpenCalonDetail = (tajuk, senaraiCalon) => {
           setModalDetailTitle(tajuk);
           setModalDetailList(senaraiCalon);
@@ -375,13 +377,11 @@
         const [cetakZon, setCetakZon] = useState('');
         const [cetakSesi, setCetakSesi] = useState('');
         const [selectedCalon, setSelectedCalon] = useState(null);
-
         const [passForm, setPassForm] = useState({ currentPass: '', newPass: '', confirmPass: '' });
 
         const handleAdminLogin = async (e) => {
           e.preventDefault();
           setMsg({ type: '', text: '' });
-
           const inputClean = usernameInput.trim().toLowerCase();
           const passClean = passwordInput.trim();
 
@@ -393,7 +393,6 @@
           }
 
           const { data: adminList, error } = await sb.from('pentadbir_admin').select('*');
-
           if (!error && adminList && adminList.length > 0) {
             const foundAdmin = adminList.find(a => safeStr(a.username).toLowerCase() === inputClean);
             if (foundAdmin) {
@@ -408,65 +407,48 @@
                }
             }
           }
-
           setMsg({ type: 'error', text: 'Pengguna Admin "' + inputClean + '" tidak dijumpai.' });
         };
 
         const fetchData = async () => {
            const { data: d1 } = await sb.from('calon').select('*').order('nama_penuh', { ascending: true });
            if (d1) setCalonList(d1);
-           
            const { data: d2 } = await sb.from('panel_penemuduga').select('*').order('created_at', { ascending: false });
            if (d2) setPanelList(d2);
-           
            const { data: d3 } = await sb.from('penugasan_panel').select('*').order('id', { ascending: false });
            if (d3) setPenugasanList(d3);
-           
            const { data: d4 } = await sb.from('urus_setia').select('*').order('id', { ascending: false });
            if (d4) setUrusSetiaList(d4);
-           
            const { data: d5 } = await sb.from('penilaian_skor').select('*').order('created_at', { ascending: false });
            if (d5) setResultsList(d5);
-
            const { data: d6 } = await sb.from('penugasan_urus_setia').select('*').order('id', { ascending: false });
            if (d6) setPenugasanUSList(d6);
         };
 
         const handleAutoFixSarawakData = async () => {
            if (!window.confirm("Sistem akan mengasingkan zon 'SARAWAK' dan menetapkan pusat 'KUCHING' atau 'MIRI' secara automatik untuk semua calon Sarawak yang masih kosong. Teruskan?")) return;
-           
            setMsg({ type: '', text: '' });
            let updateCount = 0;
-
            for (const c of calonList) {
               const uZon = safeStr(c.zon_temuduga).toUpperCase();
               const uPusat = safeStr(c.pusat_temuduga).toUpperCase();
               const uPpd = safeStr(c.ppd).toUpperCase();
-
-              let needsUpdate = false;
-              let newZon = uZon;
-              let newPusat = uPusat;
+              let needsUpdate = false, newZon = uZon, newPusat = uPusat;
 
               if (uZon.includes('SARAWAK')) {
                  newZon = 'SARAWAK';
                  if (!uPusat || uPusat === '-' || uPusat === 'UTAMA') {
-                    if (uZon.includes('MIRI') || uPpd.includes('MIRI') || uPpd.includes('SUBIS') || uPpd.includes('BINTULU') || uPpd.includes('BARAM') || uPpd.includes('LIMBANG') || uPpd.includes('LAWAS')) {
-                       newPusat = 'MIRI';
-                    } else {
-                       newPusat = 'KUCHING';
-                    }
+                    newPusat = (uZon.includes('MIRI') || uPpd.includes('MIRI') || uPpd.includes('SUBIS') || uPpd.includes('BINTULU') || uPpd.includes('BARAM') || uPpd.includes('LIMBANG') || uPpd.includes('LAWAS')) ? 'MIRI' : 'KUCHING';
                     needsUpdate = true;
                  } else if (uZon !== 'SARAWAK') {
                     needsUpdate = true;
                  }
               }
-
               if (needsUpdate) {
                  await sb.from('calon').update({ zon_temuduga: newZon, pusat_temuduga: newPusat }).eq('no_kp', c.no_kp);
                  updateCount++;
               }
            }
-
            alert(`Berjaya menyelaraskan ${updateCount} orang calon Sarawak!`);
            fetchData();
         };
@@ -476,28 +458,15 @@
         const handleRegisterPanel = async (e) => { 
            e.preventDefault(); 
            setMsg({ type: '', text: '' }); 
-           const payload = { 
-              nama_penuh: safeStr(panelForm.nama_penuh).toUpperCase(), 
-              no_kp: safeStr(panelForm.no_kp), 
-              jawatan: safeStr(panelForm.jawatan).toUpperCase(), 
-              tempat_bertugas: safeStr(panelForm.tempat_bertugas).toUpperCase(), 
-              katalaluan: panelForm.katalaluan,
-              zon_temuduga: 'UTARA' 
-           };
+           const payload = { nama_penuh: safeStr(panelForm.nama_penuh).toUpperCase(), no_kp: safeStr(panelForm.no_kp), jawatan: safeStr(panelForm.jawatan).toUpperCase(), tempat_bertugas: safeStr(panelForm.tempat_bertugas).toUpperCase(), katalaluan: panelForm.katalaluan, zon_temuduga: 'UTARA' };
            const { error } = await sb.from('panel_penemuduga').insert([payload]); 
-           if (error) { 
-              setMsg({ type: 'error', text: 'Gagal mendaftar profil panel: ' + error.message }); 
-           } else { 
-              setMsg({ type: 'success', text: 'Profil Panel berjaya didaftarkan!' }); 
-              setPanelForm({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', katalaluan: '' }); 
-              fetchData(); 
-           } 
+           if (error) setMsg({ type: 'error', text: 'Gagal mendaftar: ' + error.message }); 
+           else { setMsg({ type: 'success', text: 'Profil Panel berjaya didaftarkan!' }); setPanelForm({ nama_penuh: '', no_kp: '', jawatan: '', tempat_bertugas: '', katalaluan: '' }); fetchData(); } 
         };
 
         const handleUpdatePanel = async (kp) => { 
            const { error } = await sb.from('panel_penemuduga').update(editPanelForm).eq('no_kp', kp); 
-           if (error) alert(error.message); 
-           else { setEditModePanelKp(null); fetchData(); } 
+           if (error) alert(error.message); else { setEditModePanelKp(null); fetchData(); } 
         };
 
         const handleDeletePanel = async (kp, nama) => { 
@@ -511,32 +480,16 @@
           e.preventDefault();
           setMsg({ type: '', text: '' });
           if(!penugasanForm.no_kp_panel) return alert("Sila pilih nama panel terlebih dahulu.");
-          
           const formatTarikh = (tStr) => tStr ? tStr.split('-').reverse().join('/') : '';
           let tMula = formatTarikh(penugasanForm.tarikh_mula);
           let tTamat = formatTarikh(penugasanForm.tarikh_tamat);
-          let tarikhLabel = (tMula && tTamat) ? `[${tMula} - ${tTamat}]` : tMula ? `[${tMula}]` : '';
-          let sesiSimpan = penugasanForm.sesi_bertugas; 
-          if(tarikhLabel) sesiSimpan += ` ${tarikhLabel}`;
-
+          let sesiSimpan = penugasanForm.sesi_bertugas + ((tMula && tTamat) ? ` [${tMula} - ${tTamat}]` : tMula ? ` [${tMula}]` : '');
           const pusatVal = hasSubCenters ? safeStr(penugasanForm.pusat_bertugas).toUpperCase() : null;
 
-          const payload = { 
-             no_kp_panel: penugasanForm.no_kp_panel, 
-             zon_bertugas: safeStr(penugasanForm.zon_bertugas).toUpperCase(), 
-             pusat_bertugas: pusatVal,
-             sesi_bertugas: sesiSimpan, 
-             peranan: penugasanForm.peranan 
-          };
-          
+          const payload = { no_kp_panel: penugasanForm.no_kp_panel, zon_bertugas: safeStr(penugasanForm.zon_bertugas).toUpperCase(), pusat_bertugas: pusatVal, sesi_bertugas: sesiSimpan, peranan: penugasanForm.peranan };
           const { error } = await sb.from('penugasan_panel').insert([payload]);
-          if (error) {
-             setMsg({ type: 'error', text: 'Gagal menambah penugasan: ' + error.message });
-          } else {
-             setMsg({ type: 'success', text: `Penugasan Panel berjaya disimpan! ${pusatVal ? `(Pusat: ${pusatVal})` : '(Semua Pusat Dalam Zon)'}` }); 
-             setPenugasanForm({ ...penugasanForm, tarikh_mula: '', tarikh_tamat: '' }); 
-             fetchData(); 
-          }
+          if (error) setMsg({ type: 'error', text: 'Gagal menambah penugasan: ' + error.message });
+          else { setMsg({ type: 'success', text: `Penugasan Panel disimpan! ${pusatVal ? `(Pusat: ${pusatVal})` : ''}` }); setPenugasanForm({ ...penugasanForm, tarikh_mula: '', tarikh_tamat: '' }); fetchData(); }
         };
 
         const handleDeletePenugasan = async (id) => { 
@@ -547,8 +500,7 @@
         };
 
         const handleRegisterUS = async (e) => { 
-           e.preventDefault(); 
-           setMsg({ type: '', text: '' }); 
+           e.preventDefault(); setMsg({ type: '', text: '' }); 
            const payload = { nama_penuh: safeStr(usForm.nama_penuh).toUpperCase(), no_kp: safeStr(usForm.no_kp), katalaluan: usForm.katalaluan }; 
            const { error } = await sb.from('urus_setia').insert([payload]); 
            if(error) setMsg({ type:'error', text: error.message }); 
@@ -556,36 +508,20 @@
         };
 
         const handleRegisterPenugasanUS = async (e) => {
-          e.preventDefault();
-          setMsg({ type: '', text: '' });
-          if(!penugasanUsForm.no_kp_us) return alert("Sila pilih nama urus setia terlebih dahulu.");
-          
+          e.preventDefault(); setMsg({ type: '', text: '' });
+          if(!penugasanUsForm.no_kp_us) return alert("Sila pilih nama urus setia.");
           const formatTarikh = (tStr) => tStr ? tStr.split('-').reverse().join('/') : '';
-          let tMula = formatTarikh(penugasanUsForm.tarikh_mula);
-          let tTamat = formatTarikh(penugasanUsForm.tarikh_tamat);
-          let tempohGabungan = (tMula && tTamat) ? `${tMula} - ${tTamat}` : tMula;
-
+          let tempohGabungan = (penugasanUsForm.tarikh_mula && penugasanUsForm.tarikh_tamat) ? `${formatTarikh(penugasanUsForm.tarikh_mula)} - ${formatTarikh(penugasanUsForm.tarikh_tamat)}` : formatTarikh(penugasanUsForm.tarikh_mula);
           const pusatVal = hasSubCenters ? safeStr(penugasanUsForm.pusat_bertugas).toUpperCase() : null;
 
-          const payload = { 
-             no_kp_us: penugasanUsForm.no_kp_us, 
-             zon_bertugas: safeStr(penugasanUsForm.zon_bertugas).toUpperCase(), 
-             pusat_bertugas: pusatVal,
-             tempoh_bertugas: tempohGabungan
-          };
-          
+          const payload = { no_kp_us: penugasanUsForm.no_kp_us, zon_bertugas: safeStr(penugasanUsForm.zon_bertugas).toUpperCase(), pusat_bertugas: pusatVal, tempoh_bertugas: tempohGabungan };
           const { error } = await sb.from('penugasan_urus_setia').insert([payload]);
-          if (error) {
-             setMsg({ type: 'error', text: 'Gagal menambah penugasan urus setia: ' + error.message });
-          } else {
-             setMsg({ type: 'success', text: `Penugasan Urus Setia berjaya disimpan! ${pusatVal ? `(Pusat: ${pusatVal})` : '(Semua Pusat Dalam Zon)'}` }); 
-             setPenugasanUsForm({ ...penugasanUsForm, tarikh_mula: '', tarikh_tamat: '' }); 
-             fetchData(); 
-          }
+          if (error) setMsg({ type: 'error', text: error.message });
+          else { setMsg({ type: 'success', text: 'Penugasan Urus Setia disimpan!' }); setPenugasanUsForm({ ...penugasanUsForm, tarikh_mula: '', tarikh_tamat: '' }); fetchData(); }
         };
 
         const handleDeletePenugasanUS = async (id) => { 
-           if (window.confirm('Padam rekod penugasan urus setia ini?')) { 
+           if (window.confirm('Padam penugasan urus setia ini?')) { 
               const { error } = await sb.from('penugasan_urus_setia').delete().eq('id', id); 
               if(error) alert(error.message); else fetchData(); 
            } 
@@ -604,45 +540,19 @@
         };
 
         const handleRegisterCalon = async (e) => { 
-          e.preventDefault(); 
-          setMsg({ type: '', text: '' }); 
-          let formatTarikh = "";
-          if (calonForm.tarikh) formatTarikh = calonForm.tarikh.split('-').reverse().join('/');
+          e.preventDefault(); setMsg({ type: '', text: '' }); 
+          let formatTarikh = calonForm.tarikh ? calonForm.tarikh.split('-').reverse().join('/') : '';
           const sesiGabungan = formatTarikh ? `${calonForm.sesi.toUpperCase()} (${formatTarikh})` : calonForm.sesi.toUpperCase();
-          
           const pusatVal = hasSubCenters ? safeStr(calonForm.pusat_temuduga).toUpperCase() : null;
 
-          const payload = { 
-             nama_penuh: safeStr(calonForm.nama_penuh).toUpperCase(), 
-             no_kp: safeStr(calonForm.no_kp), 
-             zon_temuduga: safeStr(calonForm.zon_temuduga).toUpperCase(), 
-             pusat_temuduga: pusatVal,
-             sesi: sesiGabungan, 
-             ppd: safeStr(calonForm.ppd).toUpperCase(), 
-             sme_subjek: safeStr(calonForm.sme_subjek).toUpperCase(), 
-             bilik_temuduga: safeStr(calonForm.bilik_temuduga || 'BILIK 1').toUpperCase(), 
-             kehadiran: calonForm.kehadiran.toUpperCase() 
-          };
-          
+          const payload = { nama_penuh: safeStr(calonForm.nama_penuh).toUpperCase(), no_kp: safeStr(calonForm.no_kp), zon_temuduga: safeStr(calonForm.zon_temuduga).toUpperCase(), pusat_temuduga: pusatVal, sesi: sesiGabungan, ppd: safeStr(calonForm.ppd).toUpperCase(), sme_subjek: safeStr(calonForm.sme_subjek).toUpperCase(), bilik_temuduga: safeStr(calonForm.bilik_temuduga || 'BILIK 1').toUpperCase(), kehadiran: calonForm.kehadiran.toUpperCase() };
           const { error } = await sb.from('calon').insert([payload]); 
           if(error) setMsg({ type: 'error', text: error.message });
-          else { 
-             setMsg({ type: 'success', text: `Calon berjaya didaftarkan! ${pusatVal ? `(Pusat: ${pusatVal})` : ''}` }); 
-             setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'SARAWAK', pusat_temuduga: customCenterList[0] || '', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: 'BILIK 1', kehadiran: 'BELUM' }); 
-             fetchData(); 
-          } 
+          else { setMsg({ type: 'success', text: 'Calon berjaya didaftarkan!' }); setCalonForm({ nama_penuh: '', no_kp: '', zon_temuduga: 'SARAWAK', pusat_temuduga: customCenterList[0] || '', sesi: 'SESI 1', tarikh: '', ppd: '', sme_subjek: '', bilik_temuduga: 'BILIK 1', kehadiran: 'BELUM' }); fetchData(); } 
         };
 
         const handleUpdateCalon = async (kp) => { 
-           const payloadFormat = {
-              ...editCalonForm,
-              nama_penuh: safeStr(editCalonForm.nama_penuh).toUpperCase(),
-              zon_temuduga: getParentZon(editCalonForm.zon_temuduga),
-              pusat_temuduga: safeStr(editCalonForm.pusat_temuduga || '-').toUpperCase(),
-              ppd: safeStr(editCalonForm.ppd).toUpperCase(),
-              sme_subjek: safeStr(editCalonForm.sme_subjek).toUpperCase(),
-              sesi: safeStr(editCalonForm.sesi).toUpperCase()
-           };
+           const payloadFormat = { ...editCalonForm, nama_penuh: safeStr(editCalonForm.nama_penuh).toUpperCase(), zon_temuduga: getParentZon(editCalonForm.zon_temuduga), pusat_temuduga: safeStr(editCalonForm.pusat_temuduga || '-').toUpperCase(), ppd: safeStr(editCalonForm.ppd).toUpperCase(), sme_subjek: safeStr(editCalonForm.sme_subjek).toUpperCase(), sesi: safeStr(editCalonForm.sesi).toUpperCase() };
            const {error} = await sb.from('calon').update(payloadFormat).eq('no_kp', kp); 
            if(error) alert(error.message); else { setEditModeCalonKp(null); fetchData(); } 
         };
@@ -656,9 +566,7 @@
         };
 
         const handleKehadiranToggle = async (kp, statusSemasa) => { 
-           let newStatus = 'HADIR'; 
-           if (statusSemasa === 'HADIR') newStatus = 'TIDAK HADIR'; 
-           else if (statusSemasa === 'TIDAK HADIR') newStatus = 'BELUM'; 
+           let newStatus = statusSemasa === 'HADIR' ? 'TIDAK HADIR' : statusSemasa === 'TIDAK HADIR' ? 'BELUM' : 'HADIR'; 
            await sb.from('calon').update({ kehadiran: newStatus }).eq('no_kp', kp); 
            fetchData(); 
         };
@@ -666,103 +574,48 @@
         const handleFetchFromUrl = async () => {
            if (!bulkUrl.trim()) return alert("Sila masukkan pautan Google Sheet.");
            setBulkLoading(true);
-
            try {
               let csvUrl = bulkUrl.trim();
-
               if (!csvUrl.includes('output=csv')) {
                  const match = csvUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                 if (match && match[1]) {
-                    const sheetId = match[1];
-                    csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-                 }
+                 if (match && match[1]) csvUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
               }
-
               const res = await fetch(csvUrl);
-              if (!res.ok) {
-                 throw new Error("Gagal menyedut fail. Sila pastikan Google Sheet diterbitkan ke web.");
-              }
+              if (!res.ok) throw new Error("Gagal menyedut fail Google Sheet.");
               const csvData = await res.text();
               setBulkText(csvData);
-              alert("Data berjaya disedut daripada Google Sheet! Sila klik butang 'Sahkan & Masukkan Calon' di bawah.");
-           } catch (err) {
-              alert("Ralat Sedutan: " + err.message);
-           } finally {
-              setBulkLoading(false);
-           }
+              alert("Data berjaya disedut! Klik butang 'Sahkan & Masukkan Calon' di bawah.");
+           } catch (err) { alert("Ralat: " + err.message); } 
+           finally { setBulkLoading(false); }
         };
 
         const handleProcessBulkUpload = async () => {
-           if (!bulkText.trim()) return alert("Tiada data untuk dimuat naik. Sila sedut data atau tampal teks dahulu.");
+           if (!bulkText.trim()) return alert("Tiada data untuk dimuat naik.");
            setBulkLoading(true);
-
            try {
               const lines = bulkText.split(/\r?\n/).filter(line => line.trim().length > 0);
               const candidatesToInsert = [];
-
               for (let i = 0; i < lines.length; i++) {
                  const line = lines[i];
                  let cols = line.includes('\t') ? line.split('\t') : line.split(',');
                  cols = cols.map(c => safeStr(c).replace(/^["']|["']$/g, ''));
-
                  const firstColUpper = safeStr(cols[0]).toUpperCase();
                  if (firstColUpper === 'NAMA' || firstColUpper === 'BIL' || firstColUpper === 'NAMA CALON' || firstColUpper === 'NO' || firstColUpper === 'ZON') continue;
 
-                 let noKp = '';
-                 let nama = '';
-                 let ppd = '';
-                 let subjek = '';
-                 let sesi = 'SESI 1';
-                 let bilik = bulkBilikDefault || 'BILIK 1';
-                 let zon = safeStr(bulkZonTarget).toUpperCase();
-                 let pusat = null;
-
+                 let noKp = '', nama = '', ppd = '', subjek = '', sesi = 'SESI 1', bilik = bulkBilikDefault || 'BILIK 1', zon = safeStr(bulkZonTarget).toUpperCase(), pusat = null;
                  let kpIndex = cols.findIndex(c => cleanKpNum(c).length >= 10 && cleanKpNum(c).length <= 14);
 
                  if (kpIndex !== -1) {
                     noKp = cleanKpNum(cols[kpIndex]);
-
                     const colBefore = kpIndex > 0 ? safeStr(cols[kpIndex - 1]) : '';
                     const colAfter = (kpIndex + 1 < cols.length) ? safeStr(cols[kpIndex + 1]) : '';
-
-                    const isZoneOrNumber = (val) => {
-                       const v = val.toUpperCase();
-                       return !val || !isNaN(val) || v === 'SARAWAK' || v === 'SABAH' || v.includes('ZON') || v.includes('SESI');
-                    };
-
-                    if (isZoneOrNumber(colBefore)) {
-                       nama = colAfter;
-                    } else {
-                       nama = colBefore;
-                    }
-
-                    const isGradeOrMeta = (val) => {
-                       const v = val.toUpperCase();
-                       return v.startsWith('DG') || v.startsWith('GRED') || v.startsWith('PPP') || v.includes('MEMANGKU') || v.startsWith('HAKIKI') || v.startsWith('SESI');
-                    };
+                    nama = (!colBefore || !isNaN(colBefore) || colBefore.toUpperCase().includes('ZON')) ? colAfter : colBefore;
 
                     for (let cIdx = kpIndex + 2; cIdx < cols.length; cIdx++) {
                        const cellVal = safeStr(cols[cIdx]);
-                       if (!cellVal) continue;
-                       const uVal = cellVal.toUpperCase();
-
-                       if (uVal.startsWith('SMK') || uVal.startsWith('SK') || uVal.startsWith('SJK') || uVal.startsWith('PPD') || uVal.startsWith('KOLEJ') || uVal.includes('SEKOLAH')) {
-                          ppd = cellVal;
-                          break;
-                       }
-
-                       if (!ppd && !isGradeOrMeta(cellVal) && !uVal.includes('SESI') && !uVal.includes('BILIK')) {
-                          ppd = cellVal;
-                       }
+                       if (cellVal && !ppd && !cellVal.toUpperCase().startsWith('DG') && !cellVal.toUpperCase().includes('SESI')) ppd = cellVal;
                     }
-
-                    if (!ppd || isGradeOrMeta(ppd)) {
-                       const uLine = line.toUpperCase();
-                       const districtList = ['KUCHING', 'PADAWAN', 'SAMARAHAN', 'BAU', 'LUNDU', 'SERIAN', 'SRI AMAN', 'BETONG', 'SARATOK', 'MIRI', 'BINTULU', 'SUBIS', 'BARAM', 'LIMBANG', 'LAWAS', 'SIBU', 'MUKAH', 'KAPIT'];
-                       const foundDist = districtList.find(d => uLine.includes(d));
-                       ppd = foundDist ? `PPD ${foundDist}` : 'SARAWAK';
-                    }
-
+                    if (!ppd) ppd = 'SARAWAK';
                  } else {
                     nama = cols[1] && isNaN(cols[1]) ? cols[1] : cols[0];
                     noKp = cleanKpNum(cols[0]) || cleanKpNum(cols[1]);
@@ -771,110 +624,46 @@
                  }
 
                  if (!noKp || !nama || nama.toUpperCase() === 'SARAWAK') continue;
-
-                 if (bulkDefaultSesi !== 'AUTO') {
-                    sesi = bulkDefaultSesi;
-                 } else {
-                    const findSesi = cols.find(c => safeStr(c).toUpperCase().includes('SESI'));
-                    if (findSesi) sesi = safeStr(findSesi).toUpperCase();
-                 }
-
-                 const findBilik = cols.find(c => safeStr(c).toUpperCase().includes('BILIK'));
-                 if (findBilik) bilik = safeStr(findBilik).toUpperCase();
+                 sesi = (bulkDefaultSesi !== 'AUTO') ? bulkDefaultSesi : (cols.find(c => safeStr(c).toUpperCase().includes('SESI')) || 'SESI 1');
+                 bilik = cols.find(c => safeStr(c).toUpperCase().includes('BILIK')) || bulkBilikDefault || 'BILIK 1';
 
                  if (hasSubCenters) {
                     if (bulkPusatTarget === 'AUTO') {
                        const uAll = `${line} ${ppd}`.toUpperCase();
-                       if (uAll.includes('MIRI') || uAll.includes('BINTULU') || uAll.includes('SUBIS') || uAll.includes('BARAM') || uAll.includes('LIMBANG') || uAll.includes('LAWAS')) {
-                          pusat = 'MIRI';
-                       } else {
-                          pusat = 'KUCHING';
-                       }
+                       pusat = (uAll.includes('MIRI') || uAll.includes('BINTULU') || uAll.includes('SUBIS') || uAll.includes('BARAM') || uAll.includes('LIMBANG') || uAll.includes('LAWAS')) ? 'MIRI' : 'KUCHING';
                     } else {
                        pusat = safeStr(bulkPusatTarget).toUpperCase();
                     }
-                 } else {
-                    pusat = null;
                  }
 
-                 candidatesToInsert.push({
-                    nama_penuh: nama.toUpperCase(),
-                    no_kp: noKp,
-                    ppd: ppd.toUpperCase(),
-                    sme_subjek: subjek.toUpperCase() || 'SME',
-                    zon_temuduga: getParentZon(zon),
-                    pusat_temuduga: pusat ? pusat.toUpperCase() : null,
-                    bilik_temuduga: bilik.toUpperCase(),
-                    sesi: sesi.toUpperCase(),
-                    kehadiran: 'BELUM'
-                 });
+                 candidatesToInsert.push({ nama_penuh: nama.toUpperCase(), no_kp: noKp, ppd: ppd.toUpperCase(), sme_subjek: subjek.toUpperCase() || 'SME', zon_temuduga: getParentZon(zon), pusat_temuduga: pusat ? pusat.toUpperCase() : null, bilik_temuduga: bilik.toUpperCase(), sesi: sesi.toUpperCase(), kehadiran: 'BELUM' });
               }
 
-              if (candidatesToInsert.length === 0) {
-                 alert("Tiada rekod calon sah dikesan. Sila semak pautan atau teks data.");
-                 setBulkLoading(false);
-                 return;
-              }
-
+              if (candidatesToInsert.length === 0) { alert("Tiada rekod calon sah."); setBulkLoading(false); return; }
               const { error } = await sb.from('calon').upsert(candidatesToInsert, { onConflict: 'no_kp' });
-
-              if (error) {
-                 alert("Gagal memuat naik: " + error.message);
-              } else {
-                 alert(`Berjaya! ${candidatesToInsert.length} orang calon dikemas kini ke dalam pangkalan data!`);
-                 setShowBulkModal(false);
-                 setBulkText('');
-                 fetchData();
-              }
-           } catch (err) {
-              alert("Ralat memproses: " + err.message);
-           } finally {
-              setBulkLoading(false);
-           }
+              if (error) alert("Gagal: " + error.message);
+              else { alert(`Berjaya mengemas kini ${candidatesToInsert.length} calon!`); setShowBulkModal(false); setBulkText(''); fetchData(); }
+           } catch (err) { alert("Ralat: " + err.message); } 
+           finally { setBulkLoading(false); }
         };
 
         const handleChangeAdminPassword = async (e) => {
-          e.preventDefault();
-          setMsg({ type: '', text: '' });
-
-          if (passForm.newPass !== passForm.confirmPass) {
-             setMsg({ type: 'error', text: 'Pengesahan kata laluan baharu tidak sepadan.' });
-             return;
-          }
-
+          e.preventDefault(); setMsg({ type: '', text: '' });
+          if (passForm.newPass !== passForm.confirmPass) return setMsg({ type: 'error', text: 'Pengesahan kata laluan baharu tidak sepadan.' });
           const { error } = await sb.from('pentadbir_admin').update({ katalaluan: passForm.newPass.trim() }).eq('username', currentAdmin.username);
-
-          if (error) {
-             setMsg({ type: 'error', text: 'Gagal menukar kata laluan: ' + error.message });
-          } else {
-             setMsg({ type: 'success', text: 'Kata laluan Admin berjaya dikemas kini!' });
-             setCurrentAdmin({ ...currentAdmin, katalaluan: passForm.newPass.trim() });
-             setPassForm({ currentPass: '', newPass: '', confirmPass: '' });
-          }
+          if (error) setMsg({ type: 'error', text: error.message });
+          else { setMsg({ type: 'success', text: 'Kata laluan Admin berjaya dikemas kini!' }); setCurrentAdmin({ ...currentAdmin, katalaluan: passForm.newPass.trim() }); setPassForm({ currentPass: '', newPass: '', confirmPass: '' }); }
         };
 
-        const handleAdminLogoutAccount = () => {
-          setIsLoggedIn(false);
-          setCurrentAdmin(null);
-          setUsernameInput('');
-          setPasswordInput('');
-        };
-
-        const handleGoToMenuUtama = () => {
-          window.location.href = 'index.html';
-        };
+        const handleAdminLogoutAccount = () => { setIsLoggedIn(false); setCurrentAdmin(null); setUsernameInput(''); setPasswordInput(''); };
+        const handleGoToMenuUtama = () => { window.location.href = 'index.html'; };
 
         const currentRes = selectedCalon ? consolidatedResults.find(r => safeStr(r.no_kp_calon) === safeStr(selectedCalon.no_kp)) : null;
-        
         const scoresMap = currentRes ? { 
-           skor_bimbingan: ((currentRes.skor_bimbingan || 0) / 5) * 25, 
-           skor_instruksional: ((currentRes.skor_instruksional || 0) / 5) * 20, 
-           skor_pemikiran_strategik: ((currentRes.skor_pemikiran_strategik || 0) / 5) * 20, 
-           skor_analisis_data: ((currentRes.skor_analisis_data || 0) / 5) * 15, 
-           skor_interpersonal: ((currentRes.skor_interpersonal || 0) / 5) * 10, 
-           skor_evidens: ((currentRes.skor_evidens || 0) / 5) * 10 
+           skor_bimbingan: ((currentRes.skor_bimbingan || 0) / 5) * 25, skor_instruksional: ((currentRes.skor_instruksional || 0) / 5) * 20, 
+           skor_pemikiran_strategik: ((currentRes.skor_pemikiran_strategik || 0) / 5) * 20, skor_analisis_data: ((currentRes.skor_analisis_data || 0) / 5) * 15, 
+           skor_interpersonal: ((currentRes.skor_interpersonal || 0) / 5) * 10, skor_evidens: ((currentRes.skor_evidens || 0) / 5) * 10 
         } : { skor_bimbingan: 0, skor_instruksional: 0, skor_pemikiran_strategik: 0, skor_analisis_data: 0, skor_interpersonal: 0, skor_evidens: 0 };
-        
         const totalMarkah = currentRes ? currentRes.jumlah_markah : 0;
         
         const top10Calon = [...consolidatedResults].sort((a,b) => b.jumlah_markah - a.jumlah_markah).slice(0, 10);
@@ -883,47 +672,24 @@
         const filteredPenugasan = penugasanList.filter(tugas => { 
            const pDetail = panelList.find(p => safeStr(p.no_kp) === safeStr(tugas.no_kp_panel)); 
            const namaPanel = pDetail ? safeStr(pDetail.nama_penuh).toUpperCase() : safeStr(tugas.no_kp_panel).toUpperCase(); 
-           const matchZon = filterZonTugas === 'SEMUA' || getParentZon(tugas.zon_bertugas) === filterZonTugas; 
-           const matchSearch = namaPanel.includes(searchTugas.toUpperCase()) || safeStr(tugas.no_kp_panel).includes(searchTugas); 
-           return matchZon && matchSearch; 
+           return (filterZonTugas === 'SEMUA' || getParentZon(tugas.zon_bertugas) === filterZonTugas) && (namaPanel.includes(searchTugas.toUpperCase()) || safeStr(tugas.no_kp_panel).includes(searchTugas)); 
         });
         const totalPagesTugas = Math.ceil(filteredPenugasan.length / ITEMS_PER_PAGE) || 1;
         const displayedPenugasan = filteredPenugasan.slice((pageTugas - 1) * ITEMS_PER_PAGE, pageTugas * ITEMS_PER_PAGE);
 
-        const filteredPanels = panelList.filter(p => { 
-           const matchZon = filterZonPanel === 'SEMUA' || penugasanList.some(t => safeStr(t.no_kp_panel) === safeStr(p.no_kp) && getParentZon(t.zon_bertugas) === filterZonPanel); 
-           const matchSearch = safeStr(p.nama_penuh).toUpperCase().includes(searchPanel.toUpperCase()) || safeStr(p.no_kp).includes(searchPanel); 
-           return matchZon && matchSearch; 
-        });
+        const filteredPanels = panelList.filter(p => (filterZonPanel === 'SEMUA' || penugasanList.some(t => safeStr(t.no_kp_panel) === safeStr(p.no_kp) && getParentZon(t.zon_bertugas) === filterZonPanel)) && (safeStr(p.nama_penuh).toUpperCase().includes(searchPanel.toUpperCase()) || safeStr(p.no_kp).includes(searchPanel)));
         const totalPagesPanel = Math.ceil(filteredPanels.length / ITEMS_PER_PAGE) || 1;
         const displayedPanels = filteredPanels.slice((pagePanel - 1) * ITEMS_PER_PAGE, pagePanel * ITEMS_PER_PAGE);
 
         const availableZonCalonList = [...new Set(calonList.map(c => getParentZon(c.zon_temuduga)))].filter(Boolean).sort();
         const availablePusatCalonList = [...new Set(calonList.map(c => safeStr(c.pusat_temuduga) || getPusatFromZonString(c.zon_temuduga) || '-'))].filter(Boolean).sort();
-
-        const allKnownPusat = [...new Set([
-          ...customCenterList,
-          ...calonList.map(c => safeStr(c.pusat_temuduga).toUpperCase()),
-          ...penugasanList.map(t => safeStr(t.pusat_bertugas).toUpperCase()),
-        ])].filter(Boolean).sort();
-        
-        const availableSesiCalonList = [...new Set(
-           calonList
-             .filter(c => filterZonCalon === 'SEMUA' || getParentZon(c.zon_temuduga) === filterZonCalon)
-             .map(c => cleanSesiName(c.sesi))
-        )].filter(Boolean).sort();
-        
+        const availableSesiCalonList = [...new Set(calonList.filter(c => filterZonCalon === 'SEMUA' || getParentZon(c.zon_temuduga) === filterZonCalon).map(c => cleanSesiName(c.sesi)))].filter(Boolean).sort();
         const showCalonData = searchCalon.trim() !== '' || filterZonCalon !== 'SEMUA';
         
         const filteredCalons = calonList.filter(c => { 
            const cIndukZon = getParentZon(c.zon_temuduga);
            const cPusat = safeStr(c.pusat_temuduga).toUpperCase() || getPusatFromZonString(c.zon_temuduga) || '-';
-
-           const matchZon = filterZonCalon === 'SEMUA' || cIndukZon === filterZonCalon; 
-           const matchPusat = filterPusatCalon === 'SEMUA' || cPusat === filterPusatCalon;
-           const matchSesi = filterSesiCalon === 'SEMUA' || cleanSesiName(c.sesi) === cleanSesiName(filterSesiCalon); 
-           const matchSearch = safeStr(c.nama_penuh).toUpperCase().includes(searchCalon.toUpperCase()) || safeStr(c.no_kp).includes(searchCalon); 
-           return matchZon && matchPusat && matchSesi && matchSearch; 
+           return (filterZonCalon === 'SEMUA' || cIndukZon === filterZonCalon) && (filterPusatCalon === 'SEMUA' || cPusat === filterPusatCalon) && (filterSesiCalon === 'SEMUA' || cleanSesiName(c.sesi) === cleanSesiName(filterSesiCalon)) && (safeStr(c.nama_penuh).toUpperCase().includes(searchCalon.toUpperCase()) || safeStr(c.no_kp).includes(searchCalon)); 
         });
         const totalPagesCalon = Math.ceil(filteredCalons.length / ITEMS_PER_PAGE) || 1;
         const displayedCalons = filteredCalons.slice((pageCalon - 1) * ITEMS_PER_PAGE, pageCalon * ITEMS_PER_PAGE);
@@ -932,23 +698,14 @@
         const cetakCalonFiltered = cetakSesi ? calonList.filter(c => getParentZon(c.zon_temuduga) === cetakZon && cleanSesiName(c.sesi) === cleanSesiName(cetakSesi)) : [];
 
         const filteredLaporanList = consolidatedResults.filter(r => {
-           const melepasiMarkah = r.jumlah_markah >= minScore;
            const targetZon = laporanZon.replace('ZON ', '').trim();
-           const padanZon = laporanZon === 'KESELURUHAN' || r.zon === targetZon || r.raw_zon.includes(targetZon);
-           return melepasiMarkah && padanZon;
+           return (r.jumlah_markah >= minScore) && (laporanZon === 'KESELURUHAN' || r.zon === targetZon || r.raw_zon.includes(targetZon));
         }).sort((a,b) => b.jumlah_markah - a.jumlah_markah);
 
         const handleDownloadExcel = () => {
           let csvContent = "BIL,NAMA CALON,NO. KAD PENGENALAN,SUBJEK,PPD,ZON,PUSAT,MARKAH MUKTAMAD (%)\n";
           filteredLaporanList.forEach((res, index) => {
-             const nama = safeStr(res.nama_calon).replace(/"/g, '""');
-             const no_kp = safeStr(res.no_kp_calon);
-             const subjek = safeStr(res.sme_subjek).replace(/"/g, '""');
-             const ppd = safeStr(res.ppd).replace(/"/g, '""');
-             const zon = safeStr(res.zon);
-             const pusat = safeStr(res.pusat || '-');
-             const row = [index + 1, `"${nama}"`, `="${no_kp}"`, `"${subjek}"`, `"${ppd}"`, `"${zon}"`, `"${pusat}"`, res.jumlah_markah];
-             csvContent += row.join(",") + "\n";
+             csvContent += [index + 1, `"${safeStr(res.nama_calon).replace(/"/g, '""')}"`, `="${res.no_kp_calon}"`, `"${safeStr(res.sme_subjek).replace(/"/g, '""')}"`, `"${safeStr(res.ppd).replace(/"/g, '""')}"`, `"${res.zon}"`, `"${safeStr(res.pusat || '-')}"`, res.jumlah_markah].join(",") + "\n";
           });
           const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
           const link = document.createElement("a");
@@ -957,18 +714,12 @@
           document.body.appendChild(link); link.click(); document.body.removeChild(link);
         };
 
+        // KIRAAN STATISTIK UNTUK 3 PAPARAN DATA TAMBAHAN
         const dataIkutZon = availableZonCalonList.map(z => {
            const calons = calonList.filter(c => getParentZon(c.zon_temuduga) === z);
            const dinilai = consolidatedResults.filter(r => r.zon === z);
            const layak = dinilai.filter(r => r.status_lulus).length;
-           return {
-              zon: z,
-              totalDaftar: calons.length,
-              totalDinilai: dinilai.length,
-              layak,
-              belumLayak: dinilai.length - layak,
-              peratusSelesai: calons.length > 0 ? Math.round((dinilai.length / calons.length) * 100) : 0
-           };
+           return { zon: z, totalDaftar: calons.length, totalDinilai: dinilai.length, layak, belumLayak: dinilai.length - layak, peratusSelesai: calons.length > 0 ? Math.round((dinilai.length / calons.length) * 100) : 0 };
         });
 
         const allNegeriList = [...new Set(calonList.map(c => mapNegeriFromData(c)))].filter(Boolean).sort();
@@ -976,14 +727,7 @@
            const calons = calonList.filter(c => mapNegeriFromData(c) === neg);
            const dinilai = consolidatedResults.filter(r => r.negeri === neg);
            const layak = dinilai.filter(r => r.status_lulus).length;
-           return {
-              negeri: neg,
-              totalDaftar: calons.length,
-              totalDinilai: dinilai.length,
-              layak,
-              belumLayak: dinilai.length - layak,
-              peratusSelesai: calons.length > 0 ? Math.round((dinilai.length / calons.length) * 100) : 0
-           };
+           return { negeri: neg, totalDaftar: calons.length, totalDinilai: dinilai.length, layak, belumLayak: dinilai.length - layak, peratusSelesai: calons.length > 0 ? Math.round((dinilai.length / calons.length) * 100) : 0 };
         });
 
         const allSubjekList = [...new Set(calonList.map(c => safeStr(c.sme_subjek).toUpperCase() || 'SME'))].filter(Boolean).sort();
@@ -991,14 +735,7 @@
            const calons = calonList.filter(c => (safeStr(c.sme_subjek).toUpperCase() || 'SME') === sub);
            const dinilai = consolidatedResults.filter(r => r.sme_subjek === sub);
            const layak = dinilai.filter(r => r.status_lulus).length;
-           return {
-              subjek: sub,
-              totalDaftar: calons.length,
-              totalDinilai: dinilai.length,
-              layak,
-              belumLayak: dinilai.length - layak,
-              peratusLayak: dinilai.length > 0 ? Math.round((layak / dinilai.length) * 100) : 0
-           };
+           return { subjek: sub, totalDaftar: calons.length, totalDinilai: dinilai.length, layak, belumLayak: dinilai.length - layak, peratusLayak: dinilai.length > 0 ? Math.round((layak / dinilai.length) * 100) : 0 };
         });
 
         useEffect(() => { setPageTugas(1); }, [searchTugas, filterZonTugas]);
@@ -1009,11 +746,8 @@
            <button onClick={() => { setActiveTab(id); setMsg({type:'',text:''}); }} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === id ? 'bg-amber-500 text-slate-950 shadow-md scale-105' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200'}`}> 
              {label} 
            </button> 
-        );
-
-        return (
+        );return (
           <div className="min-h-screen flex flex-col">
-            
             <div className="bg-white w-full py-4 px-6 md:px-10 flex justify-between items-center shadow-md z-10 border-b-4 border-amber-500 no-print">
                <div className="flex items-center gap-4">
                   <img src="logo-kpm.png" alt="Logo KPM" className="h-12 object-contain" />
@@ -1021,13 +755,9 @@
                </div>
                <div className="flex items-center gap-4">
                   {isLoggedIn ? (
-                     <button onClick={handleAdminLogoutAccount} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-sm transition-colors border border-red-200">
-                        Log Keluar
-                     </button>
+                     <button onClick={handleAdminLogoutAccount} className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 font-bold rounded-lg text-sm transition-colors border border-red-200">Log Keluar</button>
                   ) : (
-                     <button onClick={handleGoToMenuUtama} className="px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg text-sm transition-colors border border-amber-300">
-                        Menu Utama
-                     </button>
+                     <button onClick={handleGoToMenuUtama} className="px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-lg text-sm transition-colors border border-amber-300">Menu Utama</button>
                   )}
                </div>
             </div>
@@ -1035,26 +765,17 @@
             {!isLoggedIn ? (
                <div className="flex-grow flex items-center justify-center p-6">
                   <div className="max-w-md w-full bg-slate-900 border-2 border-amber-500/40 p-8 rounded-3xl shadow-[0_0_50px_rgba(245,158,11,0.15)] space-y-6">
-                     
                      <div className="text-center space-y-3">
                         <div className="inline-block p-3 rounded-2xl border border-amber-500/30 bg-slate-950 shadow-lg shadow-amber-500/10">
                            <img src="logo-kpm.png" alt="Logo KPM" className="h-14 mx-auto object-contain" />
                         </div>
                         <div>
-                           <span className="px-3 py-0.5 bg-amber-500/20 text-amber-300 font-extrabold text-[10px] rounded-full border border-amber-500/40 uppercase tracking-widest">
-                              PENTADBIR SISTEM UTAMA
-                           </span>
+                           <span className="px-3 py-0.5 bg-amber-500/20 text-amber-300 font-extrabold text-[10px] rounded-full border border-amber-500/40 uppercase tracking-widest">PENTADBIR SISTEM UTAMA</span>
                            <h2 className="text-2xl font-black text-amber-400 uppercase tracking-wide mt-2">Log Masuk Admin</h2>
                            <p className="text-slate-400 text-xs mt-0.5">Sistem Pengurusan & Penilaian Temu Duga SISC+</p>
                         </div>
                      </div>
-
-                     {msg.text && (
-                        <div className={`p-3 rounded-xl text-xs font-bold text-center shadow ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
-                           {msg.text}
-                        </div>
-                     )}
-
+                     {msg.text && (<div className={`p-3 rounded-xl text-xs font-bold text-center shadow ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>{msg.text}</div>)}
                      <form onSubmit={handleAdminLogin} className="space-y-4">
                         <div>
                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Username Admin</label>
@@ -1064,9 +785,7 @@
                            <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Kata Laluan</label>
                            <input type="password" required placeholder="••••••••" className="w-full p-3 bg-slate-950 border border-slate-700 rounded-lg text-sm text-slate-100 focus:border-amber-500 focus:outline-none" value={passwordInput} onChange={e => setPasswordInput(e.target.value)} />
                         </div>
-                        <button type="submit" className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-sm shadow-lg transition-transform active:scale-95 mt-2 uppercase tracking-wider">
-                           Log Masuk
-                        </button>
+                        <button type="submit" className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-sm shadow-lg transition-transform active:scale-95 mt-2 uppercase tracking-wider">Log Masuk</button>
                      </form>
                   </div>
                </div>
@@ -1085,12 +804,7 @@
                   </div>
 
                   <div className="p-8 max-w-7xl mx-auto w-full flex-grow mt-2">
-                    
-                    {msg.text && ( 
-                       <div className={`p-4 mb-6 rounded-lg text-base font-bold no-print text-center shadow-lg animate-pulse ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>
-                          {msg.text}
-                       </div> 
-                    )}
+                    {msg.text && (<div className={`p-4 mb-6 rounded-lg text-base font-bold no-print text-center shadow-lg animate-pulse ${msg.type === 'error' ? 'bg-red-900/80 text-red-200 border border-red-500' : 'bg-emerald-900/80 text-emerald-200 border border-emerald-500'}`}>{msg.text}</div>)}
 
                     {activeTab === 'dashboard' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
@@ -1172,7 +886,7 @@
                            </div>
                            <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-lg">
                               <h2 className="text-lg font-bold text-slate-200 mb-4 border-b border-slate-700 pb-2 uppercase tracking-wide flex items-center gap-2">
-                                 <span className="text-amber-400">🏆</span> 10 Calon Markah Tertinggi Keseluruhan
+                                 <span className="text-amber-400">🏆</span> 10 Calon Markah Tertinggi
                               </h2>
                               <ul className="space-y-3 overflow-y-auto max-h-[300px] pr-2">
                                  {top10Calon.length === 0 ? <li className="text-sm text-slate-500 italic">Tiada rekod penilaian rasmi.</li> : top10Calon.map((res, idx) => (
@@ -1191,7 +905,7 @@
                            </div>
                         </div>
 
-                       {/* PAPARAN DATA TAMBAHAN EKSEKUTIF INTERAKTIF */}
+                        {/* PAPARAN DATA TAMBAHAN EKSEKUTIF INTERAKTIF */}
                         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6 mt-8">
                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4 gap-4">
                               <div>
@@ -1199,23 +913,17 @@
                                     <span>📊</span> PAPARAN DATA TAMBAHAN EKSEKUTIF
                                  </h2>
                                  <p className="text-xs text-slate-400 mt-0.5">
-                                    Klik nombor <span className="text-amber-400 font-bold underline">Selesai Dinilai</span> untuk perincian calon, atau klik nama negeri untuk paparan bertingkat daerah & subjek.
+                                    Klik nombor <span className="text-amber-400 font-bold underline">Selesai Dinilai</span> untuk perincian calon, atau klik nama negeri untuk paparan bertingkat daerah & subjek[cite: 8].
                                  </p>
                               </div>
                               <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
-                                 <button onClick={() => setDataTambahanTab('zon')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'zon' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>
-                                    Ikut Zon
-                                 </button>
-                                 <button onClick={() => setDataTambahanTab('negeri')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'negeri' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>
-                                    Ikut Negeri
-                                 </button>
-                                 <button onClick={() => setDataTambahanTab('subjek')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'subjek' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>
-                                    Ikut Subjek
-                                 </button>
+                                 <button onClick={() => setDataTambahanTab('zon')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'zon' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Zon</button>
+                                 <button onClick={() => setDataTambahanTab('negeri')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'negeri' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Negeri</button>
+                                 <button onClick={() => setDataTambahanTab('subjek')} className={`px-4 py-2 rounded-lg text-xs font-extrabold transition-all ${dataTambahanTab === 'subjek' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-white'}`}>Ikut Subjek</button>
                               </div>
                            </div>
 
-                           {/* 1. IKUT ZON DENGAN KLIK NOMBOR POPUP */}
+                           {/* 1. IKUT ZON */}
                            {dataTambahanTab === 'zon' && (
                               <div className="overflow-x-auto">
                                  <table className="w-full text-left text-xs border-collapse">
@@ -1224,7 +932,7 @@
                                           <th className="p-3.5">ZON</th>
                                           <th className="p-3.5 text-center">BIL. DAFTAR</th>
                                           <th className="p-3.5 text-center">SELESAI DINILAI (KLIK NOMBOR)</th>
-                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (&ge;75%)</th>
+                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (&gt;=75%)</th>
                                           <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
                                           <th className="p-3.5 text-center">PERATUS SELESAI</th>
                                        </tr>
@@ -1237,11 +945,7 @@
                                                 <td className="p-3.5 font-bold text-slate-200 uppercase">ZON {row.zon}</td>
                                                 <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
                                                 <td className="p-3.5 text-center font-mono">
-                                                   <button 
-                                                      onClick={() => handleOpenCalonDetail(`Senarai Calon Dinilai (Zon ${row.zon})`, calonZonSelesai)}
-                                                      className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 rounded-lg font-black transition-all cursor-pointer"
-                                                      title="Klik untuk melihat nama dan butiran calon"
-                                                   >
+                                                   <button onClick={() => handleOpenCalonDetail(`Senarai Calon Dinilai (Zon ${row.zon})`, calonZonSelesai)} className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 rounded-lg font-black transition-all cursor-pointer">
                                                       {row.totalDinilai} Orang 🔍
                                                    </button>
                                                 </td>
@@ -1256,37 +960,26 @@
                               </div>
                            )}
 
-                           {/* 2. IKUT NEGERI: DRILL DOWN (NEGERI -> DAERAH/PPD -> PECAHAN SUBJEK) */}
+                           {/* 2. IKUT NEGERI: DRILL DOWN (NEGERI -> DAERAH -> SUBJEK) */}
                            {dataTambahanTab === 'negeri' && (
                               <div className="space-y-4">
-                                 <p className="text-xs text-amber-400 font-bold italic">
-                                    💡 Petunjuk: Klik nama negeri untuk melihat daerah/PPD. Klik nama daerah untuk melihat pecahan subjek calon.
-                                 </p>
-
+                                 <p className="text-xs text-amber-400 font-bold italic">💡 Petunjuk: Klik nama negeri untuk melihat daerah/PPD. Klik nama daerah untuk melihat pecahan subjek calon[cite: 8].</p>
                                  <div className="space-y-3">
                                     {dataIkutNegeri.map((negRow, idx) => {
                                        const isNegeriOpen = selectedNegeriExpand === negRow.negeri;
                                        const calonNegeriSelesai = consolidatedResults.filter(r => r.negeri === negRow.negeri);
-                                       
-                                       // Senarai PPD dalam negeri ini
                                        const listPpdNegeri = [...new Set(calonList.filter(c => mapNegeriFromData(c) === negRow.negeri).map(c => safeStr(c.ppd).toUpperCase()))].filter(Boolean).sort();
 
                                        return (
                                           <div key={idx} className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden transition-all">
-                                             {/* BARIS NEGERI UTAMA */}
                                              <div className="p-4 flex flex-wrap justify-between items-center gap-3 cursor-pointer hover:bg-slate-900/60" onClick={() => { setSelectedNegeriExpand(isNegeriOpen ? null : negRow.negeri); setSelectedDaerahExpand(null); }}>
                                                 <div className="flex items-center gap-3">
                                                    <span className="text-sm font-black text-slate-100 uppercase">{isNegeriOpen ? '▼' : '►'} {negRow.negeri}</span>
-                                                   <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono font-bold">
-                                                      {listPpdNegeri.length} Daerah/PPD
-                                                   </span>
+                                                   <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded font-mono font-bold">{listPpdNegeri.length} Daerah/PPD</span>
                                                 </div>
                                                 <div className="flex items-center gap-4 text-xs font-semibold">
                                                    <span className="text-slate-400 font-mono">Daftar: <b className="text-white">{negRow.totalDaftar}</b></span>
-                                                   <button 
-                                                      onClick={(e) => { e.stopPropagation(); handleOpenCalonDetail(`Senarai Calon Dinilai (${negRow.negeri})`, calonNegeriSelesai); }}
-                                                      className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 rounded font-black font-mono transition-all"
-                                                   >
+                                                   <button onClick={(e) => { e.stopPropagation(); handleOpenCalonDetail(`Senarai Calon Dinilai (${negRow.negeri})`, calonNegeriSelesai); }} className="px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 rounded font-black font-mono transition-all">
                                                       Dinilai: {negRow.totalDinilai} 🔍
                                                    </button>
                                                    <span className="text-emerald-400 font-mono">Layak: <b>{negRow.layak}</b></span>
@@ -1295,50 +988,35 @@
                                                 </div>
                                              </div>
 
-                                             {/* TINGKAT 2: SENARAI DAERAH / PPD */}
                                              {isNegeriOpen && (
                                                 <div className="p-4 bg-slate-900/80 border-t border-slate-800 space-y-3">
-                                                   <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">
-                                                      SENARAI DAERAH (PPD) DI {negRow.negeri}:
-                                                   </h4>
-                                                   
+                                                   <h4 className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">SENARAI DAERAH (PPD) DI {negRow.negeri}:</h4>
                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                       {listPpdNegeri.map((ppdName, pIdx) => {
                                                          const isDaerahOpen = selectedDaerahExpand === ppdName;
                                                          const calonPpdAll = calonList.filter(c => safeStr(c.ppd).toUpperCase() === ppdName && mapNegeriFromData(c) === negRow.negeri);
                                                          const calonPpdDinilai = consolidatedResults.filter(r => safeStr(r.ppd).toUpperCase() === ppdName);
                                                          
-                                                         // Pecahan Subjek dalam PPD ini
                                                          const subjekMapInPpd = {};
                                                          calonPpdAll.forEach(c => {
                                                             const sub = safeStr(c.sme_subjek).toUpperCase() || 'SME';
                                                             if (!subjekMapInPpd[sub]) subjekMapInPpd[sub] = { daftar: 0, dinilai: 0, layak: 0 };
                                                             subjekMapInPpd[sub].daftar++;
                                                             const foundEval = calonPpdDinilai.find(r => r.no_kp_calon === c.no_kp);
-                                                            if (foundEval) {
-                                                               subjekMapInPpd[sub].dinilai++;
-                                                               if (foundEval.status_lulus) subjekMapInPpd[sub].layak++;
-                                                            }
+                                                            if (foundEval) { subjekMapInPpd[sub].dinilai++; if (foundEval.status_lulus) subjekMapInPpd[sub].layak++; }
                                                          });
 
                                                          return (
                                                             <div key={pIdx} className="bg-slate-950 border border-slate-800 rounded-lg p-3 space-y-2">
                                                                <div className="flex justify-between items-center cursor-pointer hover:text-amber-400" onClick={() => setSelectedDaerahExpand(isDaerahOpen ? null : ppdName)}>
-                                                                  <span className="text-xs font-bold uppercase text-slate-200">
-                                                                     {isDaerahOpen ? '▼' : '►'} {ppdName}
-                                                                  </span>
+                                                                  <span className="text-xs font-bold uppercase text-slate-200">{isDaerahOpen ? '▼' : '►'} {ppdName}</span>
                                                                   <div className="flex items-center gap-2">
                                                                      <span className="text-[10px] font-mono text-slate-400">Total: {calonPpdAll.length}</span>
-                                                                     <button 
-                                                                        onClick={(e) => { e.stopPropagation(); handleOpenCalonDetail(`Senarai Calon Dinilai (${ppdName})`, calonPpdDinilai); }}
-                                                                        className="px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 rounded text-[10px] font-black font-mono transition-all"
-                                                                     >
+                                                                     <button onClick={(e) => { e.stopPropagation(); handleOpenCalonDetail(`Senarai Calon Dinilai (${ppdName})`, calonPpdDinilai); }} className="px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/30 rounded text-[10px] font-black font-mono transition-all">
                                                                         {calonPpdDinilai.length} Dinilai 🔍
                                                                      </button>
                                                                   </div>
                                                                </div>
-
-                                                               {/* TINGKAT 3: PECAHAN SUBJEK BAGI DAERAH TERSEBUT */}
                                                                {isDaerahOpen && (
                                                                   <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
                                                                      <p className="text-[10px] font-bold text-amber-400 uppercase">Pecahan Calon Ikut Subjek:</p>
@@ -1351,10 +1029,7 @@
                                                                                  <span className="font-semibold text-slate-300 uppercase">• {sName}</span>
                                                                                  <div className="flex items-center gap-2 font-mono text-[10px]">
                                                                                     <span className="text-slate-400">Daftar: <b className="text-white">{sData.daftar}</b></span>
-                                                                                    <button 
-                                                                                       onClick={() => handleOpenCalonDetail(`Calon ${sName} - ${ppdName}`, calonSubjekDinilai)}
-                                                                                       className="text-amber-400 hover:underline font-bold"
-                                                                                    >
+                                                                                    <button onClick={() => handleOpenCalonDetail(`Calon ${sName} - ${ppdName}`, calonSubjekDinilai)} className="text-amber-400 hover:underline font-bold">
                                                                                        Dinilai: {sData.dinilai} 🔍
                                                                                     </button>
                                                                                     <span className="text-emerald-400 font-bold">({sData.layak} Layak)</span>
@@ -1378,7 +1053,7 @@
                               </div>
                            )}
 
-                           {/* 3. IKUT SUBJEK DENGAN KLIK NOMBOR POPUP */}
+                           {/* 3. IKUT SUBJEK */}
                            {dataTambahanTab === 'subjek' && (
                               <div className="overflow-x-auto">
                                  <table className="w-full text-left text-xs border-collapse">
@@ -1387,7 +1062,7 @@
                                           <th className="p-3.5">SUBJEK / BIDANG KEPAKARAN (SME)</th>
                                           <th className="p-3.5 text-center">BIL. DAFTAR</th>
                                           <th className="p-3.5 text-center">SELESAI DINILAI (KLIK NOMBOR)</th>
-                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (&ge;75%)</th>
+                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (&gt;=75%)</th>
                                           <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
                                           <th className="p-3.5 text-center">KADAR KELULUSAN</th>
                                        </tr>
@@ -1400,10 +1075,7 @@
                                                 <td className="p-3.5 font-bold text-slate-200 uppercase">{row.subjek}</td>
                                                 <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
                                                 <td className="p-3.5 text-center font-mono">
-                                                   <button 
-                                                      onClick={() => handleOpenCalonDetail(`Senarai Calon Dinilai (Subjek: ${row.subjek})`, calonSubjekSelesai)}
-                                                      className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 rounded-lg font-black transition-all cursor-pointer"
-                                                   >
+                                                   <button onClick={() => handleOpenCalonDetail(`Senarai Calon Dinilai (Subjek: ${row.subjek})`, calonSubjekSelesai)} className="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 hover:text-slate-950 text-amber-300 border border-amber-500/40 rounded-lg font-black transition-all cursor-pointer">
                                                       {row.totalDinilai} Orang 🔍
                                                    </button>
                                                 </td>
@@ -1418,105 +1090,11 @@
                               </div>
                            )}
                         </div>
-                           </div>
-
-                           {/* 1. IKUT ZON */}
-                           {dataTambahanTab === 'zon' && (
-                              <div className="overflow-x-auto">
-                                 <table className="w-full text-left text-xs border-collapse">
-                                    <thead>
-                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
-                                          <th className="p-3.5">ZON</th>
-                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
-                                          <th className="p-3.5 text-center">SELESAI DINILAI</th>
-                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (≥75%)</th>
-                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
-                                          <th className="p-3.5 text-center">PERATUS SELESAI</th>
-                                       </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
-                                       {dataIkutZon.map((row, idx) => (
-                                          <tr key={idx} className="hover:bg-slate-800/40">
-                                             <td className="p-3.5 font-bold text-slate-200 uppercase">ZON {row.zon}</td>
-                                             <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
-                                             <td className="p-3.5 text-center font-mono text-amber-300">{row.totalDinilai}</td>
-                                             <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
-                                             <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
-                                             <td className="p-3.5 text-center font-mono font-bold text-amber-400">{row.peratusSelesai}%</td>
-                                          </tr>
-                                       ))}
-                                    </tbody>
-                                 </table>
-                              </div>
-                           )}
-
-                           {/* 2. IKUT NEGERI */}
-                           {dataTambahanTab === 'negeri' && (
-                              <div className="overflow-x-auto">
-                                 <table className="w-full text-left text-xs border-collapse">
-                                    <thead>
-                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
-                                          <th className="p-3.5">NEGERI</th>
-                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
-                                          <th className="p-3.5 text-center">SELESAI DINILAI</th>
-                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (≥75%)</th>
-                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
-                                          <th className="p-3.5 text-center">PERATUS SELESAI</th>
-                                       </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
-                                       {dataIkutNegeri.map((row, idx) => (
-                                          <tr key={idx} className="hover:bg-slate-800/40">
-                                             <td className="p-3.5 font-bold text-slate-200 uppercase">{row.negeri}</td>
-                                             <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
-                                             <td className="p-3.5 text-center font-mono text-amber-300">{row.totalDinilai}</td>
-                                             <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
-                                             <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
-                                             <td className="p-3.5 text-center font-mono font-bold text-amber-400">{row.peratusSelesai}%</td>
-                                          </tr>
-                                       ))}
-                                    </tbody>
-                                 </table>
-                              </div>
-                           )}
-
-                           {/* 3. IKUT SUBJEK */}
-                           {dataTambahanTab === 'subjek' && (
-                              <div className="overflow-x-auto">
-                                 <table className="w-full text-left text-xs border-collapse">
-                                    <thead>
-                                       <tr className="bg-slate-950 text-amber-400 uppercase border-b border-slate-800">
-                                          <th className="p-3.5">SUBJEK / BIDANG KEPAKARAN (SME)</th>
-                                          <th className="p-3.5 text-center">BIL. DAFTAR</th>
-                                          <th className="p-3.5 text-center">SELESAI DINILAI</th>
-                                          <th className="p-3.5 text-center text-emerald-400">LAYAK (≥75%)</th>
-                                          <th className="p-3.5 text-center text-rose-400">BELUM LAYAK</th>
-                                          <th className="p-3.5 text-center">KADAR KELULUSAN</th>
-                                       </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800/60 font-semibold">
-                                       {dataIkutSubjek.map((row, idx) => (
-                                          <tr key={idx} className="hover:bg-slate-800/40">
-                                             <td className="p-3.5 font-bold text-slate-200 uppercase">{row.subjek}</td>
-                                             <td className="p-3.5 text-center font-mono">{row.totalDaftar}</td>
-                                             <td className="p-3.5 text-center font-mono text-amber-300">{row.totalDinilai}</td>
-                                             <td className="p-3.5 text-center font-mono text-emerald-400 font-bold">{row.layak}</td>
-                                             <td className="p-3.5 text-center font-mono text-rose-400">{row.belumLayak}</td>
-                                             <td className="p-3.5 text-center font-mono font-bold text-emerald-400">{row.peratusLayak}%</td>
-                                          </tr>
-                                       ))}
-                                    </tbody>
-                                 </table>
-                              </div>
-                           )}
-                        </div>
-
                       </div>
                     )}
 
                     {activeTab === 'urus_calon' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
-                        
                         <div className="bg-slate-900 border border-amber-500/40 p-5 rounded-xl flex flex-wrap justify-between items-center gap-4">
                            <div>
                               <h3 className="text-sm font-extrabold text-amber-400 uppercase">Pendaftaran Pukal Calon (Google Sheets / Excel)</h3>
@@ -1535,14 +1113,8 @@
                         <div className="bg-slate-900 border border-emerald-500/30 p-6 rounded-xl shadow space-y-4">
                            <div className="flex flex-wrap justify-between items-center border-b border-slate-800 pb-2">
                               <h2 className="text-xl font-bold text-emerald-400">+ Tambah Calon Baharu Secara Manual</h2>
-                              
                               <label className="flex items-center gap-2 text-xs font-bold text-amber-300 cursor-pointer bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-                                 <input 
-                                    type="checkbox" 
-                                    checked={hasSubCenters} 
-                                    onChange={e => setHasSubCenters(e.target.checked)} 
-                                    className="w-4 h-4 accent-amber-500 rounded" 
-                                 />
+                                 <input type="checkbox" checked={hasSubCenters} onChange={e => setHasSubCenters(e.target.checked)} className="w-4 h-4 accent-amber-500 rounded" />
                                  <span>Zon Ini Mempunyai Pecahan Pusat Temu Duga</span>
                               </label>
                            </div>
@@ -1550,29 +1122,15 @@
                            {hasSubCenters && (
                               <div className="p-4 bg-slate-950 border border-amber-500/30 rounded-xl space-y-3">
                                  <div className="flex items-center gap-4">
-                                    <span className="text-xs font-bold text-slate-300 uppercase">Bilangan Pusat Temu Duga Bagi Zon Ini:</span>
-                                    <input 
-                                       type="number" 
-                                       min="1" 
-                                       max="10" 
-                                       value={numSubCenters} 
-                                       onChange={e => handleNumCentersChange(e.target.value)} 
-                                       className="w-20 p-2 bg-slate-900 border border-amber-500/50 rounded font-black text-amber-400 text-center text-sm" 
-                                    />
+                                    <span className="text-xs font-bold text-slate-300 uppercase">Bilangan Pusat:</span>
+                                    <input type="number" min="1" max="10" value={numSubCenters} onChange={e => handleNumCentersChange(e.target.value)} className="w-20 p-2 bg-slate-900 border border-amber-500/50 rounded font-black text-amber-400 text-center text-sm" />
                                     <span className="text-[11px] text-slate-500 italic">*Sistem menyediakan lajur nama pusat di bawah secara automatik</span>
                                  </div>
-
                                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800">
                                     {customCenterList.map((cName, idx) => (
                                        <div key={idx}>
                                           <label className="block text-[10px] font-bold text-emerald-400 uppercase mb-1">Nama Pusat {idx + 1}:</label>
-                                          <input 
-                                             type="text" 
-                                             value={cName} 
-                                             onChange={e => handleCenterNameChange(idx, e.target.value)} 
-                                             placeholder={`PUSAT ${idx + 1}`} 
-                                             className="w-full p-2 bg-slate-900 border border-slate-700 rounded text-xs font-extrabold text-slate-100 uppercase focus:border-emerald-500 focus:outline-none" 
-                                          />
+                                          <input type="text" value={cName} onChange={e => handleCenterNameChange(idx, e.target.value)} placeholder={`PUSAT ${idx + 1}`} className="w-full p-2 bg-slate-900 border border-slate-700 rounded text-xs font-extrabold text-slate-100 uppercase focus:border-emerald-500 focus:outline-none" />
                                        </div>
                                     ))}
                                  </div>
@@ -1582,19 +1140,12 @@
                            <form onSubmit={handleRegisterCalon} className="grid grid-cols-1 md:grid-cols-4 gap-4">
                               <input type="text" required placeholder="Nama Penuh Calon" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 col-span-2 uppercase font-bold" value={calonForm.nama_penuh} onChange={e => setCalonForm({...calonForm, nama_penuh: e.target.value.toUpperCase()})} />
                               <input type="text" required placeholder="No. Kad Pengenalan" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-mono" value={calonForm.no_kp} onChange={e => setCalonForm({...calonForm, no_kp: e.target.value})} />
-                              
                               <div>
                                  <input type="text" required list="list-zon-reg" placeholder="ZON (CTH: SARAWAK)" className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-sm font-bold text-amber-400 uppercase" value={calonForm.zon_temuduga} onChange={e => setCalonForm({...calonForm, zon_temuduga: e.target.value.toUpperCase()})} />
                                  <datalist id="list-zon-reg">
-                                    <option value="SARAWAK" />
-                                    <option value="SABAH" />
-                                    <option value="UTARA" />
-                                    <option value="TIMUR" />
-                                    <option value="TENGAH" />
-                                    <option value="SELATAN" />
+                                    <option value="SARAWAK" /><option value="SABAH" /><option value="UTARA" /><option value="TIMUR" /><option value="TENGAH" /><option value="SELATAN" />
                                  </datalist>
                               </div>
-
                               {hasSubCenters && (
                                  <div>
                                     <select required className="w-full p-3 bg-slate-950 border border-emerald-500/50 rounded text-sm font-extrabold text-emerald-400 uppercase" value={calonForm.pusat_temuduga} onChange={e => setCalonForm({...calonForm, pusat_temuduga: e.target.value.toUpperCase()})}>
@@ -1602,11 +1153,9 @@
                                     </select>
                                  </div>
                               )}
-
                               <select required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 font-bold" value={calonForm.sesi} onChange={e => setCalonForm({...calonForm, sesi: e.target.value})}>
                                  <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
                               </select>
-
                               <input type="date" required className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100" value={calonForm.tarikh} onChange={e => setCalonForm({...calonForm, tarikh: e.target.value})} />
                               <input type="text" placeholder="PPD / Tempat Bertugas" className="p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase" value={calonForm.ppd} onChange={e => setCalonForm({...calonForm, ppd: e.target.value.toUpperCase()})} />
                               <input type="text" placeholder="SME Subjek (Cth: BM, SC)" className={`p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 uppercase ${hasSubCenters ? 'col-span-1' : 'col-span-2'}`} value={calonForm.sme_subjek} onChange={e => setCalonForm({...calonForm, sme_subjek: e.target.value.toUpperCase()})} />
@@ -1622,15 +1171,12 @@
                             </div>
                             <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
                                <input type="text" placeholder="🔍 Cari Nama / KP..." className="w-full md:w-44 p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-xs focus:border-amber-500 focus:outline-none" value={searchCalon} onChange={(e) => setSearchCalon(e.target.value)} />
-                               
                                <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-xs font-bold focus:border-amber-500 focus:outline-none" value={filterZonCalon} onChange={(e) => {setFilterZonCalon(e.target.value); setFilterPusatCalon('SEMUA'); setFilterSesiCalon('SEMUA');}}>
                                   <option value="SEMUA">Semua Zon</option>{availableZonCalonList.map(z => <option key={z} value={z}>{z}</option>)}
                                </select>
-
                                <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-emerald-400 text-xs font-bold focus:border-amber-500 focus:outline-none" value={filterPusatCalon} onChange={(e) => setFilterPusatCalon(e.target.value)}>
                                   <option value="SEMUA">Semua Pusat</option>{availablePusatCalonList.map(p => <option key={p} value={p}>{p}</option>)}
                                </select>
-
                                <select className="p-2 border border-slate-700 rounded-lg bg-slate-950 text-slate-100 text-xs font-bold focus:border-amber-500 focus:outline-none disabled:opacity-50" value={filterSesiCalon} disabled={filterZonCalon === 'SEMUA'} onChange={(e) => setFilterSesiCalon(e.target.value)}>
                                   <option value="SEMUA">Semua Sesi</option>{availableSesiCalonList.map(s => <option key={s} value={s}>{s}</option>)}
                                </select>
@@ -1657,11 +1203,10 @@
                                      ) : displayedCalons.map(c => {
                                         const cPusatDisplay = safeStr(c.pusat_temuduga) || getPusatFromZonString(c.zon_temuduga) || '-';
                                         const cIndukDisplay = getParentZon(c.zon_temuduga);
-
                                         return editModeCalonKp === c.no_kp ? (
                                         <tr key={c.no_kp} className="bg-slate-800">
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600 uppercase font-bold" value={editCalonForm.nama_penuh} onChange={e => setEditCalonForm({...editCalonForm, nama_penuh: e.target.value.toUpperCase()})} /></td>
-                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white border border-slate-600" disabled value={editCalonForm.no_kp} /></td>
+                                           <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" disabled value={editCalonForm.no_kp} /></td>
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-amber-300 uppercase font-bold" value={editCalonForm.zon_temuduga} onChange={e => setEditCalonForm({...editCalonForm, zon_temuduga: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-emerald-300 uppercase font-bold" value={editCalonForm.pusat_temuduga || ''} onChange={e => setEditCalonForm({...editCalonForm, pusat_temuduga: e.target.value.toUpperCase()})} /></td>
                                            <td className="p-2"><input type="text" className="w-full p-2 bg-slate-900 rounded text-xs text-white uppercase" value={editCalonForm.sesi} onChange={e => setEditCalonForm({...editCalonForm, sesi: e.target.value.toUpperCase()})} /></td>
@@ -1716,12 +1261,10 @@
                                    <option value="TENGAH">ZON TENGAH</option>
                                    <option value="SELATAN">ZON SELATAN</option>
                                 </select>
-
                                 <div className="relative w-full md:w-28">
                                    <input type="number" min="0" max="100" value={minScore} onChange={e => setMinScore(e.target.value)} className="w-full p-3 border border-slate-700 rounded-lg text-xl font-bold bg-slate-950 text-emerald-400 focus:border-emerald-500 focus:outline-none text-center pr-8" />
                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-lg font-bold text-slate-500">%</span>
                                 </div>
-                                
                                 <div className="flex gap-2 w-full md:w-auto">
                                    <button onClick={handleDownloadExcel} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-5 py-3.5 rounded-lg shadow-lg transition-transform hover:scale-105 whitespace-nowrap">📊 Muat Turun Excel</button>
                                    <button onClick={() => window.print()} className="flex-1 md:flex-none bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold px-5 py-3.5 rounded-lg shadow-lg transition-transform hover:scale-105 whitespace-nowrap">🖨️ Cetak Senarai</button>
@@ -1734,7 +1277,6 @@
                                 <img src="logo-kpm.png" alt="Logo KPM" className="h-20 mx-auto mb-2 object-contain" />
                                 <h3 className="text-sm font-bold uppercase tracking-wider">Kementerian Pendidikan</h3>
                                 <h4 className="text-xs font-semibold text-slate-600 uppercase">Bahagian Profesionalisme Guru</h4>
-                                
                                 <h2 className="text-lg font-extrabold uppercase mt-3 tracking-wide border-b-2 border-slate-900 pb-1 inline-block">
                                    SENARAI KEPUTUSAN CALON SISC+ {laporanZon !== 'KESELURUHAN' ? `(ZON ${laporanZon.replace('ZON ', '')})` : '(KESELURUHAN)'}
                                 </h2>
@@ -1852,7 +1394,6 @@
                     {activeTab === 'panel' && (
                       <div className="no-print space-y-8 animate-[fadeIn_0.5s_ease-in-out]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          
                           <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-md">
                              <h2 className="text-lg font-bold text-amber-400 mb-4 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Panel</h2>
                              <form onSubmit={handleRegisterPanel} className="space-y-4">
@@ -1879,15 +1420,9 @@
                                   <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Zon Bertugas</label>
                                   <input type="text" required list="list-zon-panel" placeholder="ZON (CTH: SARAWAK)" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-amber-300 font-bold text-sm uppercase" value={penugasanForm.zon_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, zon_bertugas: e.target.value.toUpperCase()})} />
                                   <datalist id="list-zon-panel">
-                                     <option value="SARAWAK" />
-                                     <option value="SABAH" />
-                                     <option value="UTARA" />
-                                     <option value="TIMUR" />
-                                     <option value="TENGAH" />
-                                     <option value="SELATAN" />
+                                     <option value="SARAWAK" /><option value="SABAH" /><option value="UTARA" /><option value="TIMUR" /><option value="TENGAH" /><option value="SELATAN" />
                                   </datalist>
                                 </div>
-
                                 {hasSubCenters ? (
                                    <div>
                                      <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pusat Bertugas</label>
@@ -1901,20 +1436,12 @@
                                      <input type="text" disabled value="KESELURUHAN ZON (TIADA PUSAT)" className="w-full p-3 border border-slate-800 rounded bg-slate-950/60 text-slate-500 text-xs italic" />
                                    </div>
                                 )}
-
                                 <div>
                                   <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pilihan Sesi</label>
                                   <select required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm font-bold text-amber-400" value={penugasanForm.sesi_bertugas} onChange={(e) => setPenugasanForm({...penugasanForm, sesi_bertugas: e.target.value})}>
-                                    <option value="SEMUA SESI">SEMUA SESI</option>
-                                    <option value="SESI 1">SESI 1</option>
-                                    <option value="SESI 2">SESI 2</option>
-                                    <option value="SESI 3">SESI 3</option>
-                                    <option value="SESI 4">SESI 4</option>
-                                    <option value="SESI 5">SESI 5</option>
-                                    <option value="SESI KHAS">SESI KHAS</option>
+                                    <option value="SEMUA SESI">SEMUA SESI</option><option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI KHAS">SESI KHAS</option>
                                   </select>
                                 </div>
-
                                 <div>
                                   <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tahap Akses / Peranan</label>
                                   <select className="w-full p-3 border border-emerald-500/50 rounded bg-slate-950 text-emerald-300 text-sm font-bold" value={penugasanForm.peranan} onChange={(e) => setPenugasanForm({...penugasanForm, peranan: e.target.value})}>
@@ -1923,18 +1450,15 @@
                                     <option value="Ketua Panel Utama">Ketua Panel Utama</option>
                                   </select>
                                 </div>
-
                                 <div>
                                   <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Mula</label>
                                   <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_mula} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_mula: e.target.value})} />
                                 </div>
-
                                 <div>
                                   <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Tarikh Tamat</label>
                                   <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanForm.tarikh_tamat} onChange={(e) => setPenugasanForm({...penugasanForm, tarikh_tamat: e.target.value})} />
                                 </div>
                               </div>
-
                               <button type="submit" className="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-extrabold py-3 rounded text-sm mt-2">Tambah Penugasan Panel</button>
                             </form>
                           </div>
@@ -2060,9 +1584,7 @@
 
                     {activeTab === 'urus_setia' && (
                        <div className="no-print space-y-8">
-                          
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                             
                              <div className="bg-slate-900 border border-blue-500/30 p-6 rounded-xl shadow-md">
                                 <h2 className="text-xl font-bold text-blue-400 mb-6 border-b border-slate-800 pb-3">1. Daftar Profil Akaun Urus Setia</h2>
                                 <form onSubmit={handleRegisterUS} className="space-y-4">
@@ -2087,15 +1609,9 @@
                                          <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Zon Bertugas</label>
                                          <input type="text" required list="list-zon-us" placeholder="ZON" className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-amber-300 font-bold text-sm uppercase" value={penugasanUsForm.zon_bertugas} onChange={(e) => setPenugasanUsForm({...penugasanUsForm, zon_bertugas: e.target.value.toUpperCase()})} />
                                          <datalist id="list-zon-us">
-                                            <option value="SARAWAK" />
-                                            <option value="SABAH" />
-                                            <option value="UTARA" />
-                                            <option value="TIMUR" />
-                                            <option value="TENGAH" />
-                                            <option value="SELATAN" />
+                                            <option value="SARAWAK" /><option value="SABAH" /><option value="UTARA" /><option value="TIMUR" /><option value="TENGAH" /><option value="SELATAN" />
                                          </datalist>
                                       </div>
-
                                       {hasSubCenters ? (
                                          <div>
                                             <label className="block text-xs text-slate-400 font-bold uppercase mb-1">Pusat Bertugas</label>
@@ -2121,11 +1637,9 @@
                                          <input type="date" required className="w-full p-3 border border-slate-700 rounded bg-slate-950 text-slate-100 text-sm" value={penugasanUsForm.tarikh_tamat} onChange={(e) => setPenugasanUsForm({...penugasanUsForm, tarikh_tamat: e.target.value})} />
                                       </div>
                                    </div>
-
                                    <button type="submit" className="w-full mt-2 bg-indigo-500 hover:bg-indigo-600 text-white font-extrabold rounded-lg py-3 text-sm shadow-lg">Tambah Penugasan Urus Setia</button>
                                 </form>
                              </div>
-
                           </div>
 
                           <div className="bg-slate-900 border border-indigo-500/20 p-6 rounded-xl shadow-lg mt-8">
@@ -2202,7 +1716,6 @@
                              <h2 className="text-xl font-bold text-amber-400 border-b border-slate-800 pb-2">Kemaskini Kata Laluan Admin</h2>
                              <p className="text-xs text-slate-400 mt-1">Sila masukkan kata laluan semasa dan kata laluan baharu anda.</p>
                           </div>
-
                           <form onSubmit={handleChangeAdminPassword} className="space-y-4">
                              <div>
                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Username Utama</label>
@@ -2220,9 +1733,7 @@
                                 <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Sahkan Kata Laluan Baharu</label>
                                 <input type="password" required placeholder="••••••••" className="w-full p-3 bg-slate-950 border border-slate-700 rounded text-sm text-slate-100 focus:border-amber-500 focus:outline-none" value={passForm.confirmPass} onChange={e => setPassForm({...passForm, confirmPass: e.target.value})} />
                              </div>
-                             <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3.5 rounded-lg text-sm shadow-lg transition-transform active:scale-95 mt-2">
-                                SIMPAN KATA LALUAN BAHARU
-                             </button>
+                             <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3.5 rounded-lg text-sm shadow-lg transition-transform active:scale-95 mt-2">SIMPAN KATA LALUAN BAHARU</button>
                           </form>
                        </div>
                     )}
@@ -2230,6 +1741,7 @@
                </>
             )}
 
+            {/* MODAL MUAT NAIK PUKAL CALON */}
             {showBulkModal && (
                <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
                   <div className="bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4">
@@ -2237,50 +1749,21 @@
                         <h3 className="text-base font-extrabold text-amber-400 uppercase">📋 Muat Naik Pukal Calon (Google Sheets / CSV)</h3>
                         <button onClick={() => setShowBulkModal(false)} className="text-slate-400 hover:text-white font-bold text-lg">✕</button>
                      </div>
-
                      <div className="p-3 bg-slate-950 rounded-xl border border-blue-500/30 space-y-2">
-                        <label className="block text-blue-400 text-xs font-bold uppercase">
-                           Pautan Google Sheets (Publish to Web as CSV)
-                        </label>
+                        <label className="block text-blue-400 text-xs font-bold uppercase">Pautan Google Sheets (Publish to Web as CSV)</label>
                         <div className="flex gap-2">
-                           <input 
-                              type="text" 
-                              placeholder="Tampal URL Google Sheet di sini..." 
-                              className="flex-grow p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:border-blue-500 focus:outline-none" 
-                              value={bulkUrl} 
-                              onChange={e => setBulkUrl(e.target.value)} 
-                           />
-                           <button 
-                              type="button" 
-                              onClick={handleFetchFromUrl} 
-                              disabled={bulkLoading} 
-                              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow whitespace-nowrap"
-                           >
-                              {bulkLoading ? 'Menyedut...' : 'Sedut Data'}
-                           </button>
+                           <input type="text" placeholder="Tampal URL Google Sheet di sini..." className="flex-grow p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:border-blue-500 focus:outline-none" value={bulkUrl} onChange={e => setBulkUrl(e.target.value)} />
+                           <button type="button" onClick={handleFetchFromUrl} disabled={bulkLoading} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg shadow whitespace-nowrap">{bulkLoading ? 'Menyedut...' : 'Sedut Data'}</button>
                         </div>
                      </div>
-
                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                         <div>
                            <label className="block text-slate-400 font-bold uppercase mb-1">Zon Calon:</label>
-                           <input 
-                              type="text" 
-                              list="list-zon-bulk" 
-                              className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300 font-bold uppercase" 
-                              value={bulkZonTarget} 
-                              onChange={e => setBulkZonTarget(e.target.value.toUpperCase())} 
-                           />
+                           <input type="text" list="list-zon-bulk" className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-amber-300 font-bold uppercase" value={bulkZonTarget} onChange={e => setBulkZonTarget(e.target.value.toUpperCase())} />
                            <datalist id="list-zon-bulk">
-                              <option value="SARAWAK" />
-                              <option value="SABAH" />
-                              <option value="UTARA" />
-                              <option value="TIMUR" />
-                              <option value="TENGAH" />
-                              <option value="SELATAN" />
+                              <option value="SARAWAK" /><option value="SABAH" /><option value="UTARA" /><option value="TIMUR" /><option value="TENGAH" /><option value="SELATAN" />
                            </datalist>
                         </div>
-
                         <div>
                            <label className="block text-slate-400 font-bold uppercase mb-1">Pusat Calon:</label>
                            <select className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-emerald-300 font-bold uppercase" value={bulkPusatTarget} onChange={e => setBulkPusatTarget(e.target.value)}>
@@ -2288,55 +1771,31 @@
                               {customCenterList.map(c => <option key={c} value={c}>{c}</option>)}
                            </select>
                         </div>
-
                         <div>
                            <label className="block text-slate-400 font-bold uppercase mb-1">Tetapan Sesi:</label>
                            <select className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-slate-200 font-bold" value={bulkDefaultSesi} onChange={e => setBulkDefaultSesi(e.target.value)}>
                               <option value="AUTO">✨ AUTO DARI LAJUR</option>
-                              <option value="SESI 1">SESI 1</option>
-                              <option value="SESI 2">SESI 2</option>
-                              <option value="SESI 3">SESI 3</option>
-                              <option value="SESI 4">SESI 4</option>
-                              <option value="SESI 5">SESI 5</option>
-                              <option value="SESI 6">SESI 6</option>
+                              <option value="SESI 1">SESI 1</option><option value="SESI 2">SESI 2</option><option value="SESI 3">SESI 3</option><option value="SESI 4">SESI 4</option><option value="SESI 5">SESI 5</option><option value="SESI 6">SESI 6</option>
                            </select>
                         </div>
-
                         <div>
                            <label className="block text-slate-400 font-bold uppercase mb-1">Bilik Lalai:</label>
-                           <input 
-                              type="text" 
-                              className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-slate-100 font-bold uppercase text-xs" 
-                              value={bulkBilikDefault} 
-                              onChange={e => setBulkBilikDefault(e.target.value.toUpperCase())} 
-                              placeholder="BILIK 1" 
-                           />
+                           <input type="text" className="w-full p-2 bg-slate-950 border border-slate-700 rounded text-slate-100 font-bold uppercase text-xs" value={bulkBilikDefault} onChange={e => setBulkBilikDefault(e.target.value.toUpperCase())} placeholder="BILIK 1" />
                         </div>
                      </div>
-
                      <div>
-                        <label className="block text-slate-300 text-xs font-bold uppercase mb-1">
-                           Data Helaian yang Disedut / Tampalan:
-                        </label>
-                        <textarea 
-                           rows="6" 
-                           placeholder="Data akan muncul di sini secara automatik selepas menekan butang 'Sedut Data'..." 
-                           className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-slate-200 focus:border-amber-500 focus:outline-none" 
-                           value={bulkText} 
-                           onChange={e => setBulkText(e.target.value)} 
-                        />
+                        <label className="block text-slate-300 text-xs font-bold uppercase mb-1">Data Helaian yang Disedut / Tampalan:</label>
+                        <textarea rows="5" placeholder="Data akan muncul di sini secara automatik..." className="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-xs font-mono text-slate-200 focus:border-amber-500 focus:outline-none" value={bulkText} onChange={e => setBulkText(e.target.value)} />
                      </div>
-
                      <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
                         <button onClick={() => setShowBulkModal(false)} className="px-4 py-2 bg-slate-800 text-slate-300 font-bold rounded-lg text-xs">Batal</button>
-                        <button onClick={handleProcessBulkUpload} disabled={bulkLoading} className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs shadow-lg transition-transform active:scale-95">
-                           {bulkLoading ? 'Sedang Memproses...' : '🚀 Sahkan & Masukkan Calon'}
-                        </button>
+                        <button onClick={handleProcessBulkUpload} disabled={bulkLoading} className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs shadow-lg transition-transform active:scale-95">{bulkLoading ? 'Sedang Memproses...' : '🚀 Sahkan & Masukkan Calon'}</button>
                      </div>
                   </div>
                </div>
             )}
-{/* TETINGKAP TIMBUL (MODAL) BUTIRAN SETIAP CALON SELESAI DINILAI */}
+
+            {/* MODAL POPUP BUTIRAN SETIAP CALON SELESAI DINILAI */}
             {showDetailModal && (
                <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
                   <div className="bg-slate-900 border-2 border-amber-500/50 rounded-2xl p-6 max-w-4xl w-full shadow-2xl space-y-4 animate-[fadeIn_0.3s_ease-in-out]">
@@ -2347,7 +1806,6 @@
                         </div>
                         <button onClick={() => setShowDetailModal(false)} className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-bold text-sm">✕ Tutup</button>
                      </div>
-
                      <div className="overflow-x-auto max-h-[450px] overflow-y-auto pr-1">
                         <table className="w-full text-left text-xs border-collapse">
                            <thead className="bg-slate-950 sticky top-0 shadow z-10">
@@ -2384,15 +1842,13 @@
                            </tbody>
                         </table>
                      </div>
-
                      <div className="flex justify-end pt-2 border-t border-slate-800">
-                        <button onClick={() => setShowDetailModal(false)} className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs">
-                           Selesai
-                        </button>
+                        <button onClick={() => setShowDetailModal(false)} className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-lg text-xs">Selesai</button>
                      </div>
                   </div>
                </div>
             )}
+
           </div>
         );
       }
